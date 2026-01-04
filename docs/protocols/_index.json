@@ -1,0 +1,33 @@
+{
+  "name": "BFM Protocols Knowledge Base",
+  "description": "Health protocols, lab interpretation guides, and care documentation for BFM Copilot",
+  "version": "1.0",
+  "last_updated": "2025-01-01",
+  "categories": [
+    {
+      "path": "endocrine",
+      "name": "Endocrine System",
+      "description": "Thyroid, adrenal, metabolic, and hormone protocols"
+    },
+    {
+      "path": "cardiovascular",
+      "name": "Cardiovascular System",
+      "description": "Heart health, lipid management, blood pressure protocols"
+    },
+    {
+      "path": "digestive",
+      "name": "Digestive System",
+      "description": "GI health, gut protocols, liver support"
+    },
+    {
+      "path": "care-guides",
+      "name": "Care Guides",
+      "description": "Cross-system care guides and general protocols"
+    },
+    {
+      "path": "reference",
+      "name": "Reference Materials",
+      "description": "Lab reference ranges, quick references"
+    }
+  ]
+}

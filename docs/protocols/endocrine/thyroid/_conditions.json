@@ -1,0 +1,6 @@
+{
+  "primary_conditions": ["hypothyroidism", "hyperthyroidism", "hashimotos", "graves_disease"],
+  "related_conditions": ["adrenal_fatigue", "iron_deficiency", "vitamin_d_deficiency"],
+  "common_symptoms": ["fatigue", "weight_gain", "hair_loss", "cold_intolerance", "brain_fog"],
+  "key_lab_markers": ["tsh", "free_t4", "free_t3", "reverse_t3", "tpo_antibodies", "tg_antibodies"]
+}

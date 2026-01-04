@@ -1,0 +1,160 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { useRoleView } from '@/providers/RoleViewProvider'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  BubbleChatIcon,
+  Pulse01Icon,
+  TestTubeIcon,
+  UserGroupIcon,
+  File01Icon,
+  SlidersHorizontalIcon,
+  Settings01Icon,
+  StarIcon,
+  HealthIcon,
+} from '@hugeicons/core-free-icons'
+
+interface NavItem {
+  label: string
+  href: string
+  icon: string
+}
+
+// Navigation items for practitioners
+const PRACTITIONER_NAV_ITEMS: NavItem[] = [
+  { label: 'Chats', href: '/chats', icon: 'Chats' },
+  { label: 'Diagnostics', href: '/diagnostics', icon: 'Diagnostics' },
+  { label: 'Labs', href: '/labs', icon: 'Labs' },
+  { label: 'Patients', href: '/patients', icon: 'Patients' },
+  { label: 'Protocols', href: '/protocols', icon: 'Protocols' },
+  { label: 'Settings', href: '/settings', icon: 'Settings' },
+]
+
+// Navigation items for members - uses softer, non-clinical language
+const MEMBER_NAV_ITEMS: NavItem[] = [
+  { label: 'Chat', href: '/', icon: 'Chats' },
+  { label: 'Labs', href: '/my-labs', icon: 'Labs' },
+  { label: 'myHealth', href: '/my-health', icon: 'myHealth' },
+  { label: 'Suggestions', href: '/suggestions', icon: 'Suggestions' },
+  { label: 'Settings', href: '/settings', icon: 'Settings' },
+]
+
+// Admin link - always visible for admins
+const ADMIN_NAV_ITEM: NavItem = { label: 'Admin', href: '/admin', icon: 'Admin' }
+
+interface NavigationProps {
+  isCollapsed?: boolean
+}
+
+const TRANSITION_TIMING = 'cubic-bezier(0.4, 0, 0.2, 1)'
+const TRANSITION_DURATION = '300ms'
+
+// Icon mapping for navigation items using Hugeicons
+const NAV_ICONS: Record<string, typeof BubbleChatIcon> = {
+  Chats: BubbleChatIcon,
+  Diagnostics: Pulse01Icon,
+  Labs: TestTubeIcon,
+  Patients: UserGroupIcon,
+  Protocols: File01Icon,
+  Admin: SlidersHorizontalIcon,
+  Settings: Settings01Icon,
+  Suggestions: StarIcon,
+  myHealth: HealthIcon,
+}
+
+function NavIcon({ iconKey }: { iconKey: string }) {
+  const icon = NAV_ICONS[iconKey] || BubbleChatIcon
+  return <HugeiconsIcon icon={icon} size={20} strokeWidth={2} className="flex-shrink-0" />
+}
+
+export function Navigation({ isCollapsed = false }: NavigationProps) {
+  const pathname = usePathname()
+  const { effectiveRole, isAdmin } = useRoleView()
+
+  // Select nav items based on effective role (view mode for admins)
+  const navItems = effectiveRole === 'member' ? MEMBER_NAV_ITEMS : PRACTITIONER_NAV_ITEMS
+
+  return (
+    <nav className="space-y-1">
+      {navItems.map((item) => {
+        // Check if active - handle home route specially
+        const isActive = item.href === '/'
+          ? pathname === '/'
+          : pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'group relative flex items-center gap-3 rounded-lg text-base font-semibold',
+              'transition-colors duration-200 h-10 px-[10px]',
+              isActive
+                ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50'
+                : 'text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            )}
+            style={{
+              width: isCollapsed ? '40px' : '100%',
+              transition: `width ${TRANSITION_DURATION} ${TRANSITION_TIMING}`,
+            }}
+          >
+            {/* Tooltip when collapsed */}
+            {isCollapsed && (
+              <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                {item.label}
+              </span>
+            )}
+            <NavIcon iconKey={item.icon} />
+            <span
+              className="whitespace-nowrap"
+              style={{
+                opacity: isCollapsed ? 0 : 1,
+                transition: `opacity ${TRANSITION_DURATION} ${TRANSITION_TIMING}`,
+              }}
+            >
+              {item.label}
+            </span>
+          </Link>
+        )
+      })}
+
+      {/* Admin link - always visible for admins regardless of view mode */}
+      {isAdmin && (
+        <Link
+          href={ADMIN_NAV_ITEM.href}
+          className={cn(
+            'group relative flex items-center gap-3 rounded-lg text-base font-semibold',
+            'transition-colors duration-200 h-10 px-[10px]',
+            pathname.startsWith('/admin')
+              ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50'
+              : 'text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          )}
+          style={{
+            width: isCollapsed ? '40px' : '100%',
+            transition: `width ${TRANSITION_DURATION} ${TRANSITION_TIMING}`,
+          }}
+        >
+          {/* Tooltip when collapsed */}
+          {isCollapsed && (
+            <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              {ADMIN_NAV_ITEM.label}
+            </span>
+          )}
+          <NavIcon iconKey={ADMIN_NAV_ITEM.icon} />
+          <span
+            className="whitespace-nowrap"
+            style={{
+              opacity: isCollapsed ? 0 : 1,
+              transition: `opacity ${TRANSITION_DURATION} ${TRANSITION_TIMING}`,
+            }}
+          >
+            {ADMIN_NAV_ITEM.label}
+          </span>
+        </Link>
+      )}
+    </nav>
+  )
+}

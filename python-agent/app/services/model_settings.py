@@ -1,0 +1,155 @@
+"""
+Model Settings Service
+
+Fetches model configuration from the Next.js API with caching.
+Falls back to environment variables if the API is unavailable.
+"""
+
+import time
+import httpx
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class ModelSettings:
+    """Model configuration settings."""
+    chat_model: str
+    reasoning_effort: str
+    reasoning_summary: str
+
+
+class ModelSettingsService:
+    """Service for fetching and caching model settings."""
+
+    def __init__(
+        self,
+        api_url: str,
+        cache_ttl_seconds: int = 60,
+        default_model: str = "gpt-5.2",
+        default_reasoning_effort: str = "high",
+        default_reasoning_summary: str = "detailed",
+    ):
+        self.api_url = api_url
+        self.cache_ttl_seconds = cache_ttl_seconds
+        self.default_model = default_model
+        self.default_reasoning_effort = default_reasoning_effort
+        self.default_reasoning_summary = default_reasoning_summary
+
+        self._cached_settings: Optional[ModelSettings] = None
+        self._cache_timestamp: float = 0
+
+    def _is_cache_valid(self) -> bool:
+        """Check if the cached settings are still valid."""
+        if self._cached_settings is None:
+            return False
+        return (time.time() - self._cache_timestamp) < self.cache_ttl_seconds
+
+    def _get_defaults(self) -> ModelSettings:
+        """Return default settings from environment variables."""
+        return ModelSettings(
+            chat_model=self.default_model,
+            reasoning_effort=self.default_reasoning_effort,
+            reasoning_summary=self.default_reasoning_summary,
+        )
+
+    async def get_settings(self) -> ModelSettings:
+        """
+        Get current model settings.
+
+        First checks the cache, then fetches from API if cache is stale.
+        Falls back to defaults if API is unavailable.
+        """
+        # Return cached settings if still valid
+        if self._is_cache_valid():
+            return self._cached_settings  # type: ignore
+
+        # Try to fetch from API
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self.api_url}/api/settings/models")
+
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    self._cached_settings = ModelSettings(
+                        chat_model=data.get("chat_model", self.default_model),
+                        reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
+                        reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
+                    )
+                    self._cache_timestamp = time.time()
+                    return self._cached_settings
+                else:
+                    # API returned error, use defaults
+                    return self._get_defaults()
+
+        except Exception as e:
+            # API unavailable, use defaults
+            print(f"Failed to fetch model settings from API: {e}")
+            return self._get_defaults()
+
+    def get_settings_sync(self) -> ModelSettings:
+        """
+        Synchronous version of get_settings.
+
+        Useful for contexts where async is not available.
+        """
+        # Return cached settings if still valid
+        if self._is_cache_valid():
+            return self._cached_settings  # type: ignore
+
+        # Try to fetch from API
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"{self.api_url}/api/settings/models")
+
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    self._cached_settings = ModelSettings(
+                        chat_model=data.get("chat_model", self.default_model),
+                        reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
+                        reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
+                    )
+                    self._cache_timestamp = time.time()
+                    return self._cached_settings
+                else:
+                    return self._get_defaults()
+
+        except Exception as e:
+            print(f"Failed to fetch model settings from API: {e}")
+            return self._get_defaults()
+
+    def invalidate_cache(self) -> None:
+        """Force the next request to fetch fresh settings."""
+        self._cached_settings = None
+        self._cache_timestamp = 0
+
+
+# Singleton instance (will be initialized in main.py)
+_model_settings_service: Optional[ModelSettingsService] = None
+
+
+def get_model_settings_service() -> ModelSettingsService:
+    """Get the model settings service singleton."""
+    global _model_settings_service
+    if _model_settings_service is None:
+        raise RuntimeError("ModelSettingsService not initialized. Call init_model_settings_service first.")
+    return _model_settings_service
+
+
+def init_model_settings_service(
+    api_url: str,
+    default_model: str = "gpt-5.2",
+    default_reasoning_effort: str = "high",
+    default_reasoning_summary: str = "detailed",
+    cache_ttl_seconds: int = 60,
+) -> ModelSettingsService:
+    """Initialize the model settings service singleton."""
+    global _model_settings_service
+    _model_settings_service = ModelSettingsService(
+        api_url=api_url,
+        cache_ttl_seconds=cache_ttl_seconds,
+        default_model=default_model,
+        default_reasoning_effort=default_reasoning_effort,
+        default_reasoning_summary=default_reasoning_summary,
+    )
+    return _model_settings_service

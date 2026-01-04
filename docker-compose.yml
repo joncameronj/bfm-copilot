@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  python-agent:
+    build: ./python-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.2}
+      - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - DEBUG=true
+      - CORS_ORIGINS=["http://localhost:3000"]
+      - REASONING_EFFORT=${REASONING_EFFORT:-high}
+      - REASONING_SUMMARY=${REASONING_SUMMARY:-detailed}
+    volumes:
+      - ./python-agent:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

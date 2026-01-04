@@ -1,0 +1,7 @@
+export { SettingsLayout } from './SettingsLayout'
+export { ProfileSection } from './ProfileSection'
+export { PasswordSection } from './PasswordSection'
+export { NotificationsSection } from './NotificationsSection'
+export { AdminSettingsSection } from './AdminSettingsSection'
+export { PractitionerSettingsSection } from './PractitionerSettingsSection'
+export { MemberSettingsSection } from './MemberSettingsSection'

@@ -1,0 +1,17 @@
+{
+  "name": "Endocrine System",
+  "body_system": "endocrine",
+  "description": "Protocols and guides for endocrine system conditions including thyroid, adrenal, and metabolic disorders.",
+  "subcategories": [
+    {
+      "path": "thyroid",
+      "name": "Thyroid",
+      "conditions": ["hypothyroidism", "hyperthyroidism", "hashimotos", "graves_disease"]
+    },
+    {
+      "path": "adrenal",
+      "name": "Adrenal",
+      "conditions": ["adrenal_fatigue", "adrenal_insufficiency", "cushings"]
+    }
+  ]
+}

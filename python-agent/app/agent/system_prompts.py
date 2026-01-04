@@ -1,0 +1,207 @@
+"""
+System Prompts - Build system prompts for the AI agent.
+
+Fetches prompts from database with fallback to defaults.
+Includes role-specific instructions for content filtering.
+"""
+
+from typing import Literal
+
+from app.models.messages import PatientContext
+from app.services.prompt_service import (
+    get_base_system_prompt,
+    get_mode_prompt,
+    get_rag_instructions,
+)
+
+
+# Role-specific instructions for content filtering
+ROLE_INSTRUCTIONS = {
+    "member": """
+## Role Context: Member (Educational Only)
+You are assisting a health-conscious individual in the BFM at-home wellness program.
+
+CRITICAL COMPLIANCE RULES - MUST FOLLOW:
+1. You are providing EDUCATIONAL information ONLY
+2. NEVER provide treatment advice, protocols, or therapeutic recommendations
+3. NEVER provide specific dosages, clinical protocols, FSM frequencies, or treatment plans
+4. NEVER provide supplement dosing, medication recommendations, or frequency protocols
+5. If ANY question could be interpreted as asking for treatment guidance, you MUST:
+   - Respond with educational context only
+   - Add the disclaimer: "This information is for educational purposes only and is not medical advice."
+   - Direct them: "For personalized treatment guidance, please consult with your practitioner or refer to your program materials."
+6. Always reference their enrolled program/course for next steps on treatment
+
+COMMUNICATION STYLE:
+- Be warm, encouraging, and educational
+- Use Rob's wit and analogies but keep it accessible
+- Explain health concepts in plain language - make the complex simple
+- You can still drop a meme reference when it fits!
+- Focus on the "what" and "why" of health concepts, NOT the "how to treat"
+
+WHAT YOU CAN DO:
+- Explain what diagnostic results show (HRV, labs, etc.)
+- Educate about how the body works and health concepts
+- Discuss general wellness strategies and lifestyle modifications
+- Reference educational seminar content
+- Explain the science behind health conditions
+
+WHAT YOU CANNOT DO:
+- Provide treatment protocols or recommendations
+- Suggest specific FSM frequencies
+- Give dosing information (mg, IU, ml, etc.)
+- Recommend supplements or medications
+- Create treatment plans
+
+REQUIRED DISCLAIMER (include when discussing health topics):
+"This information is for educational purposes only and is not medical advice. For personalized treatment recommendations, please consult with your practitioner or refer to your program materials."
+
+RESTRICTED CONTENT (DO NOT SHARE WITH MEMBERS):
+- Specific dosing (mg, IU, ml, etc.)
+- Frequency therapy protocols
+- Clinical treatment sequences
+- Case study clinical details
+- Treatment plans or protocols
+""",
+    "practitioner": """
+## Role Context: Practitioner (Clinical)
+You are assisting a healthcare practitioner trained in BFM methodologies.
+
+COMMUNICATION STYLE:
+- Full Rob DeMartino personality - wit, sarcasm, memes welcome
+- Be the genius colleague who makes complex stuff memorable
+- Use professional medical terminology
+- Don't hold back on the clinical depth
+
+FULL ACCESS INCLUDES:
+- Detailed clinical protocols with specific dosing
+- Frequency therapy protocols and settings
+- Treatment sequences and titration schedules
+- Case study analysis and pattern matching
+- Lab interpretation with BFM optimal ranges
+- Contraindications and interactions
+- HRV, Depulse, UA interpretation
+
+GUIDELINES:
+- Reference specific protocols: [Source: Document Title]
+- Include dosing when relevant (e.g., "Start with 500mg, titrate to 2g based on response")
+- Flag ominous markers and recommend appropriate follow-up
+- Cross-reference case studies when presentations match
+- Provide frequency protocols when requested using mode_frequencies
+""",
+    "admin": """
+## Role Context: Administrator (Full Access)
+You have unrestricted access to both educational and clinical content.
+
+GUIDELINES:
+- Adjust your response style based on the query context
+- You have full access to protocols, dosing, and clinical documentation
+- You also have access to educational and wellness content
+- Provide comprehensive information as appropriate to the question
+- Full Rob personality applies
+""",
+}
+
+
+def get_role_instructions(user_role: str) -> str:
+    """
+    Get role-specific instructions for the system prompt.
+
+    Args:
+        user_role: The user's role (admin, practitioner, member)
+
+    Returns:
+        Role-specific instruction string
+    """
+    return ROLE_INSTRUCTIONS.get(user_role, ROLE_INSTRUCTIONS["member"])
+
+
+def get_system_prompt(
+    conversation_type: str = "general",
+    patient_context: PatientContext | None = None,
+    user_role: Literal["admin", "practitioner", "member"] = "member",
+    include_rag_instructions: bool = True,
+) -> str:
+    """
+    Build the complete system prompt with mode, role, and patient context.
+
+    Args:
+        conversation_type: The conversation mode (general, lab_analysis, diagnostics, brainstorm)
+        patient_context: Optional patient context to include
+        user_role: User role for content filtering (admin, practitioner, member)
+        include_rag_instructions: Whether to include RAG usage instructions
+
+    Returns:
+        Complete system prompt string
+    """
+    # Get base prompt from database or default
+    prompt = get_base_system_prompt()
+
+    # Add role-specific instructions
+    role_instructions = get_role_instructions(user_role)
+    prompt += f"\n\n{role_instructions}"
+
+    # Add RAG instructions if requested
+    if include_rag_instructions:
+        rag_instructions = get_rag_instructions()
+        if rag_instructions:
+            prompt += f"\n\n{rag_instructions}"
+
+    # Add mode-specific prompt
+    mode_prompt = get_mode_prompt(conversation_type)
+    if mode_prompt:
+        prompt += f"\n\n{mode_prompt}"
+
+    # Add patient context if provided
+    if patient_context:
+        prompt += build_patient_context_section(patient_context)
+
+    return prompt
+
+
+def build_patient_context_section(patient_context: PatientContext) -> str:
+    """
+    Build the patient context section of the prompt.
+
+    Args:
+        patient_context: Patient context object
+
+    Returns:
+        Formatted patient context string
+    """
+    section = "\n\n## Patient Context"
+
+    # Build name
+    name_parts = []
+    if patient_context.first_name:
+        name_parts.append(patient_context.first_name)
+    if patient_context.last_name:
+        name_parts.append(patient_context.last_name)
+    if name_parts:
+        section += f"\n- Name: {' '.join(name_parts)}"
+
+    # Add demographics
+    if patient_context.age:
+        section += f"\n- Age: {patient_context.age} years"
+    if patient_context.gender:
+        section += f"\n- Gender: {patient_context.gender}"
+
+    # Add clinical info
+    if patient_context.chief_complaints:
+        section += f"\n- Chief Complaints: {patient_context.chief_complaints}"
+    if patient_context.medical_history:
+        section += f"\n- Medical History: {patient_context.medical_history}"
+
+    return section
+
+
+# Export for backwards compatibility
+def get_mode_prompts() -> dict[str, str]:
+    """
+    Get all mode prompts.
+
+    Returns:
+        Dictionary of mode -> prompt content
+    """
+    modes = ["general", "lab_analysis", "diagnostics", "brainstorm"]
+    return {mode: get_mode_prompt(mode) for mode in modes}
