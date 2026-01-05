@@ -21,7 +21,7 @@ interface UploadFile {
 interface DiagnosticsUploadProps {
   patientId?: string
   uploadId?: string
-  onComplete?: (files: UploadFile[], uploadId?: string) => void
+  onComplete?: (files: UploadFile[], uploadId?: string, statusUpdated?: boolean) => void
   onAnalysisGenerated?: (analysisId: string) => void
   showGenerateButton?: boolean
 }
@@ -43,7 +43,6 @@ export function DiagnosticsUpload({
     const lower = filename.toLowerCase()
     if (lower.includes('pulse') || lower.includes('dpulse') || lower.includes('depulse')) return 'd_pulse'
     if (lower.includes('hrv')) return 'hrv'
-    if (lower.includes('ua') || lower.includes('urinalysis')) return 'ua'
     if (lower.includes('nes') || lower.includes('nes scan')) return 'nes_scan'
     if (lower.includes('mold') || lower.includes('mycotox')) return 'mold_toxicity'
     if (lower.includes('blood') || lower.includes('lab') || lower.includes('cbc')) return 'blood_panel'
@@ -146,6 +145,7 @@ export function DiagnosticsUpload({
     const allUploaded = updatedFiles.every((f) => f.status === 'complete')
 
     // Mark the upload batch as 'uploaded' (ready for analysis) with retry logic
+    let statusUpdateSuccess = false
     if (allUploaded && currentUploadId) {
       const updateStatus = async (retries = 3): Promise<boolean> => {
         for (let i = 0; i < retries; i++) {
@@ -166,11 +166,12 @@ export function DiagnosticsUpload({
         }
         return false
       }
-      await updateStatus()
+      statusUpdateSuccess = await updateStatus()
     }
 
     setIsUploading(false)
-    onComplete?.(updatedFiles, currentUploadId)
+    // Pass success status to callback so it can handle toast appropriately
+    onComplete?.(updatedFiles, currentUploadId, statusUpdateSuccess)
   }
 
   const generateAnalysis = async () => {

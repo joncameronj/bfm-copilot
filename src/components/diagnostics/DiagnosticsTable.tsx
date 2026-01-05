@@ -35,8 +35,6 @@ export function DiagnosticsTable({ files, isLoading = false, onRefresh }: Diagno
         return 'D-Pulse'
       case 'hrv':
         return 'HRV'
-      case 'ua':
-        return 'UA'
       case 'nes_scan':
         return 'NES Scan'
       case 'mold_toxicity':

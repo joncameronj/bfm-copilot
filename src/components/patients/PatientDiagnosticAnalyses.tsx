@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Loading03Icon, FileSearchIcon, Add01Icon } from '@hugeicons/core-free-icons'
+import { Loading03Icon, FileSearchIcon, Add01Icon, AiMagicIcon, File01Icon } from '@hugeicons/core-free-icons'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { DiagnosticAnalysisPanel } from '@/components/diagnostics/DiagnosticAnalysisPanel'
 import type { DiagnosticAnalysisWithRecommendations, ProtocolRecommendation } from '@/types/diagnostic-analysis'
 import { formatDate } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 
 interface PatientDiagnosticAnalysesProps {
   patientId: string
@@ -48,31 +49,79 @@ interface AnalysisData {
   }>
 }
 
+interface PendingUpload {
+  id: string
+  status: string
+  createdAt: string
+  files: Array<{
+    id: string
+    filename: string
+    fileType: string
+  }>
+}
+
 export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalysesProps) {
   const [analyses, setAnalyses] = useState<AnalysisData[]>([])
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [generatingId, setGeneratingId] = useState<string | null>(null)
 
-  const fetchAnalyses = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch(`/api/patients/${patientId}/analyses`)
-      if (res.ok) {
-        const data = await res.json()
+      // Fetch analyses and pending uploads in parallel
+      const [analysesRes, uploadsRes] = await Promise.all([
+        fetch(`/api/patients/${patientId}/analyses`),
+        fetch(`/api/diagnostics?patientId=${patientId}`)
+      ])
+
+      if (analysesRes.ok) {
+        const data = await analysesRes.json()
         setAnalyses(data.data || [])
-        // Auto-expand the first one if there's only one
         if (data.data?.length === 1) {
           setExpandedId(data.data[0].id)
         }
       }
+
+      if (uploadsRes.ok) {
+        const data = await uploadsRes.json()
+        // Filter to only show uploads that don't have an analysis yet
+        const analysisUploadIds = new Set(analyses.map(a => a.diagnostic_upload_id))
+        const pending = (data.data || []).filter(
+          (upload: PendingUpload) => !analysisUploadIds.has(upload.id) && upload.status === 'uploaded'
+        )
+        setPendingUploads(pending)
+      }
     } catch (error) {
-      console.error('Failed to fetch analyses:', error)
+      console.error('Failed to fetch data:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleGenerateAnalysis = async (uploadId: string) => {
+    setGeneratingId(uploadId)
+    try {
+      const response = await fetch(`/api/diagnostics/${uploadId}/generate-analysis`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate analysis')
+      }
+
+      toast.success('Analysis generated successfully')
+      fetchData() // Refresh the data
+    } catch (error) {
+      console.error('Analysis generation failed:', error)
+      toast.error('Failed to generate analysis')
+    } finally {
+      setGeneratingId(null)
+    }
+  }
+
   useEffect(() => {
-    fetchAnalyses()
+    fetchData()
   }, [patientId])
 
   const transformToAnalysisWithRecommendations = (data: AnalysisData): DiagnosticAnalysisWithRecommendations => {
@@ -137,8 +186,49 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
         </Link>
       </div>
 
+      {/* Pending Uploads - Ready for Analysis */}
+      {pendingUploads.length > 0 && (
+        <div className="border-b border-neutral-100 dark:border-neutral-700">
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20">
+            <div className="flex items-center gap-2 mb-3">
+              <HugeiconsIcon icon={File01Icon} size={18} className="text-yellow-600 dark:text-yellow-400" />
+              <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                Pending Uploads ({pendingUploads.length})
+              </span>
+            </div>
+            <div className="space-y-3">
+              {pendingUploads.map((upload) => (
+                <div
+                  key={upload.id}
+                  className="flex items-center justify-between p-3 bg-white dark:bg-neutral-800 rounded-lg"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                      {upload.files?.length || 0} files uploaded
+                    </p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {formatDate(upload.createdAt)} •{' '}
+                      {upload.files?.map(f => f.fileType.replace('_', ' ')).join(', ')}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleGenerateAnalysis(upload.id)}
+                    isLoading={generatingId === upload.id}
+                    className="flex items-center gap-2"
+                    size="sm"
+                  >
+                    <HugeiconsIcon icon={AiMagicIcon} size={16} />
+                    Generate Analysis
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
-      {analyses.length === 0 ? (
+      {analyses.length === 0 && pendingUploads.length === 0 ? (
         <div className="p-8 text-center">
           <div className="w-16 h-16 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <HugeiconsIcon icon={FileSearchIcon} size={28} className="text-neutral-400" />
@@ -151,6 +241,8 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
             <Button>Upload Diagnostics</Button>
           </Link>
         </div>
+      ) : analyses.length === 0 ? (
+        null // Only pending uploads, no analyses - don't show empty state
       ) : (
         <div className="divide-y divide-neutral-100 dark:divide-neutral-700">
           {analyses.map((analysis) => (
@@ -196,7 +288,7 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                 <div className="px-6 pb-6 border-t border-neutral-100 dark:border-neutral-700">
                   <DiagnosticAnalysisPanel
                     analysis={transformToAnalysisWithRecommendations(analysis)}
-                    onRefresh={fetchAnalyses}
+                    onRefresh={fetchData}
                   />
                 </div>
               )}

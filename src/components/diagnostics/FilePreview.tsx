@@ -91,7 +91,6 @@ export function FilePreview({ file, onTypeChange, onRemove, disabled }: FilePrev
           >
             <option value="d_pulse">D-Pulse</option>
             <option value="hrv">HRV</option>
-            <option value="ua">UA</option>
             <option value="nes_scan">NES Scan</option>
             <option value="mold_toxicity">Mold Toxicity</option>
             <option value="blood_panel">Blood Panel</option>

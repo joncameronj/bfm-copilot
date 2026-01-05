@@ -86,7 +86,6 @@ export type LabCategory =
 export type DiagnosticType =
   | 'd_pulse'
   | 'hrv'
-  | 'ua'
   | 'nes_scan'
   | 'mold_toxicity'
   | 'blood_panel'
@@ -96,7 +95,7 @@ export interface DiagnosticUpload {
   id: string
   userId: string
   patientId: string | null
-  status: 'pending' | 'uploading' | 'processing' | 'complete' | 'error'
+  status: 'pending' | 'uploading' | 'uploaded' | 'processing' | 'complete' | 'error'
   analysisSummary: string | null
   createdAt: Date
   updatedAt: Date

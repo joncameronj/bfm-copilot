@@ -118,6 +118,7 @@ export async function PUT(request: Request) {
           },
           { onConflict: 'key' }
         )
+        .then()
     )
   }
 
@@ -134,6 +135,7 @@ export async function PUT(request: Request) {
           },
           { onConflict: 'key' }
         )
+        .then()
     )
   }
 
@@ -150,6 +152,7 @@ export async function PUT(request: Request) {
           },
           { onConflict: 'key' }
         )
+        .then()
     )
   }
 

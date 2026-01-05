@@ -60,13 +60,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
     }
 
+    // Valid database enum values for diagnostic_type
+    const validFileTypes = ['d_pulse', 'hrv', 'nes_scan', 'mold_toxicity', 'blood_panel', 'other']
+    const safeFileType = validFileTypes.includes(type) ? type : 'other'
+
     // Create diagnostic file record
     const { data: fileData, error: fileError } = await supabase
       .from('diagnostic_files')
       .insert({
         upload_id: diagnosticUploadId,
         filename: file.name,
-        file_type: type || 'other',
+        file_type: safeFileType,
         mime_type: file.type,
         size_bytes: file.size,
         storage_path: storageData.path,

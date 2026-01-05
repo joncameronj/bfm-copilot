@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { PatientSearchSelector } from '@/components/shared/PatientSearchSelector'
 import type { ProtocolFilters as ProtocolFiltersType, ProtocolStatus, ProtocolCategory } from '@/types/protocol'
 import { STATUS_LABELS, CATEGORY_LABELS } from '@/types/protocol'
 
@@ -25,6 +26,10 @@ export function ProtocolFilters({ filters, onChange }: ProtocolFiltersProps) {
     onChange({ ...filters, category: value })
   }
 
+  const handlePatientChange = (patientId: string | undefined) => {
+    onChange({ ...filters, patientId })
+  }
+
   return (
     <div className="flex flex-wrap gap-4">
       <div className="flex-1 min-w-[200px]">
@@ -32,6 +37,14 @@ export function ProtocolFilters({ filters, onChange }: ProtocolFiltersProps) {
           placeholder="Search protocols..."
           value={filters.search || ''}
           onChange={handleSearchChange}
+        />
+      </div>
+
+      <div className="w-64">
+        <PatientSearchSelector
+          value={filters.patientId}
+          onChange={handlePatientChange}
+          placeholder="Filter by patient..."
         />
       </div>
 
