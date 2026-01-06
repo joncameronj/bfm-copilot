@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Message, ReasoningData, AgentStep, ActionButton, Attachment, Source } from '@/types/chat'
+import type { Message, ReasoningData, AgentStep, ActionButton, Attachment, Source, RagChunk, AgentHandoff } from '@/types/chat'
+import { parseSSELines, parseSSEData } from '@/lib/utils/sse-parser'
+
+const DEBUG_STREAMING = process.env.NODE_ENV === 'development'
 
 interface UseChatOptions {
   conversationId?: string
@@ -21,6 +24,8 @@ interface UseChatReturn {
   currentSteps: AgentStep[]
   currentActions: ActionButton[]
   currentSources: Source[]
+  currentRagChunks: RagChunk[]
+  currentAgentHandoffs: AgentHandoff[] // Agent SDK: track agent transitions
   thinkingStartTime: number | null
   error: string | null
   sendMessage: (content: string, files?: File[]) => Promise<void>
@@ -66,6 +71,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const [currentSteps, setCurrentSteps] = useState<AgentStep[]>([])
   const [currentActions, setCurrentActions] = useState<ActionButton[]>([])
   const [currentSources, setCurrentSources] = useState<Source[]>([])
+  const [currentRagChunks, setCurrentRagChunks] = useState<RagChunk[]>([])
+  const [currentAgentHandoffs, setCurrentAgentHandoffs] = useState<AgentHandoff[]>([]) // Agent SDK
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [threadId, setThreadId] = useState<string | null>(null)
@@ -121,6 +128,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       setCurrentSteps([])
       setCurrentActions([])
       setCurrentSources([])
+      setCurrentRagChunks([])
+      setCurrentAgentHandoffs([])
 
       // Add user message optimistically
       const userMessage: Message = {
@@ -131,6 +140,11 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         createdAt: new Date(),
       }
       setMessages((prev) => [...prev, userMessage])
+
+      // Declare these outside try block so they're accessible in catch
+      let assistantId = ''
+      let reasoningText = ''
+      let reasoningElapsedMs = 0
 
       try {
         // Create abort controller for cancellation
@@ -227,14 +241,13 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
 
         // Handle streaming response
         const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
         let assistantMessage = ''
-        let reasoningText = ''
+        reasoningText = ''
         let reasoningSummary: string | undefined
-        let reasoningElapsedMs = 0
+        reasoningElapsedMs = 0
 
         // Add placeholder assistant message
-        const assistantId = crypto.randomUUID()
+        assistantId = crypto.randomUUID()
         setMessages((prev) => [
           ...prev,
           {
@@ -251,160 +264,213 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         setStreamingMessageId(assistantId)
 
         if (reader) {
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
+          // Use buffered SSE parser to handle chunks split across network boundaries
+          console.log('[Streaming] Starting to read SSE stream...')
+          let lineCount = 0
+          for await (const line of parseSSELines(reader)) {
+            lineCount++
+            console.log(`[SSE Line ${lineCount}]`, line.slice(0, 80))
+            try {
+              const parsed = parseSSEData<{
+                type: string
+                delta?: string
+                error?: string
+                summary?: string
+                elapsed_ms?: number
+                step_id?: string
+                label?: string
+                actions?: ActionButton[]
+                sources?: Source[]
+                chunks?: RagChunk[]
+              }>(line)
 
-              const chunk = decoder.decode(value)
-              const lines = chunk.split('\n')
+              // Skip non-data lines or [DONE] signal
+              if (!parsed) continue
 
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6)
-                  if (data === '[DONE]') continue
+              if (DEBUG_STREAMING) {
+                console.log('[SSE Event]', parsed.type, parsed.delta?.slice(0, 50))
+              }
 
-                  try {
-                    const parsed = JSON.parse(data)
+              // Handle error events from the server
+              if (parsed.type === 'error') {
+                throw new Error(parsed.error || 'An error occurred during streaming')
+              }
 
-                    // Handle error events from the server
-                    if (parsed.type === 'error') {
-                      throw new Error(parsed.error || 'An error occurred during streaming')
-                    }
+              // Handle reasoning events (agent thinking)
+              // Always set state - React batches identical updates
+              if (parsed.type === 'reasoning_delta') {
+                setIsThinking(false)
+                setIsReasoning(true)
+                reasoningText += parsed.delta || ''
+                reasoningElapsedMs = parsed.elapsed_ms || 0
+                setCurrentReasoning({
+                  text: reasoningText,
+                  elapsedMs: reasoningElapsedMs,
+                })
+              }
 
-                    // Handle reasoning events (agent thinking)
-                    if (parsed.type === 'reasoning_delta') {
-                      // Turn off thinking indicator, now we have reasoning data
-                      setIsThinking(false)
-                      if (!isReasoning) {
-                        setIsReasoning(true)
-                      }
-                      reasoningText += parsed.delta || ''
-                      reasoningElapsedMs = parsed.elapsed_ms || 0
-                      setCurrentReasoning({
-                        text: reasoningText,
-                        elapsedMs: reasoningElapsedMs,
-                      })
-                    }
+              if (parsed.type === 'reasoning_done') {
+                reasoningSummary = parsed.summary
+                reasoningElapsedMs = parsed.elapsed_ms || reasoningElapsedMs
+                setCurrentReasoning({
+                  text: reasoningText,
+                  summary: reasoningSummary,
+                  elapsedMs: reasoningElapsedMs,
+                })
+                setIsReasoning(false)
+                setIsStreaming(true)
+              }
 
-                    if (parsed.type === 'reasoning_done') {
-                      reasoningSummary = parsed.summary
-                      reasoningElapsedMs = parsed.elapsed_ms || reasoningElapsedMs
-                      setCurrentReasoning({
-                        text: reasoningText,
-                        summary: reasoningSummary,
-                        elapsedMs: reasoningElapsedMs,
-                      })
-                      setIsReasoning(false)
-                      setIsStreaming(true)
-                    }
+              // Handle text response events
+              // Always set streaming state - no stale closure check needed
+              if (parsed.type === 'text_delta' && parsed.delta) {
+                setIsThinking(false)
+                setIsStreaming(true)
+                setIsReasoning(false)
+                assistantMessage += parsed.delta
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, content: assistantMessage }
+                      : m
+                  )
+                )
+              }
 
-                    // Handle text response events
-                    if (parsed.type === 'text_delta' && parsed.delta) {
-                      // Turn off thinking indicator, now we have text streaming
-                      setIsThinking(false)
-                      if (!isStreaming) {
-                        setIsStreaming(true)
-                        setIsReasoning(false)
-                      }
-                      assistantMessage += parsed.delta
-                      setMessages((prev) =>
-                        prev.map((m) =>
-                          m.id === assistantId
-                            ? { ...m, content: assistantMessage }
-                            : m
-                        )
-                      )
-                    }
-
-                    // Handle step events
-                    if (parsed.type === 'step_start') {
-                      // Turn off initial thinking indicator, steps are now showing
-                      setIsThinking(false)
-                      const newStep: AgentStep = {
-                        id: parsed.step_id,
-                        label: parsed.label || 'Processing...',
-                        status: 'in_progress',
-                        startTime: Date.now(),
-                      }
-                      setCurrentSteps((prev) => [...prev, newStep])
-                    }
-
-                    if (parsed.type === 'step_complete') {
-                      setCurrentSteps((prev) =>
-                        prev.map((step) =>
-                          step.id === parsed.step_id
-                            ? { ...step, status: 'completed', endTime: Date.now() }
-                            : step
-                        )
-                      )
-                    }
-
-                    if (parsed.type === 'step_error') {
-                      setCurrentSteps((prev) =>
-                        prev.map((step) =>
-                          step.id === parsed.step_id
-                            ? { ...step, status: 'error', error: parsed.error, endTime: Date.now() }
-                            : step
-                        )
-                      )
-                    }
-
-                    // Handle action buttons event
-                    if (parsed.type === 'action_buttons' && parsed.actions) {
-                      setCurrentActions(parsed.actions)
-                    }
-
-                    // Handle sources event
-                    if (parsed.type === 'sources' && parsed.sources) {
-                      setCurrentSources((prev) => [...prev, ...parsed.sources])
-                    }
-                  } catch (parseError) {
-                    // Re-throw actual errors (not JSON parse errors)
-                    if (parseError instanceof Error && parseError.message !== 'Unexpected token') {
-                      if (parseError.message.includes('error occurred')) {
-                        throw parseError
-                      }
-                    }
-                    // Ignore malformed JSON chunks
-                  }
+              // Handle step events
+              // Note: Don't clear isThinking on step_start - keep the spinner
+              // until we get actual content or reasoning
+              if (parsed.type === 'step_start') {
+                const newStep: AgentStep = {
+                  id: parsed.step_id!,
+                  label: parsed.label || 'Processing...',
+                  status: 'in_progress',
+                  startTime: Date.now(),
                 }
+                setCurrentSteps((prev) => [...prev, newStep])
+              }
+
+              if (parsed.type === 'step_complete') {
+                setCurrentSteps((prev) =>
+                  prev.map((step) =>
+                    step.id === parsed.step_id
+                      ? { ...step, status: 'completed', endTime: Date.now() }
+                      : step
+                  )
+                )
+              }
+
+              if (parsed.type === 'step_error') {
+                setCurrentSteps((prev) =>
+                  prev.map((step) =>
+                    step.id === parsed.step_id
+                      ? { ...step, status: 'error', error: parsed.error, endTime: Date.now() }
+                      : step
+                  )
+                )
+              }
+
+              // Handle action buttons event
+              if (parsed.type === 'action_buttons' && parsed.actions) {
+                setCurrentActions(parsed.actions)
+              }
+
+              // Handle sources event
+              if (parsed.type === 'sources' && parsed.sources) {
+                const newSources = parsed.sources
+                setCurrentSources((prev) => [...prev, ...newSources])
+              }
+
+              // Handle RAG chunks event
+              if (parsed.type === 'rag_chunks' && parsed.chunks) {
+                const newChunks = parsed.chunks as RagChunk[]
+                setCurrentRagChunks((prev) => [...prev, ...newChunks])
+              }
+
+              // Handle agent handoff events (Agent SDK feature)
+              if (parsed.type === 'agent_handoff') {
+                const handoff: AgentHandoff = {
+                  fromAgent: (parsed as { from_agent?: string }).from_agent || null,
+                  toAgent: (parsed as { to_agent?: string }).to_agent || 'unknown',
+                  reason: (parsed as { reason?: string }).reason || 'Agent switched',
+                  timestamp: new Date(),
+                }
+                setCurrentAgentHandoffs((prev) => [...prev, handoff])
+
+                // Also add as a step for visibility in the UI
+                setCurrentSteps((prev) => [
+                  ...prev,
+                  {
+                    id: `handoff-${Date.now()}`,
+                    label: `Handing off to ${handoff.toAgent}...`,
+                    status: 'completed',
+                    startTime: Date.now(),
+                    endTime: Date.now(),
+                  },
+                ])
+              }
+
+              // Handle done event
+              if (parsed.type === 'done') {
+                console.log('[SSE] Stream completed normally')
+              }
+            } catch (parseError) {
+              // Log parse errors for debugging - don't silently swallow
+              console.error('[SSE Parse Error]', {
+                line: line.slice(0, 100),
+                error: parseError instanceof Error ? parseError.message : parseError,
+              })
+              // Re-throw business errors (not JSON parse errors)
+              if (parseError instanceof Error && parseError.message.includes('error occurred')) {
+                throw parseError
               }
             }
-          } finally {
-            reader.releaseLock()
           }
+          console.log(`[Streaming] Finished reading. Total lines: ${lineCount}, assistantMessage length: ${assistantMessage.length}`)
         }
 
-        // Attach reasoning data to the final message metadata
+        // Attach reasoning data and RAG chunks to the final message metadata
         const finalReasoning = reasoningText
           ? { text: reasoningText, summary: reasoningSummary, elapsedMs: reasoningElapsedMs }
           : undefined
 
-        // Update message with reasoning metadata
-        if (finalReasoning) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, metadata: { ...m.metadata, reasoning: finalReasoning } }
-                : m
-            )
+        // Update message with reasoning metadata, RAG chunks, and ensure content is preserved
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: assistantMessage || m.content,
+                  metadata: {
+                    ...m.metadata,
+                    ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+                    ...(currentRagChunks.length > 0 ? { ragChunks: currentRagChunks } : {}),
+                  },
+                }
+              : m
           )
-        }
+        )
 
         // Save messages to database (include attachments if present)
         await saveMessageToDb(currentConversationId!, {
           ...userMessage,
           metadata: attachments ? { attachments } : undefined,
         })
-        await saveMessageToDb(currentConversationId!, {
-          id: assistantId,
-          conversationId: currentConversationId!,
-          role: 'assistant',
-          content: assistantMessage,
-          metadata: finalReasoning ? { reasoning: finalReasoning } : undefined,
-          createdAt: new Date(),
-        })
+
+        // Only save assistant message if there's content OR reasoning
+        // If no content but has reasoning, save with placeholder
+        const hasContent = assistantMessage.trim().length > 0
+        const hasReasoning = !!finalReasoning
+        if (hasContent || hasReasoning) {
+          await saveMessageToDb(currentConversationId!, {
+            id: assistantId,
+            conversationId: currentConversationId!,
+            role: 'assistant',
+            content: assistantMessage || '*(No response generated)*',
+            metadata: finalReasoning ? { reasoning: finalReasoning } : undefined,
+            createdAt: new Date(),
+          })
+        }
 
         // Generate AI title for new conversations (fire and forget)
         if (isNewConversation && currentConversationId) {
@@ -421,8 +487,34 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           // Save failed message for retry
           lastFailedMessageRef.current = { content, files }
 
-          // Remove the user message if the request failed
-          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id))
+          // Only remove messages if we got NO response at all (no content and no reasoning)
+          // If we have partial content or reasoning, keep it visible
+          setMessages((prev) => {
+            const assistantMsg = prev.find((m) => m.id === assistantId)
+            const hasPartialContent = assistantMsg?.content && assistantMsg.content.length > 0
+            const hasReasoning = reasoningText.length > 0
+
+            if (hasPartialContent || hasReasoning) {
+              // Keep the messages but update assistant with error indicator and reasoning
+              return prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      content: m.content || '*(Response interrupted)*',
+                      metadata: {
+                        ...m.metadata,
+                        ...(hasReasoning
+                          ? { reasoning: { text: reasoningText, elapsedMs: reasoningElapsedMs } }
+                          : {}),
+                      },
+                    }
+                  : m
+              )
+            } else {
+              // No content at all - remove both messages
+              return prev.filter((m) => m.id !== userMessage.id && m.id !== assistantId)
+            }
+          })
         }
       } finally {
         setIsLoading(false)
@@ -436,11 +528,27 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         abortControllerRef.current = null
       }
     },
-    [activeConversationId, patientId, threadId, isLoading, isReasoning, isStreaming, onError, router]
+    [activeConversationId, patientId, threadId, isLoading, onError, router]
   )
 
   const cancelGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
+
+    // Update the streaming message to show "Copilot interrupted."
+    if (streamingMessageId) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === streamingMessageId
+            ? {
+                ...m,
+                content: 'Copilot interrupted.',
+                metadata: { ...m.metadata, interrupted: true },
+              }
+            : m
+        )
+      )
+    }
+
     setIsLoading(false)
     setIsThinking(false)
     setIsReasoning(false)
@@ -450,8 +558,10 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     setCurrentSteps([])
     setCurrentActions([])
     setCurrentSources([])
+    setCurrentRagChunks([])
+    setCurrentAgentHandoffs([])
     setThinkingStartTime(null)
-  }, [])
+  }, [streamingMessageId])
 
   const clearMessages = useCallback(() => {
     setMessages([])
@@ -478,6 +588,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     currentSteps,
     currentActions,
     currentSources,
+    currentRagChunks,
+    currentAgentHandoffs,
     thinkingStartTime,
     error,
     sendMessage,
