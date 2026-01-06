@@ -13,47 +13,29 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('system');
+  const [theme, setTheme] = useState<Theme>('light');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
 
-  // Load saved preference on mount
+  // Force light theme for now (dark theme needs work)
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem('theme') as Theme | null;
-    if (saved && ['light', 'dark', 'system'].includes(saved)) {
-      setTheme(saved);
-    }
+    // Clear any saved dark theme preference and force light
+    localStorage.setItem('theme', 'light');
+    setTheme('light');
   }, []);
 
-  // Apply theme changes
+  // Apply theme changes - FORCED LIGHT for now (dark theme needs work)
   useEffect(() => {
     if (!mounted) return;
 
     const root = document.documentElement;
 
-    const applyTheme = (isDark: boolean) => {
-      if (isDark) {
-        root.classList.add('dark');
-        root.style.colorScheme = 'dark';
-        setResolvedTheme('dark');
-      } else {
-        root.classList.remove('dark');
-        root.style.colorScheme = 'light';
-        setResolvedTheme('light');
-      }
-    };
-
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      applyTheme(mediaQuery.matches);
-
-      const listener = (e: MediaQueryListEvent) => applyTheme(e.matches);
-      mediaQuery.addEventListener('change', listener);
-      return () => mediaQuery.removeEventListener('change', listener);
-    } else {
-      applyTheme(theme === 'dark');
-    }
+    // Always force light theme
+    root.classList.remove('dark');
+    root.classList.add('light');
+    root.style.colorScheme = 'light';
+    setResolvedTheme('light');
   }, [theme, mounted]);
 
   const handleSetTheme = (newTheme: Theme) => {

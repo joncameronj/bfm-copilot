@@ -18,6 +18,8 @@ interface PatientFormProps {
 export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [medicationInput, setMedicationInput] = useState('')
+  const [allergyInput, setAllergyInput] = useState('')
   const [formData, setFormData] = useState<CreatePatientInput>({
     firstName: patient?.firstName || '',
     lastName: patient?.lastName || '',
@@ -78,6 +80,40 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
         return newErrors
       })
     }
+  }
+
+  const addMedication = () => {
+    if (medicationInput.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        currentMedications: [...(prev.currentMedications || []), medicationInput.trim()],
+      }))
+      setMedicationInput('')
+    }
+  }
+
+  const removeMedication = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      currentMedications: (prev.currentMedications || []).filter((_, i) => i !== index),
+    }))
+  }
+
+  const addAllergy = () => {
+    if (allergyInput.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        allergies: [...(prev.allergies || []), allergyInput.trim()],
+      }))
+      setAllergyInput('')
+    }
+  }
+
+  const removeAllergy = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      allergies: (prev.allergies || []).filter((_, i) => i !== index),
+    }))
   }
 
   return (
@@ -165,24 +201,80 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
       />
 
       {/* Current Medications */}
-      <Textarea
-        label="Current Medications"
-        value={formData.currentMedications?.join('\n') || ''}
-        onChange={(e) => handleChange('currentMedications', e.target.value.split('\n').filter(Boolean))}
-        rows={3}
-        placeholder="Enter one medication per line..."
-        helperText="Enter one medication per line"
-      />
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">
+          Current Medications
+        </label>
+        {(formData.currentMedications || []).length > 0 && (
+          <div className="mb-3 p-3 bg-neutral-50 rounded-lg border border-neutral-200 space-y-2">
+            {(formData.currentMedications || []).map((med, index) => (
+              <div key={index} className="flex items-center justify-between bg-white px-3 py-2 rounded border border-neutral-200">
+                <span className="text-sm text-neutral-700">{med}</span>
+                <button
+                  type="button"
+                  onClick={() => removeMedication(index)}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Input
+            value={medicationInput}
+            onChange={(e) => setMedicationInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && addMedication()}
+            placeholder="Enter medication name"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addMedication}
+          >
+            Add Medication
+          </Button>
+        </div>
+      </div>
 
       {/* Allergies */}
-      <Textarea
-        label="Allergies"
-        value={formData.allergies?.join('\n') || ''}
-        onChange={(e) => handleChange('allergies', e.target.value.split('\n').filter(Boolean))}
-        rows={2}
-        placeholder="Enter one allergy per line..."
-        helperText="Enter one allergy per line"
-      />
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">
+          Allergies
+        </label>
+        {(formData.allergies || []).length > 0 && (
+          <div className="mb-3 p-3 bg-neutral-50 rounded-lg border border-neutral-200 space-y-2">
+            {(formData.allergies || []).map((allergy, index) => (
+              <div key={index} className="flex items-center justify-between bg-white px-3 py-2 rounded border border-neutral-200">
+                <span className="text-sm text-neutral-700">{allergy}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAllergy(index)}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Input
+            value={allergyInput}
+            onChange={(e) => setAllergyInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && addAllergy()}
+            placeholder="Enter allergy"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addAllergy}
+          >
+            Add Allergy
+          </Button>
+        </div>
+      </div>
 
       {/* Form Actions */}
       <div className="flex justify-end gap-3 pt-4">

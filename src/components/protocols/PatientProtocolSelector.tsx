@@ -214,7 +214,7 @@ export function PatientProtocolSelector({ className }: PatientProtocolSelectorPr
   }
 
   return (
-    <div className={cn('bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl overflow-hidden', className)}>
+    <div className={cn('bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl', className)}>
       {/* Header */}
       <div className="p-6 border-b border-neutral-100 dark:border-neutral-700">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-1">Generate Protocol</h2>

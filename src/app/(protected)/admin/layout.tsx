@@ -11,6 +11,7 @@ const adminNavItems = [
   { label: 'Knowledge', href: '/admin/documents', description: 'Upload and manage protocol documents' },
   { label: 'Logs', href: '/admin/rag/logs', description: 'Monitor knowledge base queries' },
   { label: 'Telemetry', href: '/admin/rag/telemetry', description: 'Search performance and analytics' },
+  { label: 'Validation', href: '/admin/rag/validation', description: 'Frequency validation and Hz rejection logs' },
   { label: 'Evaluations', href: '/admin/evaluations', description: 'Grade agent responses for quality' },
   { label: 'Analytics', href: '/admin/analytics', description: 'Protocol effectiveness and usage metrics' },
   { label: 'Settings', href: '/admin/settings', description: 'Configure AI model and system settings' },

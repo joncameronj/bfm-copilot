@@ -10,12 +10,15 @@ Provides intelligent knowledge base search that:
 """
 
 import time
+import httpx
+import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.embeddings.embedder import embed_query
 from app.services.supabase import get_supabase_client
 from app.tools.query_analyzer import QueryAnalysis, analyze_query
+from app.config import get_settings
 
 
 # Role scope mappings
@@ -147,28 +150,39 @@ async def smart_search(
         # Generate query embedding
         query_embedding = await embed_query(query)
 
-        # Get Supabase client
-        client = get_supabase_client()
+        # Use direct HTTP to bypass Supabase SDK caching issues
+        settings = get_settings()
+        headers = {
+            'apikey': settings.supabase_service_key,
+            'Authorization': f'Bearer {settings.supabase_service_key}',
+            'Content-Type': 'application/json',
+        }
+        payload = {
+            "p_query_embedding": query_embedding,
+            "p_user_id": user_id,
+            "p_care_categories": None,
+            "p_body_systems": body_systems,
+            "p_document_categories": document_categories,
+            "p_tag_names": analysis.all_tags() or None,
+            "p_include_related": include_related and analysis.should_expand,
+            "p_match_threshold": threshold,
+            "p_match_count": limit,
+            "p_user_role": user_role,
+        }
 
-        # Use smart search function V2 with role filtering
-        result = client.rpc(
-            "smart_search_documents_v2",
-            {
-                "p_query_embedding": query_embedding,
-                "p_user_id": user_id,
-                "p_user_role": user_role,
-                "p_tag_names": analysis.all_tags() or None,
-                "p_body_systems": body_systems,
-                "p_document_categories": document_categories,
-                "p_include_related": include_related and analysis.should_expand,
-                "p_match_threshold": threshold,
-                "p_match_count": limit,
-            },
-        ).execute()
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
+                headers=headers,
+                json=payload,
+                timeout=30.0
+            )
+            resp.raise_for_status()
+            result_data = resp.json()
 
         # Convert to SearchResult objects
         results = []
-        for row in result.data or []:
+        for row in result_data or []:
             results.append(
                 SearchResult(
                     content=row["content"],
@@ -210,7 +224,7 @@ async def search_knowledge_base(
     conversation_id: str | None = None,
     file_types: list[str] | None = None,
     limit: int = 5,
-    threshold: float = 0.7,
+    threshold: float = 0.4,  # Lowered from 0.7 to capture more BFM content
 ) -> str:
     """
     Search the health knowledge base for relevant documents.
@@ -429,3 +443,69 @@ SMART_SEARCH_TOOL_DEFINITION = {
         },
     },
 }
+
+
+# =============================================================================
+# OpenAI Agents SDK Integration
+# =============================================================================
+
+def create_search_knowledge_base_tool(
+    user_id: str,
+    user_role: Literal["admin", "practitioner", "member"],
+    conversation_id: str | None = None,
+):
+    """
+    Create a FunctionTool for the OpenAI Agents SDK with user context injected via closure.
+
+    This wraps the existing search_knowledge_base function, preserving all its
+    functionality including role-based filtering, while making it compatible
+    with the Agents SDK.
+
+    Args:
+        user_id: User ID for access control and logging
+        user_role: User role for content filtering
+        conversation_id: Optional conversation ID for logging
+
+    Returns:
+        FunctionTool instance for the search_knowledge_base function
+    """
+    # Import here to avoid circular imports and only when SDK is used
+    from agents import function_tool
+
+    @function_tool
+    async def search_knowledge_base_tool(
+        query: str,
+        file_types: list[str] | None = None,
+        limit: int = 5,
+    ) -> str:
+        """
+        Search the BFM health knowledge base for protocols, lab interpretation guides,
+        and clinical documentation.
+
+        This tool intelligently expands searches to include related conditions.
+        For example, when searching for thyroid issues, it will also find adrenal
+        and iron deficiency protocols that commonly co-occur.
+
+        Use this tool to find evidence-based guidelines and reference materials
+        relevant to the current patient case or clinical question.
+
+        Args:
+            query: The search query describing what information you need to find
+            file_types: Optional filter for document types (medical_protocol,
+                       lab_interpretation, diagnostic_report, ip_material)
+            limit: Maximum number of results to return (default: 5)
+
+        Returns:
+            Formatted search results with relevance scores and match types
+        """
+        # Call the existing search_knowledge_base function with injected context
+        return await search_knowledge_base(
+            query=query,
+            user_id=user_id,  # Injected via closure
+            user_role=user_role,  # Injected via closure
+            conversation_id=conversation_id,  # Injected via closure
+            file_types=file_types,
+            limit=limit,
+        )
+
+    return search_knowledge_base_tool

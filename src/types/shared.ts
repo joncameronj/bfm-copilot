@@ -89,6 +89,9 @@ export type DiagnosticType =
   | 'nes_scan'
   | 'mold_toxicity'
   | 'blood_panel'
+  | 'urinalysis'    // UA - pH, protein levels
+  | 'vcs'           // Visual Contrast Spectrum
+  | 'brainwave'     // EEG/brainwave analysis
   | 'other'
 
 export interface DiagnosticUpload {

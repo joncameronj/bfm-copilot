@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic'
 interface ExportRequest {
   labResultId?: string;
   patientName?: string;
+  patientContext?: {
+    gender: 'male' | 'female';
+    age: number;
+  };
   testDate?: string;
   results?: {
     markerId: string;
@@ -64,10 +68,24 @@ export async function POST(request: NextRequest) {
         ? labResult.patients[0]
         : labResult.patients;
 
+      // Calculate age from DOB if available
+      let patientAge: number | undefined;
+      if (patient?.date_of_birth) {
+        const dob = new Date(patient.date_of_birth);
+        const today = new Date();
+        patientAge = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+          patientAge--;
+        }
+      }
+
       labData = {
         patientName: patient
           ? `${patient.first_name} ${patient.last_name}`
           : 'Unknown Patient',
+        patientAge,
+        patientGender: patient?.gender,
         testDate: labResult.test_date,
         ominousCount: labResult.ominous_count,
         ominousMarkers: labResult.ominous_markers_triggered || [],
@@ -96,6 +114,8 @@ export async function POST(request: NextRequest) {
       // Use provided results directly
       labData = {
         patientName: body.patientName || 'Unknown Patient',
+        patientAge: body.patientContext?.age,
+        patientGender: body.patientContext?.gender,
         testDate: body.testDate || new Date().toISOString().split('T')[0],
         ominousCount: body.ominousCount || 0,
         ominousMarkers: body.ominousMarkers || [],

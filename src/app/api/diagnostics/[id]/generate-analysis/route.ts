@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateDiagnosticAnalysis, saveAnalysisToDatabase } from '@/lib/rag'
+import { createReasoningRecords } from '@/lib/rag/reasoning-generator'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Allow up to 60 seconds for AI generation
@@ -110,6 +111,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             protocols: analysis.protocols,
             supplementation: analysis.supplementation,
           },
+          supplementation: analysis.supplementation,
           status: 'complete',
           rag_context: {
             chunks: analysis.ragContext.map(c => ({
@@ -126,7 +128,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         throw new Error(`Failed to update analysis: ${updateError.message}`)
       }
 
-      // Create protocol recommendations
+      // Create protocol recommendations with reasoning records
       const recommendationIds: string[] = []
       for (const protocol of analysis.protocols) {
         const { data: recRecord, error: recError } = await supabase
@@ -147,6 +149,21 @@ export async function POST(request: Request, { params }: RouteParams) {
 
         if (!recError && recRecord) {
           recommendationIds.push(recRecord.id)
+
+          // Create reasoning records for explainability
+          // This populates the recommendation_reasoning table
+          await createReasoningRecords({
+            recommendationId: recRecord.id,
+            frequencies: protocol.frequencies.map(f => ({
+              name: f.name,
+              rationale: f.rationale,
+              source_reference: f.source_reference,
+              diagnostic_trigger: f.diagnostic_trigger,
+            })),
+            ragChunks: analysis.ragContext,
+            diagnosticData: analysis.extractedData,
+            reasoningChain: analysis.reasoningChain || [],
+          })
         }
       }
 

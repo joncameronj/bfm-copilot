@@ -2,19 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import { useRole } from '@/hooks/useRole'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Attachment02Icon,
-  UserGroupIcon,
-  Search01Icon,
-  TestTubeIcon,
-  StethoscopeIcon,
-  File01Icon,
-  Idea01Icon,
-  BubbleChatIcon,
-} from '@hugeicons/core-free-icons'
-import type { IconSvgElement } from '@hugeicons/react'
+import { Attachment02Icon } from '@hugeicons/core-free-icons'
 import { PatientSearchModal } from './PatientSearchModal'
 import { FormattingToolbar } from './FormattingToolbar'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -23,30 +12,9 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 
-interface QuickActionButton {
-  id: string
-  label: string
-  icon: IconSvgElement
-  prompt: string
-  special?: 'find-patient'
-}
-
-const PRACTITIONER_BUTTONS: QuickActionButton[] = [
-  { id: 'new-patient', label: 'New Patient', icon: UserGroupIcon, prompt: 'I want to create a new patient profile.' },
-  { id: 'find-patient', label: 'Find Patient', icon: Search01Icon, prompt: '', special: 'find-patient' },
-  { id: 'upload-labs', label: 'Upload Labs', icon: TestTubeIcon, prompt: "I'd like to upload and analyze lab results." },
-  { id: 'diagnostics', label: 'Input Diagnostics', icon: StethoscopeIcon, prompt: 'I have diagnostic information to input.' },
-  { id: 'adjust-protocol', label: 'Adjust Protocol', icon: File01Icon, prompt: 'I need to adjust a treatment protocol.' },
-]
-
-const MEMBER_BUTTONS: QuickActionButton[] = [
-  { id: 'feedback', label: 'Suggestion Feedback', icon: Idea01Icon, prompt: 'I want to provide feedback on my suggestions.' },
-  { id: 'upload-labs', label: 'Upload Labs', icon: TestTubeIcon, prompt: "I'd like to upload my lab results." },
-  { id: 'get-suggestions', label: 'Get Suggestions', icon: BubbleChatIcon, prompt: "I'd like to get health suggestions." },
-]
-
 interface ChatInputProps {
   onSend: (message: string, files?: File[]) => void
+  onStop?: () => void
   onVoiceStart?: () => void
   onVoiceEnd?: () => void
   isLoading?: boolean
@@ -95,6 +63,7 @@ function htmlToMarkdown(html: string): string {
 
 export function ChatInput({
   onSend,
+  onStop,
   onVoiceStart,
   onVoiceEnd,
   isLoading = false,
@@ -108,9 +77,6 @@ export function ChatInput({
   const [isEditorEmpty, setIsEditorEmpty] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  const { isMember, isLoading: roleLoading } = useRole()
-  const quickButtons = isMember ? MEMBER_BUTTONS : PRACTITIONER_BUTTONS
 
   const editor = useEditor({
     immediatelyRender: false, // Disable SSR to avoid hydration mismatches
@@ -200,15 +166,6 @@ export function ChatInput({
       onVoiceEnd?.()
     } else {
       onVoiceStart?.()
-    }
-  }
-
-  const handleQuickAction = (button: QuickActionButton) => {
-    if (button.special === 'find-patient') {
-      setShowPatientModal(true)
-    } else {
-      editor?.commands.setContent(button.prompt)
-      editor?.commands.focus()
     }
   }
 
@@ -311,36 +268,25 @@ export function ChatInput({
             )}
           />
 
-          {/* Send button - morphs from circle to square */}
+          {/* Send/Stop button - morphs from circle to square */}
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={disabled || isLoading || (isEditorEmpty && files.length === 0)}
+            onClick={isLoading ? onStop : handleSubmit}
+            disabled={disabled || (!isLoading && isEditorEmpty && files.length === 0)}
             className={cn(
               'btn-send btn-morph',
-              isFocused ? 'squared' : 'circular'
+              isFocused ? 'squared' : 'circular',
+              isLoading && 'btn-stop'
             )}
-            aria-label="Send message"
+            aria-label={isLoading ? 'Stop generation' : 'Send message'}
           >
             {isLoading ? (
               <svg
-                className="w-5 h-5 animate-spin"
-                fill="none"
+                className="w-5 h-5"
+                fill="currentColor"
                 viewBox="0 0 24 24"
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
+                <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
             ) : (
               <svg
@@ -361,29 +307,6 @@ export function ChatInput({
         </div>
       </div>
 
-      {/* Quick action buttons */}
-      {!roleLoading && (
-        <div className="quick-actions-container">
-          {quickButtons.map((btn) => (
-            <button
-              key={btn.id}
-              type="button"
-              onClick={() => handleQuickAction(btn)}
-              disabled={disabled || isLoading}
-              className={cn(
-                'btn-morph flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap flex-shrink-0',
-                'bg-neutral-100 text-neutral-600',
-                'hover:bg-neutral-200 hover:text-neutral-900',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                isFocused ? 'squared' : 'circular'
-              )}
-            >
-              <HugeiconsIcon icon={btn.icon} size={16} color="currentColor" strokeWidth={2} />
-              {btn.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Patient search modal */}
       <PatientSearchModal

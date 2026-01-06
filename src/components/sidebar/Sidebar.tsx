@@ -105,7 +105,7 @@ export function Sidebar({ user }: SidebarProps) {
               </span>
             )}
             <div className="w-5 h-5 rounded-full bg-black dark:bg-neutral-50 flex items-center justify-center flex-shrink-0">
-              <HugeiconsIcon icon={Add01Icon} size={12} className="text-white dark:text-neutral-900" />
+              <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={3.5} className="text-white dark:text-black" color="currentColor" />
             </div>
             <span
               className="text-base font-semibold whitespace-nowrap"

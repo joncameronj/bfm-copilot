@@ -19,8 +19,8 @@ export interface FSMFrequency {
 export interface FrequencyUsed {
   id: string;
   name: string;
-  frequencyA: number;
-  frequencyB?: number;
+  frequencyA?: number;  // Deprecated - no Hz values in new system
+  frequencyB?: number;  // Deprecated - no Hz values in new system
 }
 
 export interface TreatmentSession {

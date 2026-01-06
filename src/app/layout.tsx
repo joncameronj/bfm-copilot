@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+    <html lang="en" className="light" style={{ colorScheme: 'light' }} suppressHydrationWarning>
+      <body className={`${inter.className} bg-white text-neutral-900`} suppressHydrationWarning>
         <ThemeProvider>
           {children}
           <Toaster

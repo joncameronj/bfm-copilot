@@ -6,9 +6,6 @@ import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRoleView } from '@/providers/RoleViewProvider'
-import { useTheme } from '@/providers/ThemeProvider'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Sun01Icon, Moon01Icon, ComputerIcon } from '@hugeicons/core-free-icons'
 
 interface UserMenuProps {
   user: {
@@ -40,7 +37,6 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { isAdmin, viewMode, setViewMode, actualRole } = useRoleView()
-  const { theme, setTheme } = useTheme()
 
   const handleLogout = async () => {
     setIsLoading(true)
@@ -213,52 +209,6 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
                 <div className="my-1 border-t border-neutral-200 dark:border-neutral-700" />
               </>
             )}
-
-            {/* Theme switcher */}
-            <div className="px-3 py-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              Theme
-            </div>
-            <div className="px-2 pb-2">
-              <div className="flex gap-1 p-1 bg-neutral-100 dark:bg-neutral-700 rounded-lg">
-                <button
-                  onClick={() => setTheme('light')}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                    theme === 'light'
-                      ? 'bg-white dark:bg-neutral-600 text-neutral-900 dark:text-neutral-50 shadow-sm'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-                  )}
-                >
-                  <HugeiconsIcon icon={Sun01Icon} size={14} />
-                  Light
-                </button>
-                <button
-                  onClick={() => setTheme('dark')}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                    theme === 'dark'
-                      ? 'bg-white dark:bg-neutral-600 text-neutral-900 dark:text-neutral-50 shadow-sm'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-                  )}
-                >
-                  <HugeiconsIcon icon={Moon01Icon} size={14} />
-                  Dark
-                </button>
-                <button
-                  onClick={() => setTheme('system')}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors',
-                    theme === 'system'
-                      ? 'bg-white dark:bg-neutral-600 text-neutral-900 dark:text-neutral-50 shadow-sm'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-                  )}
-                >
-                  <HugeiconsIcon icon={ComputerIcon} size={14} />
-                  Auto
-                </button>
-              </div>
-            </div>
-            <div className="my-1 border-t border-neutral-200 dark:border-neutral-700" />
 
             <button
               onClick={() => {

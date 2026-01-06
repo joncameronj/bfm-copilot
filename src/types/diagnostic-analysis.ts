@@ -12,7 +12,7 @@ export type { FrequencyUsed } from './treatment';
 // ============================================
 
 export type AnalysisStatus = 'pending' | 'processing' | 'complete' | 'error';
-export type RecommendationStatus = 'recommended' | 'executed' | 'declined';
+export type RecommendationStatus = 'recommended' | 'approved' | 'executed' | 'declined';
 export type ExecutionOutcome = 'positive' | 'negative' | 'neutral' | 'pending';
 
 // ============================================
@@ -22,9 +22,11 @@ export type ExecutionOutcome = 'positive' | 'negative' | 'neutral' | 'pending';
 export interface RecommendedFrequency {
   id: string;
   name: string;
-  frequencyA: number;
-  frequencyB?: number;
-  rationale: string;  // Why this frequency was recommended
+  frequencyA?: number;  // Deprecated - no Hz values should be stored
+  frequencyB?: number;  // Deprecated - no Hz values should be stored
+  rationale?: string;  // Why this frequency was recommended
+  source_reference?: string;  // Which BFM doc section led to this
+  diagnostic_trigger?: string;  // Which diagnostic finding triggered this
 }
 
 // ============================================
@@ -52,6 +54,9 @@ export interface DiagnosticAnalysis {
   status: AnalysisStatus;
   errorMessage: string | null;
   ragContext: Record<string, unknown>;
+  supplementation: Supplementation[];  // Analysis-level supplementation
+  isArchived: boolean;  // Soft delete flag
+  archivedAt: Date | null;  // When analysis was archived
   createdAt: Date;
   updatedAt: Date;
 }
@@ -117,6 +122,49 @@ export interface ProtocolExecution {
 }
 
 // ============================================
+// FLATTENED FREQUENCY CARD (Display-Time Transformation)
+// ============================================
+
+export interface FlattenedFrequencyCard {
+  // Frequency details
+  frequencyId: string;
+  frequencyName: string;
+  frequencyRationale?: string;
+  sourceReference?: string;
+  diagnosticTrigger?: string;
+
+  // Context from parent protocol
+  originalProtocolId: string;
+  originalProtocolTitle: string;
+  category: ProtocolCategory;
+  priority: number;
+
+  // Current status (from protocol_recommendations.status)
+  status: RecommendationStatus;
+
+  // Local execution state (UI only, not persisted)
+  pendingExecution?: boolean;
+}
+
+// ============================================
+// BATCH EXECUTION
+// ============================================
+
+export interface BatchExecutionRequest {
+  diagnosticAnalysisId: string;
+  patientId: string;
+  frequencies: Array<{
+    protocolRecommendationId: string;
+    frequencyId: string;
+    frequencyName: string;
+  }>;
+  sessionDate: string;  // YYYY-MM-DD
+  sessionTime?: string; // HH:MM:SS
+  effect: 'positive' | 'negative' | 'nil' | 'pending';
+  notes?: string;
+}
+
+// ============================================
 // INPUT TYPES
 // ============================================
 
@@ -150,6 +198,9 @@ export interface DiagnosticAnalysisRow {
   status: AnalysisStatus;
   error_message: string | null;
   rag_context: Record<string, unknown>;
+  supplementation: Supplementation[];
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -200,6 +251,9 @@ export function rowToAnalysis(row: DiagnosticAnalysisRow): DiagnosticAnalysis {
     status: row.status,
     errorMessage: row.error_message,
     ragContext: row.rag_context || {},
+    supplementation: row.supplementation || [],
+    isArchived: row.is_archived || false,
+    archivedAt: row.archived_at ? new Date(row.archived_at) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -260,13 +314,15 @@ export const ANALYSIS_STATUS_COLORS: Record<AnalysisStatus, string> = {
 
 export const RECOMMENDATION_STATUS_LABELS: Record<RecommendationStatus, string> = {
   recommended: 'Recommended',
+  approved: 'Approved',
   executed: 'Executed',
   declined: 'Declined',
 };
 
 export const RECOMMENDATION_STATUS_COLORS: Record<RecommendationStatus, string> = {
   recommended: 'bg-blue-100 text-blue-700',
-  executed: 'bg-green-100 text-green-700',
+  approved: 'bg-green-100 text-green-700',
+  executed: 'bg-emerald-100 text-emerald-700',
   declined: 'bg-neutral-100 text-neutral-500',
 };
 

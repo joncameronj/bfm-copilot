@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { ProtocolList } from '@/components/protocols/ProtocolList'
+import { ManualProtocolBuilder } from '@/components/protocols/ManualProtocolBuilder'
 
 export default async function ProtocolsPage() {
   const supabase = await createClient()
@@ -26,11 +26,11 @@ export default async function ProtocolsPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-[-0.05em] text-neutral-900 dark:text-neutral-50">Protocols</h1>
-        <p className="text-neutral-500 dark:text-neutral-400 mt-1">View and manage treatment protocols generated from patient diagnostics</p>
+        <p className="text-neutral-500 dark:text-neutral-400 mt-1">Build and apply treatment protocols by selecting from approved frequencies</p>
       </div>
 
-      {/* Protocol List */}
-      <ProtocolList />
+      {/* Manual Protocol Builder */}
+      <ManualProtocolBuilder />
     </div>
   )
 }

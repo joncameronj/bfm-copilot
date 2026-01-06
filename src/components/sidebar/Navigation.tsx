@@ -15,6 +15,7 @@ import {
   Settings01Icon,
   StarIcon,
   HealthIcon,
+  ChartHistogramIcon,
 } from '@hugeicons/core-free-icons'
 
 interface NavItem {
@@ -37,6 +38,7 @@ const PRACTITIONER_NAV_ITEMS: NavItem[] = [
 const MEMBER_NAV_ITEMS: NavItem[] = [
   { label: 'Chat', href: '/', icon: 'Chats' },
   { label: 'Labs', href: '/my-labs', icon: 'Labs' },
+  { label: 'Progress', href: '/my-progress', icon: 'Progress' },
   { label: 'myHealth', href: '/my-health', icon: 'myHealth' },
   { label: 'Suggestions', href: '/suggestions', icon: 'Suggestions' },
   { label: 'Settings', href: '/settings', icon: 'Settings' },
@@ -63,6 +65,7 @@ const NAV_ICONS: Record<string, typeof BubbleChatIcon> = {
   Settings: Settings01Icon,
   Suggestions: StarIcon,
   myHealth: HealthIcon,
+  Progress: ChartHistogramIcon,
 }
 
 function NavIcon({ iconKey }: { iconKey: string }) {
@@ -78,7 +81,7 @@ export function Navigation({ isCollapsed = false }: NavigationProps) {
   const navItems = effectiveRole === 'member' ? MEMBER_NAV_ITEMS : PRACTITIONER_NAV_ITEMS
 
   return (
-    <nav className="space-y-1">
+    <nav className="space-y-3">
       {navItems.map((item) => {
         // Check if active - handle home route specially
         const isActive = item.href === '/'

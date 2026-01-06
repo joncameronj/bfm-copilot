@@ -39,6 +39,7 @@ export function PatientFilters({ filters, onChange, viewMode, onViewModeChange }
           placeholder="Search patients..."
           value={filters.search || ''}
           onChange={handleSearchChange}
+          className="bg-transparent border border-neutral-300 dark:border-neutral-600"
         />
       </div>
 
@@ -68,11 +69,15 @@ export function PatientFilters({ filters, onChange, viewMode, onViewModeChange }
         </Select>
       </div>
 
-      <div className="flex border border-neutral-200 rounded-lg overflow-hidden">
+      <div className="flex border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
         <button
           type="button"
           onClick={() => onViewModeChange('card')}
-          className={`p-2 ${viewMode === 'card' ? 'bg-neutral-100' : 'bg-white hover:bg-neutral-50'}`}
+          className={`p-2 transition-colors ${
+            viewMode === 'card'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'bg-white text-neutral-600 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+          }`}
           aria-label="Card view"
         >
           <HugeiconsIcon icon={GridViewIcon} size={20} color="currentColor" />
@@ -80,7 +85,11 @@ export function PatientFilters({ filters, onChange, viewMode, onViewModeChange }
         <button
           type="button"
           onClick={() => onViewModeChange('list')}
-          className={`p-2 ${viewMode === 'list' ? 'bg-neutral-100' : 'bg-white hover:bg-neutral-50'}`}
+          className={`p-2 transition-colors ${
+            viewMode === 'list'
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'bg-white text-neutral-600 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+          }`}
           aria-label="List view"
         >
           <HugeiconsIcon icon={ListViewIcon} size={20} color="currentColor" />

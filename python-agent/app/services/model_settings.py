@@ -17,6 +17,7 @@ class ModelSettings:
     chat_model: str
     reasoning_effort: str
     reasoning_summary: str
+    temperature: float = 0.8
 
 
 class ModelSettingsService:
@@ -29,12 +30,14 @@ class ModelSettingsService:
         default_model: str = "gpt-5.2",
         default_reasoning_effort: str = "high",
         default_reasoning_summary: str = "detailed",
+        default_temperature: float = 0.8,
     ):
         self.api_url = api_url
         self.cache_ttl_seconds = cache_ttl_seconds
         self.default_model = default_model
         self.default_reasoning_effort = default_reasoning_effort
         self.default_reasoning_summary = default_reasoning_summary
+        self.default_temperature = default_temperature
 
         self._cached_settings: Optional[ModelSettings] = None
         self._cache_timestamp: float = 0
@@ -51,6 +54,7 @@ class ModelSettingsService:
             chat_model=self.default_model,
             reasoning_effort=self.default_reasoning_effort,
             reasoning_summary=self.default_reasoning_summary,
+            temperature=self.default_temperature,
         )
 
     async def get_settings(self) -> ModelSettings:
@@ -75,6 +79,7 @@ class ModelSettingsService:
                         chat_model=data.get("chat_model", self.default_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
+                        temperature=float(data.get("temperature", self.default_temperature)),
                     )
                     self._cache_timestamp = time.time()
                     return self._cached_settings
@@ -108,6 +113,7 @@ class ModelSettingsService:
                         chat_model=data.get("chat_model", self.default_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
+                        temperature=float(data.get("temperature", self.default_temperature)),
                     )
                     self._cache_timestamp = time.time()
                     return self._cached_settings
@@ -141,6 +147,7 @@ def init_model_settings_service(
     default_model: str = "gpt-5.2",
     default_reasoning_effort: str = "high",
     default_reasoning_summary: str = "detailed",
+    default_temperature: float = 0.8,
     cache_ttl_seconds: int = 60,
 ) -> ModelSettingsService:
     """Initialize the model settings service singleton."""
@@ -151,5 +158,6 @@ def init_model_settings_service(
         default_model=default_model,
         default_reasoning_effort=default_reasoning_effort,
         default_reasoning_summary=default_reasoning_summary,
+        default_temperature=default_temperature,
     )
     return _model_settings_service

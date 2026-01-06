@@ -26,7 +26,4 @@ export {
   type Conversation,
   type ConversationType,
   type ChatState,
-  type Workflow,
-  WORKFLOWS,
-  WORKFLOW_PROMPTS,
 } from './chat'

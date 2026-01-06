@@ -4,7 +4,7 @@ import { useRef, useEffect } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { ReasoningIndicator } from './ReasoningDisplay'
-import type { Message, ReasoningData, AgentStep, ActionButton, Source } from '@/types/chat'
+import type { Message, ReasoningData, AgentStep, ActionButton, Source, RagChunk } from '@/types/chat'
 
 interface MessageListProps {
   messages: Message[]
@@ -16,6 +16,7 @@ interface MessageListProps {
   currentSteps?: AgentStep[]
   currentActions?: ActionButton[]
   currentSources?: Source[]
+  currentRagChunks?: RagChunk[]
   thinkingStartTime?: number | null
 }
 
@@ -29,6 +30,7 @@ export function MessageList({
   currentSteps = [],
   currentActions = [],
   currentSources = [],
+  currentRagChunks = [],
   thinkingStartTime,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -58,12 +60,13 @@ export function MessageList({
               currentSteps={isActiveMessage ? currentSteps : message.metadata?.steps}
               currentActions={isActiveMessage ? currentActions : message.metadata?.actions}
               currentSources={isActiveMessage ? currentSources : message.metadata?.sources}
+              currentRagChunks={isActiveMessage ? currentRagChunks : message.metadata?.ragChunks}
               thinkingStartTime={isActiveMessage ? thinkingStartTime : undefined}
             />
           )
         })}
         {/* Only show thinking indicator if no streaming message yet */}
-        {isThinking && !streamingMessageId && <ThinkingIndicator />}
+        {isThinking && !streamingMessageId && <ThinkingIndicator startTime={thinkingStartTime} />}
         {isReasoning && !streamingMessageId && (
           <ReasoningIndicator
             isReasoning={isReasoning}

@@ -32,6 +32,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Get analyses with nested recommendations and executions
+    // Filter out archived analyses (is_archived = false or null for backward compatibility)
     const { data: analyses, error: analysesError } = await supabase
       .from('diagnostic_analyses')
       .select(`
@@ -40,6 +41,9 @@ export async function GET(request: Request, { params }: RouteParams) {
         summary,
         status,
         error_message,
+        supplementation,
+        is_archived,
+        archived_at,
         created_at,
         updated_at,
         diagnostic_uploads (
@@ -74,6 +78,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         )
       `)
       .eq('patient_id', patientId)
+      .or('is_archived.is.null,is_archived.eq.false') // Filter out archived analyses
       .order('created_at', { ascending: false })
 
     if (analysesError) {

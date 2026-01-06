@@ -41,7 +41,7 @@
   }
 
   body {
-    @apply bg-[var(--bg-base)] text-[var(--text-primary)] antialiased font-sans;
+    @apply bg-white text-neutral-900 antialiased font-sans;
   }
 }
 
@@ -119,8 +119,14 @@
            flex items-center justify-center w-10 h-10
            hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95
            disabled:opacity-30 disabled:cursor-not-allowed;
-    transition: border-radius 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-radius 250ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease;
     will-change: border-radius;
+  }
+
+  /* Stop button - red to indicate stopping the generation */
+  .btn-send.btn-stop {
+    @apply bg-red-500 dark:bg-red-500 text-white dark:text-white
+           hover:bg-red-600 dark:hover:bg-red-600;
   }
 
   /* Morphing button - animates between circle and rounded square */
@@ -188,7 +194,7 @@
 
   /* TipTap editor styling */
   .tiptap-editor {
-    @apply flex-1 bg-transparent py-2 px-2 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-neutral-900 dark:text-neutral-50 focus:outline-none;
+    @apply flex-1 bg-transparent py-2 px-2 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-neutral-900 dark:text-neutral-50 focus:outline-none font-semibold;
     min-height: 24px;
     max-height: 200px;
     overflow-y: auto;
@@ -211,4 +217,67 @@
     @apply text-neutral-400 dark:text-neutral-500 pointer-events-none float-left h-0;
     content: attr(data-placeholder);
   }
+
+  /* Shimmer border effect for thinking/loading states */
+  .shimmer-border-effect {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(30, 66, 252, 0.1) 25%,
+      rgba(30, 66, 252, 0.2) 50%,
+      rgba(30, 66, 252, 0.1) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  .dark .shimmer-border-effect {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(30, 66, 252, 0.15) 25%,
+      rgba(30, 66, 252, 0.3) 50%,
+      rgba(30, 66, 252, 0.15) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* Text gradient shimmer for thinking state - dark gray to super light gray */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #404040 0%,
+      #e5e5e5 25%,
+      #404040 50%,
+      #e5e5e5 75%,
+      #404040 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-text 2s linear infinite;
+  }
+
+  .dark .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #a3a3a3 0%,
+      #fafafa 25%,
+      #a3a3a3 50%,
+      #fafafa 75%,
+      #a3a3a3 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-text 2s linear infinite;
+  }
+}
+
+@keyframes shimmer-text {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

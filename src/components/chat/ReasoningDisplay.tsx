@@ -14,7 +14,7 @@ interface ReasoningDisplayProps {
 export function ReasoningDisplay({
   isReasoning,
   reasoning,
-  isExpanded = false,
+  isExpanded = true,
   onToggle,
 }: ReasoningDisplayProps) {
   const [localExpanded, setLocalExpanded] = useState(isExpanded)
@@ -48,8 +48,8 @@ export function ReasoningDisplay({
 
   const expanded = onToggle !== undefined ? isExpanded : localExpanded
 
-  // Don't render if there's no reasoning and we're not actively reasoning
-  if (!isReasoning && !reasoning?.text) {
+  // Show if actively reasoning OR if we have reasoning content (text or summary)
+  if (!isReasoning && !reasoning?.text && !reasoning?.summary) {
     return null
   }
 

@@ -43,6 +43,9 @@ export function DiagnosticsUpload({
     const lower = filename.toLowerCase()
     if (lower.includes('pulse') || lower.includes('dpulse') || lower.includes('depulse')) return 'd_pulse'
     if (lower.includes('hrv')) return 'hrv'
+    if (lower.includes('ua') || lower.includes('urinalysis') || lower.includes('urine')) return 'urinalysis'
+    if (lower.includes('vcs') || lower.includes('visual contrast')) return 'vcs'
+    if (lower.includes('brainwave') || lower.includes('eeg') || lower.includes('brain')) return 'brainwave'
     if (lower.includes('nes') || lower.includes('nes scan')) return 'nes_scan'
     if (lower.includes('mold') || lower.includes('mycotox')) return 'mold_toxicity'
     if (lower.includes('blood') || lower.includes('lab') || lower.includes('cbc')) return 'blood_panel'
@@ -235,7 +238,7 @@ export function DiagnosticsUpload({
               : 'Drag & drop up to 6 files, or click to select'}
           </p>
           <p className="text-neutral-400 text-sm mt-2">
-            Supports: D-Pulse, HRV, UA, NES Scan, Mold Toxicity, Blood Panels
+            Supports: D-Pulse, HRV, Urinalysis (UA), VCS, Brainwave, NES Scan, Mold Toxicity, Blood Panels
           </p>
           <p className="text-neutral-400 text-xs mt-1">
             PDF, Images, Word documents

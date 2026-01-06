@@ -20,6 +20,9 @@ interface AnalysisData {
   summary: string
   status: 'pending' | 'processing' | 'complete' | 'error'
   error_message: string | null
+  supplementation?: unknown[]  // Analysis-level supplementation
+  is_archived?: boolean
+  archived_at?: string | null
   created_at: string
   updated_at: string
   diagnostic_uploads?: {
@@ -135,6 +138,9 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
       status: data.status,
       errorMessage: data.error_message,
       ragContext: {},
+      supplementation: (data.supplementation || []) as DiagnosticAnalysisWithRecommendations['supplementation'],
+      isArchived: data.is_archived || false,
+      archivedAt: data.archived_at ? new Date(data.archived_at) : null,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
       recommendations: (data.protocol_recommendations || []).map(rec => ({

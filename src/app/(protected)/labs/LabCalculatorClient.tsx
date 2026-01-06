@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { LabCalculator, type LabSaveOptions } from '@/components/labs/LabCalculator';
-import { PatientSearchSelector } from '@/components/shared/PatientSearchSelector';
+import { PatientSelectorCompact } from '@/components/labs/PatientSelectorCompact';
 import type { LabCalculationResult, LabFormValues } from '@/types/labs';
+import type { Patient } from '@/types/patient';
 
 interface PatientJoin {
   first_name: string;
@@ -28,6 +29,37 @@ export function LabCalculatorClient({
 }: LabCalculatorClientProps) {
   const router = useRouter();
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(undefined);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  // Fetch full patient data when selectedPatientId changes
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setSelectedPatient(null);
+      return;
+    }
+
+    const fetchPatient = async () => {
+      try {
+        const response = await fetch(`/api/patients/${selectedPatientId}`);
+        if (response.ok) {
+          const { data } = await response.json();
+          // Convert date strings to Date objects
+          setSelectedPatient({
+            ...data,
+            dateOfBirth: new Date(data.dateOfBirth),
+            lastVisitDate: data.lastVisitDate ? new Date(data.lastVisitDate) : undefined,
+            createdAt: new Date(data.createdAt),
+            updatedAt: new Date(data.updatedAt),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch patient:', error);
+        setSelectedPatient(null);
+      }
+    };
+
+    fetchPatient();
+  }, [selectedPatientId]);
 
   // Helper to get patient name from result
   const getPatientName = (result: RecentResult): string => {
@@ -73,67 +105,62 @@ export function LabCalculatorClient({
 
   return (
     <div className="w-full">
-      {/* Header with patient selector and recent results */}
-      <div className="flex flex-col lg:flex-row gap-6 mb-8">
-        {/* Patient Selector */}
-        <div className="lg:w-2/3">
-          <div className="card-flat">
-            <h2 className="text-lg font-medium mb-4">Patient</h2>
-            <PatientSearchSelector
-              value={selectedPatientId}
-              onChange={setSelectedPatientId}
-              placeholder="Search patients..."
-            />
-            {!selectedPatientId && (
-              <p className="text-sm text-neutral-500 mt-3">
-                Select a patient to link lab results (optional)
-              </p>
-            )}
-          </div>
+      {/* Main Layout: Content + Sticky Sidebar */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content - 2/3 width */}
+        <div className="lg:w-2/3 space-y-6">
+          {/* Compact Patient Selector */}
+          <PatientSelectorCompact
+            selectedPatient={selectedPatient}
+            onPatientChange={setSelectedPatientId}
+          />
+
+          {/* Lab Calculator */}
+          <LabCalculator
+            onSave={handleSave}
+            patientId={selectedPatientId}
+            patient={selectedPatient}
+          />
         </div>
 
-        {/* Recent Results */}
+        {/* Sidebar - 1/3 width - Sticky */}
         <div className="lg:w-1/3">
-          <div className="card-flat h-full">
-            <h2 className="text-lg font-medium mb-4">Recent Results</h2>
-            {recentResults.length === 0 ? (
-              <p className="text-neutral-500 text-sm">No recent lab results</p>
-            ) : (
-              <div className="space-y-2">
-                {recentResults.map((result) => (
-                  <button
-                    key={result.id}
-                    onClick={() => router.push(`/labs/${result.id}`)}
-                    className="w-full text-left p-3 rounded-lg bg-neutral-100 hover:bg-neutral-200 transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium">
-                          {getPatientName(result)}
-                        </p>
-                        <p className="text-xs text-neutral-500">
-                          {new Date(result.test_date).toLocaleDateString()}
-                        </p>
+          <div className="lg:sticky lg:top-6">
+            <div className="card-flat">
+              <h2 className="text-lg font-medium mb-4">Recent Results</h2>
+              {recentResults.length === 0 ? (
+                <p className="text-neutral-500 text-sm">No recent lab results</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onClick={() => router.push(`/labs/${result.id}`)}
+                      className="w-full text-left p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {getPatientName(result)}
+                          </p>
+                          <p className="text-xs text-neutral-500">
+                            {new Date(result.test_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {result.ominous_count > 0 && (
+                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                            {result.ominous_count} ominous
+                          </span>
+                        )}
                       </div>
-                      {result.ominous_count > 0 && (
-                        <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                          {result.ominous_count} ominous
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Lab Calculator */}
-      <LabCalculator
-        onSave={handleSave}
-        patientId={selectedPatientId}
-      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { MyLabsClient } from './MyLabsClient'
+import { MyLabsEditable } from './MyLabsEditable'
+import { calculateAge } from '@/lib/utils'
 
 export default async function MyLabsPage() {
   const supabase = await createClient()
@@ -10,10 +11,10 @@ export default async function MyLabsPage() {
     redirect('/login')
   }
 
-  // Verify member role
+  // Verify member role and get profile details
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, self_patient_id')
+    .select('role, self_patient_id, date_of_birth')
     .eq('id', user.id)
     .single()
 
@@ -21,40 +22,36 @@ export default async function MyLabsPage() {
     redirect('/')
   }
 
-  if (!profile.self_patient_id) {
-    return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold tracking-[-0.05em] text-neutral-900 mb-4">My Labs</h1>
-        <div className="bg-neutral-50 rounded-2xl p-8 text-center">
-          <p className="text-neutral-600">
-            No patient record linked to your account yet. Please contact your practitioner.
-          </p>
-        </div>
-      </div>
-    )
+  // Get member's patient record for demographics
+  let memberProfile: {
+    gender?: 'male' | 'female'
+    dateOfBirth?: string
+    age?: number
+  } = {}
+
+  if (profile.self_patient_id) {
+    const { data: patient } = await supabase
+      .from('patients')
+      .select('gender, date_of_birth')
+      .eq('id', profile.self_patient_id)
+      .single()
+
+    if (patient) {
+      memberProfile = {
+        gender: patient.gender === 'male' || patient.gender === 'female' ? patient.gender : 'male',
+        dateOfBirth: patient.date_of_birth,
+        age: patient.date_of_birth ? calculateAge(patient.date_of_birth) : undefined,
+      }
+    }
   }
 
-  // Fetch lab results
-  const { data: results } = await supabase
-    .from('lab_results')
-    .select(`
-      id,
-      test_date,
-      ominous_count,
-      ominous_markers_triggered,
-      notes,
-      created_at,
-      lab_values (
-        id,
-        marker_id,
-        value,
-        evaluation,
-        delta_from_target,
-        is_ominous
-      )
-    `)
-    .eq('patient_id', profile.self_patient_id)
+  // Fetch member's self-tracked lab values (from member_lab_values table)
+  const { data: labValues } = await supabase
+    .from('member_lab_values')
+    .select('*')
+    .eq('user_id', user.id)
     .order('test_date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   // Fetch markers for reference
   const { data: markers } = await supabase
@@ -65,12 +62,13 @@ export default async function MyLabsPage() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-[-0.05em] text-neutral-900">My Labs</h1>
-        <p className="text-neutral-600 mt-1">Track your lab results over time</p>
+        <p className="text-neutral-600 mt-1">Enter, track, and analyze your lab results over time</p>
       </div>
 
-      <MyLabsClient
-        results={results || []}
+      <MyLabsEditable
+        initialValues={labValues || []}
         markers={markers || []}
+        memberProfile={memberProfile}
       />
     </div>
   )

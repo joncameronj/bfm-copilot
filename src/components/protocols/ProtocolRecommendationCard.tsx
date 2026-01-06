@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PlayIcon, Cancel01Icon, Tick01Icon, Loading03Icon } from '@hugeicons/core-free-icons'
+import { PlayIcon, Cancel01Icon, Tick01Icon, Loading03Icon, ThumbsUpIcon } from '@hugeicons/core-free-icons'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CATEGORY_LABELS, CATEGORY_COLORS } from '@/types/protocol'
@@ -18,6 +18,7 @@ interface ProtocolRecommendationCardProps {
   recommendation: ProtocolRecommendation
   onExecute: (id: string) => void
   onDecline: (id: string) => void
+  onApprove?: (id: string) => void
   isLoading?: boolean
 }
 
@@ -25,6 +26,7 @@ export function ProtocolRecommendationCard({
   recommendation,
   onExecute,
   onDecline,
+  onApprove,
   isLoading = false,
 }: ProtocolRecommendationCardProps) {
   const [expanded, setExpanded] = useState(false)
@@ -81,14 +83,21 @@ export function ProtocolRecommendationCard({
             <div className="mt-3 space-y-2">
               {recommendation.recommendedFrequencies.map((freq: RecommendedFrequency, idx: number) => (
                 <div key={idx} className="bg-neutral-50 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="mb-1">
                     <span className="font-medium text-neutral-900">{freq.name}</span>
-                    <span className="text-sm font-mono text-brand-blue">
-                      {freq.frequencyA}/{freq.frequencyB || 'N/A'} Hz
-                    </span>
                   </div>
                   {freq.rationale && (
-                    <p className="text-sm text-neutral-600">{freq.rationale}</p>
+                    <p className="text-sm text-neutral-600 mb-1">{freq.rationale}</p>
+                  )}
+                  {freq.source_reference && (
+                    <p className="text-xs text-neutral-500">
+                      <span className="font-medium">Source:</span> {freq.source_reference}
+                    </p>
+                  )}
+                  {freq.diagnostic_trigger && (
+                    <p className="text-xs text-neutral-500">
+                      <span className="font-medium">Trigger:</span> {freq.diagnostic_trigger}
+                    </p>
                   )}
                 </div>
               ))}
@@ -100,6 +109,21 @@ export function ProtocolRecommendationCard({
       {/* Actions */}
       {recommendation.status === 'recommended' && (
         <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
+          {onApprove && (
+            <Button
+              variant="secondary"
+              onClick={() => onApprove(recommendation.id)}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              {isLoading ? (
+                <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+              ) : (
+                <HugeiconsIcon icon={ThumbsUpIcon} size={18} />
+              )}
+              Approve
+            </Button>
+          )}
           <Button
             onClick={() => onExecute(recommendation.id)}
             disabled={isLoading}
@@ -120,6 +144,28 @@ export function ProtocolRecommendationCard({
           >
             <HugeiconsIcon icon={Cancel01Icon} size={18} />
             Decline
+          </Button>
+        </div>
+      )}
+
+      {/* Approved status */}
+      {recommendation.status === 'approved' && (
+        <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
+          <div className="flex items-center gap-2 text-green-600">
+            <HugeiconsIcon icon={ThumbsUpIcon} size={18} />
+            <span className="text-sm font-medium">Approved</span>
+          </div>
+          <Button
+            onClick={() => onExecute(recommendation.id)}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            {isLoading ? (
+              <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+            ) : (
+              <HugeiconsIcon icon={PlayIcon} size={18} />
+            )}
+            Execute Protocol
           </Button>
         </div>
       )}

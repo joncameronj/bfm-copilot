@@ -17,7 +17,17 @@ export interface MessageMetadata {
   actions?: ActionButton[];
   citations?: Citation[];
   sources?: Source[];
+  ragChunks?: RagChunk[];
+  agentHandoffs?: AgentHandoff[]; // Agent SDK: track agent transitions
   [key: string]: unknown;
+}
+
+// Agent handoff event for multi-agent architectures (Agent SDK feature)
+export interface AgentHandoff {
+  fromAgent: string | null;
+  toAgent: string;
+  reason: string;
+  timestamp: Date;
 }
 
 export interface ReasoningData {
@@ -61,6 +71,18 @@ export interface Source {
   type: 'knowledge' | 'web';
   category?: string | null;
   bodySystem?: string | null;
+}
+
+// RAG chunk with full content for dev debugging
+export interface RagChunk {
+  id: string;
+  content: string;
+  title: string;
+  filename?: string;
+  bodySystem?: string;
+  documentCategory?: string;
+  matchType?: 'direct' | 'related' | 'semantic';
+  similarity?: number;
 }
 
 export interface ToolCall {
@@ -114,27 +136,6 @@ export interface ChatState {
   error: string | null;
 }
 
-// Workflow types
-export interface Workflow {
-  id: string;
-  label: string;
-  prompt?: string;
-}
-
-export const WORKFLOWS: Workflow[] = [
-  { id: 'new-lab', label: 'New Lab Analysis' },
-  { id: 'new-patient', label: 'New Patient Profile' },
-  { id: 'diagnostics', label: 'Analyze Diagnostics' },
-  { id: 'brainstorm', label: 'Brainstorm' },
-];
-
-export const WORKFLOW_PROMPTS: Record<string, string> = {
-  'new-lab': "I'd like to analyze a new lab panel.",
-  'new-patient': 'I want to create a new patient profile.',
-  'diagnostics': 'I have diagnostic files to analyze.',
-  'brainstorm': "Let's brainstorm treatment options.",
-};
-
 // User types (referenced from shared types)
 export interface ChatUser {
   id: string;
@@ -161,6 +162,7 @@ export interface SendMessageRequest {
 
 export interface StreamEvent {
   type:
+    // Existing events (unchanged)
     | 'text_delta'
     | 'text_done'
     | 'tool_call'
@@ -173,8 +175,13 @@ export interface StreamEvent {
     | 'action_buttons'
     | 'citations'
     | 'sources'
+    | 'rag_chunks'
     | 'done'
-    | 'error';
+    | 'error'
+    // NEW Agent SDK events
+    | 'agent_handoff'
+    | 'run_item_started'
+    | 'run_item_completed';
   delta?: string;
   content?: string;
   summary?: string;
@@ -190,4 +197,10 @@ export interface StreamEvent {
   citations?: Citation[];
   // Sources event
   sources?: Source[];
+  // RAG chunks event
+  chunks?: RagChunk[];
+  // Agent handoff events (Agent SDK)
+  from_agent?: string;
+  to_agent?: string;
+  reason?: string;
 }

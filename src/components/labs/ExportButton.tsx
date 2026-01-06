@@ -13,6 +13,10 @@ interface ExportButtonProps {
     deltaFromTarget: number | null;
   }[];
   patientName?: string;
+  patientContext?: {
+    gender: 'male' | 'female';
+    age: number;
+  };
   testDate?: string;
   ominousCount?: number;
   ominousMarkers?: string[];
@@ -26,6 +30,7 @@ export function ExportButton({
   labResultId,
   results,
   patientName,
+  patientContext,
   testDate,
   ominousCount,
   ominousMarkers,
@@ -54,6 +59,7 @@ export function ExportButton({
           labResultId,
           results,
           patientName,
+          patientContext,
           testDate,
           ominousCount,
           ominousMarkers,

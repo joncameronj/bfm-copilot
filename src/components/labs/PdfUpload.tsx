@@ -46,12 +46,21 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
     setEditableValues((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Valid file types
+  const isValidFileType = (file: File): boolean => {
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const mimeValid = validTypes.some((t) => file.type.includes(t));
+    const extValid = validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
+    return mimeValid || extValid;
+  };
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    if (!file.type.includes('pdf')) {
-      toast.error('Please upload a PDF file');
+    if (!isValidFileType(file)) {
+      toast.error('Please upload a PDF, JPEG, or PNG file');
       return;
     }
 
@@ -69,19 +78,21 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to parse PDF');
+        throw new Error(errorData.error || 'Failed to parse lab file');
       }
 
       const data = await response.json();
 
       if (!data.success || data.values.length === 0) {
-        toast.error('No lab values could be extracted from this PDF');
+        toast.error('No lab values could be extracted from this file');
         return;
       }
 
       setParsedValues(data.values);
       setShowPreview(true);
-      toast.success(`Found ${data.values.length} lab values`);
+
+      const methodLabel = data.extractionMethod === 'vision' ? '(via image analysis)' : '';
+      toast.success(`Found ${data.values.length} lab values ${methodLabel}`);
 
       if (data.unmatchedCount > 0) {
         toast(`${data.unmatchedCount} values could not be matched`, {
@@ -90,7 +101,7 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to parse PDF');
+      toast.error(error instanceof Error ? error.message : 'Failed to parse lab file');
     } finally {
       setIsUploading(false);
     }
@@ -100,6 +111,8 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
     },
     maxFiles: 1,
     disabled: isUploading,
@@ -277,17 +290,17 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
           </svg>
 
           {isUploading ? (
-            <p className="text-neutral-600">Parsing PDF...</p>
+            <p className="text-neutral-600">Analyzing lab file...</p>
           ) : isDragActive ? (
-            <p className="text-neutral-900 font-medium">Drop your lab PDF here</p>
+            <p className="text-neutral-900 font-medium">Drop your lab file here</p>
           ) : (
             <>
               <p className="text-neutral-600">
-                Drag & drop a lab report PDF, or{' '}
+                Drag & drop a lab report (PDF or image), or{' '}
                 <span className="text-neutral-900 font-medium underline">browse</span>
               </p>
               <p className="text-sm text-neutral-400">
-                PDF files up to 10MB
+                PDF, JPEG, PNG up to 50MB
               </p>
             </>
           )}
