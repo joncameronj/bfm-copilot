@@ -107,52 +107,58 @@ export async function PUT(request: Request) {
 
   if (body.chat_model !== undefined) {
     updates.push(
-      supabase
-        .from('system_config')
-        .upsert(
-          {
-            key: 'chat_model',
-            value: JSON.stringify(body.chat_model),
-            description: 'The OpenAI model used for the main chat agent',
-            updated_by: auth.user.id,
-          },
-          { onConflict: 'key' }
-        )
-        .then()
+      (async () => {
+        const { error } = await supabase
+          .from('system_config')
+          .upsert(
+            {
+              key: 'chat_model',
+              value: JSON.stringify(body.chat_model),
+              description: 'The OpenAI model used for the main chat agent',
+              updated_by: auth.user.id,
+            },
+            { onConflict: 'key' }
+          )
+        if (error) throw error
+      })()
     )
   }
 
   if (body.reasoning_effort !== undefined) {
     updates.push(
-      supabase
-        .from('system_config')
-        .upsert(
-          {
-            key: 'reasoning_effort',
-            value: JSON.stringify(body.reasoning_effort),
-            description: 'Reasoning effort level for extended thinking (low, medium, high)',
-            updated_by: auth.user.id,
-          },
-          { onConflict: 'key' }
-        )
-        .then()
+      (async () => {
+        const { error } = await supabase
+          .from('system_config')
+          .upsert(
+            {
+              key: 'reasoning_effort',
+              value: JSON.stringify(body.reasoning_effort),
+              description: 'Reasoning effort level for extended thinking (low, medium, high)',
+              updated_by: auth.user.id,
+            },
+            { onConflict: 'key' }
+          )
+        if (error) throw error
+      })()
     )
   }
 
   if (body.reasoning_summary !== undefined) {
     updates.push(
-      supabase
-        .from('system_config')
-        .upsert(
-          {
-            key: 'reasoning_summary',
-            value: JSON.stringify(body.reasoning_summary),
-            description: 'Reasoning summary verbosity (auto, concise, detailed)',
-            updated_by: auth.user.id,
-          },
-          { onConflict: 'key' }
-        )
-        .then()
+      (async () => {
+        const { error } = await supabase
+          .from('system_config')
+          .upsert(
+            {
+              key: 'reasoning_summary',
+              value: JSON.stringify(body.reasoning_summary),
+              description: 'Reasoning summary verbosity (auto, concise, detailed)',
+              updated_by: auth.user.id,
+            },
+            { onConflict: 'key' }
+          )
+        if (error) throw error
+      })()
     )
   }
 
