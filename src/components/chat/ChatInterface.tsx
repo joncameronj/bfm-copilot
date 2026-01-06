@@ -4,14 +4,12 @@ import { useRef, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { ChatInput } from './ChatInput'
 import { MessageList } from './MessageList'
-import { WorkflowButtons } from './WorkflowButtons'
 import { EmptyState } from './EmptyState'
 import { PatientContextCard } from './PatientContextCard'
 import { QuickActionsBar } from './QuickActionsBar'
 import { useChat } from '@/hooks/useChat'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { useRole } from '@/hooks/useRole'
-import { WORKFLOW_PROMPTS } from '@/types/chat'
 import type { PatientChatContext, QuickAction } from '@/types/patient-context'
 
 interface ChatInterfaceProps {
@@ -40,9 +38,11 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
     currentSteps,
     currentActions,
     currentSources,
+    currentRagChunks,
     thinkingStartTime,
     error,
     sendMessage,
+    cancelGeneration,
     retryLastMessage,
   } = useChat({ conversationId, patientId })
 
@@ -103,13 +103,6 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
     }
   }, [sendMessage])
 
-  const handleWorkflowSelect = (workflowId: string) => {
-    const prompt = WORKFLOW_PROMPTS[workflowId]
-    if (prompt) {
-      sendMessage(prompt)
-    }
-  }
-
   const handleSend = (content: string, files?: File[]) => {
     // Track when user sends their first real message (not the auto-opening)
     if (patientContext && !isInitializing) {
@@ -131,8 +124,8 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
       <div className="flex-1 overflow-y-auto overscroll-contain relative">
         {!hasMessages ? (
           <EmptyState
-            onWorkflowSelect={handleWorkflowSelect}
             onSend={handleSend}
+            onStop={cancelGeneration}
             onVoiceStart={isSupported ? startListening : undefined}
             onVoiceEnd={isSupported ? stopListening : undefined}
             isLoading={isLoading}
@@ -158,6 +151,7 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
               currentSteps={currentSteps}
               currentActions={currentActions}
               currentSources={currentSources}
+              currentRagChunks={currentRagChunks}
               thinkingStartTime={thinkingStartTime}
             />
 
@@ -213,18 +207,12 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
           <div className="max-w-3xl mx-auto">
             <ChatInput
               onSend={handleSend}
+              onStop={cancelGeneration}
               onVoiceStart={isSupported ? startListening : undefined}
               onVoiceEnd={isSupported ? stopListening : undefined}
               isLoading={isLoading}
               isListening={isListening}
             />
-            <div className="mt-3">
-              <WorkflowButtons
-                onSelect={handleWorkflowSelect}
-                compact
-                disabled={isLoading}
-              />
-            </div>
           </div>
         </div>
       )}
