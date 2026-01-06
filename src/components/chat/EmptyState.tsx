@@ -4,8 +4,8 @@ import { ChatInput } from './ChatInput'
 import { getGreeting } from '@/lib/greetings'
 
 interface EmptyStateProps {
-  onWorkflowSelect?: (workflowId: string) => void
   onSend: (message: string, files?: File[]) => void
+  onStop?: () => void
   onVoiceStart?: () => void
   onVoiceEnd?: () => void
   isLoading?: boolean
@@ -43,6 +43,7 @@ function renderGreetingWithGradientName(greeting: string, firstName: string | nu
 
 export function EmptyState({
   onSend,
+  onStop,
   isLoading = false,
   firstName,
 }: EmptyStateProps) {
@@ -52,13 +53,14 @@ export function EmptyState({
     <div className="flex flex-col items-center justify-center h-full px-4">
       {/* Heading - ChatGPT 5.2 style per PRD V2 */}
       <h1 className="text-4xl font-bold tracking-[-0.05em] text-neutral-900 dark:text-neutral-50 mb-8">
-        {renderGreetingWithGradientName(greeting, firstName)}
+        {renderGreetingWithGradientName(greeting, firstName ?? null)}
       </h1>
 
       {/* Input Bar */}
       <div className="w-full max-w-2xl">
         <ChatInput
           onSend={onSend}
+          onStop={onStop}
           isLoading={isLoading}
           placeholder="Ask Copilot"
         />
