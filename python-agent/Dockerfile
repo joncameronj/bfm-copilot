@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --link pyproject.toml ./
 
 # Create virtual environment and install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     uv venv && \
     ENV PATH="/app/.venv/bin:$PATH" uv pip install -r pyproject.toml
 
