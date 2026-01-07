@@ -3,9 +3,11 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useTheme } from '@/providers/ThemeProvider'
 import toast from 'react-hot-toast'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Mail01Icon } from '@hugeicons/core-free-icons'
@@ -13,6 +15,7 @@ import { Mail01Icon } from '@hugeicons/core-free-icons'
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { resolvedTheme } = useTheme()
   const [email, setEmail] = useState('')
   const [step, setStep] = useState<'email' | 'sent'>('email')
   const [isLoading, setIsLoading] = useState(false)
@@ -94,40 +97,61 @@ function LoginContent() {
   if (step === 'sent') {
     return (
       <div>
-        <div className="text-center mb-6">
-          <div className="mx-auto w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center mb-4">
-            <HugeiconsIcon icon={Mail01Icon} size={32} className="text-brand-blue" />
+        {/* Mobile Warning - Show only on small screens */}
+        <div className="md:hidden text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src={resolvedTheme === 'dark'
+                ? '/images/copilot-logo-gradient-dark.svg'
+                : '/images/copilot-logo-gradient.svg'}
+              alt="Copilot"
+              width={180}
+              height={44}
+              priority
+            />
           </div>
-          <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Check your email</h2>
-          <p className="text-neutral-500 dark:text-neutral-400 mt-2">
-            We sent a magic link to<br />
-            <span className="font-medium text-neutral-700 dark:text-neutral-300">{email}</span>
-          </p>
-          <p className="text-neutral-400 text-sm mt-4">
-            Click the link in the email to sign in
+          <p className="text-lg font-bold tracking-[-0.05em] text-neutral-900 dark:text-neutral-50 leading-relaxed">
+            For best experience, login with your desktop
           </p>
         </div>
 
-        <div className="text-center space-y-3">
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={countdown > 0 || isLoading}
-            className="text-sm text-brand-blue hover:underline disabled:text-neutral-400 disabled:no-underline"
-          >
-            {countdown > 0 ? `Resend link in ${countdown}s` : 'Resend magic link'}
-          </button>
+        {/* Desktop Confirmation - Show only on tablet and larger */}
+        <div className="hidden md:block">
+          <div className="text-center mb-6">
+            <div className="mx-auto w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center mb-4">
+              <HugeiconsIcon icon={Mail01Icon} size={32} className="text-brand-blue" />
+            </div>
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Check your email</h2>
+            <p className="text-neutral-500 dark:text-neutral-400 mt-2">
+              We sent a magic link to<br />
+              <span className="font-medium text-neutral-700 dark:text-neutral-300">{email}</span>
+            </p>
+            <p className="text-neutral-400 text-sm mt-4">
+              Click the link in the email to sign in
+            </p>
+          </div>
 
-          <div>
+          <div className="text-center space-y-3">
             <button
               type="button"
-              onClick={() => {
-                setStep('email')
-              }}
-              className="text-sm text-neutral-500 dark:text-neutral-400 hover:underline"
+              onClick={handleResend}
+              disabled={countdown > 0 || isLoading}
+              className="text-sm text-brand-blue hover:underline disabled:text-neutral-400 disabled:no-underline"
             >
-              Use a different email
+              {countdown > 0 ? `Resend link in ${countdown}s` : 'Resend magic link'}
             </button>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('email')
+                }}
+                className="text-sm text-neutral-500 dark:text-neutral-400 hover:underline"
+              >
+                Use a different email
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -136,65 +160,86 @@ function LoginContent() {
 
   return (
     <div>
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Welcome back</h2>
-        <p className="text-neutral-500 dark:text-neutral-400 mt-1">Enter your email to receive a magic link</p>
+      {/* Mobile Warning - Show only on small screens */}
+      <div className="md:hidden text-center">
+        <div className="flex justify-center mb-6">
+          <Image
+            src={resolvedTheme === 'dark'
+              ? '/images/copilot-logo-gradient-dark.svg'
+              : '/images/copilot-logo-gradient.svg'}
+            alt="Copilot"
+            width={180}
+            height={44}
+            priority
+          />
+        </div>
+        <p className="text-lg font-bold tracking-[-0.05em] text-neutral-900 dark:text-neutral-50 leading-relaxed">
+          For best experience, login with your desktop
+        </p>
       </div>
 
-      <form onSubmit={handleSendMagicLink} className="space-y-4">
-        <Input
-          type="email"
-          label="Email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-        />
+      {/* Desktop Login Form - Show only on tablet and larger */}
+      <div className="hidden md:block">
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Welcome back</h2>
+          <p className="text-neutral-500 dark:text-neutral-400 mt-1">Enter your email to receive a magic link</p>
+        </div>
 
-        <Button
-          type="submit"
-          className="w-full"
-          isLoading={isLoading}
-        >
-          Send magic link
-        </Button>
-      </form>
+        <form onSubmit={handleSendMagicLink} className="space-y-4">
+          <Input
+            type="email"
+            label="Email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
 
-      <p className="text-center mt-6 text-neutral-500 dark:text-neutral-400 text-sm">
-        Do not have an account?{' '}
-        <Link href="/signup" className="text-brand-blue hover:underline">
-          Sign up
-        </Link>
-      </p>
-
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-700">
           <Button
-            type="button"
-            variant="secondary"
+            type="submit"
             className="w-full"
-            onClick={async () => {
-              setIsLoading(true)
-              const supabase = createClient()
-              const { error } = await supabase.auth.signInWithPassword({
-                email: 'joncameron@etho.net',
-                password: 'Copilot2024!',
-              })
-              if (error) {
-                toast.error(error.message)
-                setIsLoading(false)
-                return
-              }
-              router.push('/')
-              router.refresh()
-            }}
             isLoading={isLoading}
           >
-            Skip Login (Dev Only)
+            Send magic link
           </Button>
-        </div>
-      )}
+        </form>
+
+        <p className="text-center mt-6 text-neutral-500 dark:text-neutral-400 text-sm">
+          Do not have an account?{' '}
+          <Link href="/signup" className="text-brand-blue hover:underline">
+            Sign up
+          </Link>
+        </p>
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={async () => {
+                setIsLoading(true)
+                const supabase = createClient()
+                const { error } = await supabase.auth.signInWithPassword({
+                  email: 'joncameron@etho.net',
+                  password: 'Copilot2024!',
+                })
+                if (error) {
+                  toast.error(error.message)
+                  setIsLoading(false)
+                  return
+                }
+                router.push('/')
+                router.refresh()
+              }}
+              isLoading={isLoading}
+            >
+              Skip Login (Dev Only)
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
