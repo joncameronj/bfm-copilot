@@ -243,7 +243,7 @@ otp_expiry = 3600
 
 # Custom email templates for Copilot
 [auth.email.template.magic_link]
-subject = "Sign in to your Copilot account"
+subject = "Log in to Copilot"
 content_path = "./supabase/templates/magic_link.html"
 
 [auth.email.template.confirm]
