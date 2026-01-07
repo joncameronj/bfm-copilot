@@ -44,7 +44,7 @@ function LoginContent() {
         email,
         options: {
           shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/`,
         },
       })
 
@@ -73,7 +73,7 @@ function LoginContent() {
         email,
         options: {
           shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/`,
         },
       })
 
