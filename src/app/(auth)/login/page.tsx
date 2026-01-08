@@ -116,13 +116,6 @@ function LoginContent() {
             Forgot password?
           </Link>
         </div>
-
-        <p className="text-center mt-6 text-neutral-500 dark:text-neutral-400 text-sm">
-          Do not have an account?{' '}
-          <Link href="/signup" className="text-brand-blue hover:underline">
-            Sign up
-          </Link>
-        </p>
       </div>
     </div>
   )

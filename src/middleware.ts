@@ -12,7 +12,7 @@ interface CookieToSet {
 function getHomeRoute(role: UserRole): string {
   switch (role) {
     case 'admin':
-      return '/admin'
+      return '/'
     case 'practitioner':
       return '/'
     case 'member':
@@ -67,7 +67,6 @@ export async function middleware(request: NextRequest) {
   // Check if this is an auth page
   const isAuthPage =
     pathname.startsWith('/login') ||
-    pathname.startsWith('/signup') ||
     pathname.startsWith('/reset-password')
 
   // If user is not logged in and trying to access protected route
