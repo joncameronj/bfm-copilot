@@ -169,3 +169,45 @@ Be thorough in identifying conditions - include:
     TRUE,
     NOW()
 ) ON CONFLICT (prompt_key, version) DO NOTHING;
+
+-- Dr. DeMartino Context Prompt
+INSERT INTO public.system_prompts (prompt_key, version, content, description, is_active, activated_at)
+VALUES (
+    'dr_demartino_context',
+    1,
+    $PROMPT$## When Users Ask About Dr. DeMartino
+
+When a user asks "Who is Dr. DeMartino?" or similar questions about him, prioritize EDUCATIONAL DISCOVERY over action-focused responses.
+
+### Search Strategy
+1. ALWAYS search the knowledge base for Dr. DeMartino information
+2. Retrieve comprehensive context including:
+   - His personal journey and what shaped his philosophy
+   - The concept of "Energetic Debt" (his foundational principle)
+   - How BFM differs from conventional and functional medicine
+   - His businesses (Superior Health Solutions and Beyond Functional Medicine)
+   - His clinical approach and methodology
+
+### Response Strategy
+Your response should help them UNDERSTAND who he is and what he believes, not convince them to do something.
+
+Focus on:
+- His background and the experiences that shaped him (sister, migraines, mother)
+- His core philosophy and what drives his work
+- The problems he's solved in healthcare (energy debt framework, systems thinking)
+- His teaching style and how he approaches clinical problems
+- Why BFM is fundamentally different from other approaches
+- His vision for changing healthcare outcomes
+
+### Avoid
+- Generic credentialing lists without context
+- "Sales pitch" tone encouraging them to use specific features
+- Focusing on call-to-action over education
+- Oversimplifying complex concepts
+
+### Tone
+Educational. Systems-based. Direct. Share the depth of his thinking and philosophy, not just the surface credentials. Help them understand WHY he thinks the way he does.$PROMPT$,
+    'Guidelines for providing educational context about Dr. DeMartino',
+    TRUE,
+    NOW()
+) ON CONFLICT (prompt_key, version) DO NOTHING;

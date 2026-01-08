@@ -7,7 +7,8 @@ and dynamic reasoning capabilities.
 
 from typing import Literal
 
-from agents import Agent
+from agents import Agent, ModelSettings
+from openai.types.shared import Reasoning
 
 from app.agent.system_prompts import get_system_prompt
 from app.models.messages import PatientContext
@@ -66,12 +67,12 @@ def create_base_agent(
         model=model,
         instructions=instructions,
         tools=[search_tool],
-        model_settings={
-            "reasoning": {
-                "effort": reasoning_effort,  # Dynamic: low/medium/high
-                "summary": "detailed",
-            }
-        },
+        model_settings=ModelSettings(
+            reasoning=Reasoning(
+                effort=reasoning_effort,  # Dynamic: low/medium/high
+                summary="detailed",
+            )
+        ),
     )
 
     return agent

@@ -65,7 +65,38 @@ const ISSUE_TAGS = [
 
 const CARE_CATEGORIES = ['diabetes', 'thyroid', 'hormones', 'neurological']
 
-type TabType = 'evaluate' | 'history' | 'sessions'
+// Chat evaluation types
+interface ChatEvaluation {
+  id: string
+  messageId: string
+  conversationId: string
+  evaluatorId: string
+  contentType: 'chat_response' | 'protocol' | 'patient_analysis'
+  rating: 'correct' | 'partially_correct' | 'partially_fail' | 'fail'
+  correctAspects: string | null
+  needsAdjustment: string | null
+  messageContent: string
+  patientId: string | null
+  isEvalMode: boolean
+  createdAt: string
+  updatedAt: string
+  evaluator: { id: string; email: string; fullName: string | null } | null
+}
+
+const CHAT_RATING_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  correct: { label: 'Correct', color: 'text-blue-700', bgColor: 'bg-blue-50' },
+  partially_correct: { label: 'Partially Correct', color: 'text-green-700', bgColor: 'bg-green-50' },
+  partially_fail: { label: 'Partially Fail', color: 'text-yellow-700', bgColor: 'bg-yellow-50' },
+  fail: { label: 'Fail', color: 'text-red-700', bgColor: 'bg-red-50' },
+}
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  chat_response: 'Chat Response',
+  protocol: 'Protocol',
+  patient_analysis: 'Patient Analysis',
+}
+
+type TabType = 'evaluate' | 'history' | 'sessions' | 'chat'
 
 export default function EvaluationsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('evaluate')
@@ -104,6 +135,23 @@ export default function EvaluationsPage() {
   const [stats, setStats] = useState({
     totalEvaluations: 0,
     averageScore: 0,
+  })
+
+  // Chat evaluations state
+  const [chatEvaluations, setChatEvaluations] = useState<ChatEvaluation[]>([])
+  const [chatPagination, setChatPagination] = useState<Pagination>({
+    page: 1, pageSize: 20, totalCount: 0, totalPages: 0,
+  })
+  const [chatStats, setChatStats] = useState({
+    totalEvaluations: 0,
+    byRating: { correct: 0, partially_correct: 0, partially_fail: 0, fail: 0 },
+    byContentType: { chat_response: 0, protocol: 0, patient_analysis: 0 },
+    evalModeCount: 0,
+    regularFeedbackCount: 0,
+  })
+  const [chatFilters, setChatFilters] = useState({
+    rating: '',
+    contentType: '',
   })
 
   // Fetch unevaluated logs
@@ -166,6 +214,34 @@ export default function EvaluationsPage() {
     }
   }, [])
 
+  // Fetch chat evaluations
+  const fetchChatEvaluations = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: chatPagination.page.toString(),
+        pageSize: chatPagination.pageSize.toString(),
+      })
+      if (chatFilters.rating) {
+        params.append('rating', chatFilters.rating)
+      }
+      if (chatFilters.contentType) {
+        params.append('contentType', chatFilters.contentType)
+      }
+      const res = await fetch(`/api/admin/evaluations/chat?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setChatEvaluations(data.data || [])
+        setChatPagination(data.pagination)
+        setChatStats(data.stats)
+      }
+    } catch (error) {
+      console.error('Failed to fetch chat evaluations:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [chatPagination.page, chatPagination.pageSize, chatFilters.rating, chatFilters.contentType])
+
   // Initial fetch
   useEffect(() => {
     fetchSessions()
@@ -176,8 +252,10 @@ export default function EvaluationsPage() {
       fetchUnevaluatedLogs()
     } else if (activeTab === 'history') {
       fetchEvaluations()
+    } else if (activeTab === 'chat') {
+      fetchChatEvaluations()
     }
-  }, [activeTab, fetchUnevaluatedLogs, fetchEvaluations])
+  }, [activeTab, fetchUnevaluatedLogs, fetchEvaluations, fetchChatEvaluations])
 
   // Submit evaluation
   const handleSubmitEvaluation = async () => {
@@ -335,7 +413,7 @@ export default function EvaluationsPage() {
       {/* Tabs */}
       <div className="border-b mb-6">
         <nav className="flex gap-4">
-          {(['evaluate', 'history', 'sessions'] as TabType[]).map((tab) => (
+          {(['evaluate', 'history', 'sessions', 'chat'] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -345,10 +423,15 @@ export default function EvaluationsPage() {
                   : 'border-transparent text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'chat' ? 'Chat Evaluations' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               {tab === 'evaluate' && totalUnevaluated > 0 && (
                 <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
                   {totalUnevaluated}
+                </span>
+              )}
+              {tab === 'chat' && chatStats.totalEvaluations > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                  {chatStats.totalEvaluations}
                 </span>
               )}
             </button>
@@ -780,6 +863,175 @@ export default function EvaluationsPage() {
                   <p className="text-sm mt-1">Create a session to organize your evaluations</p>
                 </CardContent>
               </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div>
+          {/* Chat Evaluations Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-neutral-500">Total Chat Evaluations</p>
+                <p className="text-3xl font-semibold text-neutral-900">{chatStats.totalEvaluations}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-neutral-500">Correct</p>
+                <p className="text-3xl font-semibold text-blue-600">{chatStats.byRating.correct}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-neutral-500">Partially Correct</p>
+                <p className="text-3xl font-semibold text-green-600">{chatStats.byRating.partially_correct}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-neutral-500">Fail / Partial Fail</p>
+                <p className="text-3xl font-semibold text-red-600">
+                  {chatStats.byRating.fail + chatStats.byRating.partially_fail}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Export */}
+          <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+            <div className="flex gap-4 items-center">
+              <select
+                value={chatFilters.rating}
+                onChange={(e) => {
+                  setChatFilters(prev => ({ ...prev, rating: e.target.value }))
+                  setChatPagination(prev => ({ ...prev, page: 1 }))
+                }}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                <option value="">All Ratings</option>
+                <option value="correct">Correct</option>
+                <option value="partially_correct">Partially Correct</option>
+                <option value="partially_fail">Partially Fail</option>
+                <option value="fail">Fail</option>
+              </select>
+              <select
+                value={chatFilters.contentType}
+                onChange={(e) => {
+                  setChatFilters(prev => ({ ...prev, contentType: e.target.value }))
+                  setChatPagination(prev => ({ ...prev, page: 1 }))
+                }}
+                className="px-3 py-2 border rounded-lg text-sm"
+              >
+                <option value="">All Content Types</option>
+                <option value="chat_response">Chat Response</option>
+                <option value="protocol">Protocol</option>
+                <option value="patient_analysis">Patient Analysis</option>
+              </select>
+              <button
+                onClick={fetchChatEvaluations}
+                disabled={isLoading}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.open(`/api/admin/evaluations/chat/export?format=csv${chatFilters.rating ? `&rating=${chatFilters.rating}` : ''}${chatFilters.contentType ? `&contentType=${chatFilters.contentType}` : ''}`, '_blank')}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50"
+              >
+                Export CSV
+              </button>
+              <button
+                onClick={() => window.open(`/api/admin/evaluations/chat/export?format=json${chatFilters.rating ? `&rating=${chatFilters.rating}` : ''}${chatFilters.contentType ? `&contentType=${chatFilters.contentType}` : ''}`, '_blank')}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50"
+              >
+                Export JSON
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Evaluations Table */}
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-neutral-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Evaluator</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Rating</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Comment Preview</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : chatEvaluations.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                      No chat evaluations found
+                    </td>
+                  </tr>
+                ) : (
+                  chatEvaluations.map((evaluation) => (
+                    <tr key={evaluation.id} className="hover:bg-neutral-50">
+                      <td className="px-4 py-3 text-sm text-neutral-600">
+                        {new Date(evaluation.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="truncate max-w-[150px]" title={evaluation.evaluator?.email}>
+                          {evaluation.evaluator?.fullName || evaluation.evaluator?.email || 'Unknown'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded text-xs">
+                          {CONTENT_TYPE_LABELS[evaluation.contentType] || evaluation.contentType}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${CHAT_RATING_CONFIG[evaluation.rating]?.bgColor} ${CHAT_RATING_CONFIG[evaluation.rating]?.color}`}>
+                          {CHAT_RATING_CONFIG[evaluation.rating]?.label || evaluation.rating}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-neutral-600">
+                        <div className="truncate max-w-[300px]" title={evaluation.needsAdjustment || evaluation.correctAspects || ''}>
+                          {evaluation.needsAdjustment || evaluation.correctAspects || '-'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            {chatPagination.totalPages > 1 && (
+              <div className="px-4 py-3 border-t flex justify-between items-center">
+                <button
+                  onClick={() => setChatPagination(p => ({ ...p, page: p.page - 1 }))}
+                  disabled={chatPagination.page === 1}
+                  className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-neutral-500">
+                  Page {chatPagination.page} of {chatPagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setChatPagination(p => ({ ...p, page: p.page + 1 }))}
+                  disabled={chatPagination.page === chatPagination.totalPages}
+                  className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             )}
           </div>
         </div>

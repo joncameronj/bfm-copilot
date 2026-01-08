@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 
 interface RagLog {
   id: string
@@ -164,9 +164,8 @@ export default function RagLogsPage() {
             </thead>
             <tbody className="divide-y">
               {logs.map((log) => (
-                <>
+                <Fragment key={log.id}>
                   <tr
-                    key={log.id}
                     className={`hover:bg-gray-50 cursor-pointer ${
                       log.error_message ? 'bg-red-50' : ''
                     }`}
@@ -268,7 +267,7 @@ export default function RagLogsPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -427,6 +427,11 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             }
           }
           console.log(`[Streaming] Finished reading. Total lines: ${lineCount}, assistantMessage length: ${assistantMessage.length}`)
+
+          // Warn if stream completed with no text output
+          if (!assistantMessage.trim()) {
+            console.warn('[Streaming] WARNING: Stream completed with no text output. Agent may have encountered an issue or timed out.')
+          }
         }
 
         // Attach reasoning data and RAG chunks to the final message metadata
@@ -440,7 +445,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             m.id === assistantId
               ? {
                   ...m,
-                  content: assistantMessage || m.content,
+                  content: assistantMessage || (currentSteps.length > 0 ? 'Processing your request...' : m.content),
                   metadata: {
                     ...m.metadata,
                     ...(finalReasoning ? { reasoning: finalReasoning } : {}),

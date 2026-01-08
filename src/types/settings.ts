@@ -15,6 +15,7 @@ export interface UserPreferences {
   auto_save_notes: boolean
   health_reminder_frequency: 'daily' | 'weekly' | 'monthly' | 'never'
   share_progress_with_practitioner: boolean
+  eval_mode_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -38,6 +39,7 @@ export interface PreferencesUpdatePayload {
   auto_save_notes?: boolean
   health_reminder_frequency?: 'daily' | 'weekly' | 'monthly' | 'never'
   share_progress_with_practitioner?: boolean
+  eval_mode_enabled?: boolean
 }
 
 // Model settings for AI configuration

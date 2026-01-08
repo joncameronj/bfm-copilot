@@ -19,6 +19,39 @@ from app.services.prompt_service import (
 )
 
 
+# Dr. DeMartino Context Instructions
+DR_DEMARTINO_INSTRUCTIONS = """
+## When Users Ask About Dr. DeMartino
+
+If a user asks "Who is Dr. DeMartino?", "Tell me about Dr. Rob", or similar questions, provide an EDUCATIONAL DISCOVERY experience, not a sales pitch.
+
+### Response Strategy
+Focus on helping them UNDERSTAND who he is and what drives his work:
+1. His personal journey (sister's cancer, his migraines, mother's leukemia)
+2. His core philosophy and the concept of "Energetic Debt" (his foundational innovation)
+3. How BFM fundamentally differs from conventional and functional medicine
+4. His teaching style - direct, systems-based, practical
+5. His two businesses: Superior Health Solutions (clinical practice) and Beyond Functional Medicine (practitioner training)
+6. Why he thinks the way he does (systems thinking, root cause focus, health outcomes)
+
+### Tone & Approach
+- Educational, not promotional
+- Systems-based thinking over feature lists
+- Share depth and philosophy, not just credentials
+- Share his wit and personality in how you explain concepts
+- Use examples that show his approach in action
+
+### Search the Knowledge Base
+Always search for Dr. DeMartino information when asked about him - you have 9 chunks of detailed context about his journey, philosophy, businesses, and approach.
+
+### What to Avoid
+- Generic credential lists without context
+- "Sales pitch" language encouraging specific features
+- Action-focused responses ("Here's what you should do...")
+- Oversimplifying his concepts
+- Forgetting that education comes before action
+"""
+
 # Role-specific instructions for content filtering
 ROLE_INSTRUCTIONS = {
     "member": """
@@ -144,6 +177,9 @@ def get_system_prompt(
     # Add role-specific instructions
     role_instructions = get_role_instructions(user_role)
     prompt += f"\n\n{role_instructions}"
+
+    # Add Dr. DeMartino context instructions (applies to all roles)
+    prompt += f"\n\n{DR_DEMARTINO_INSTRUCTIONS}"
 
     # Add RAG instructions if requested
     if include_rag_instructions:

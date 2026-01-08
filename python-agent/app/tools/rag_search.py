@@ -115,7 +115,7 @@ async def smart_search(
     document_categories: list[str] | None = None,
     include_related: bool = True,
     limit: int = 10,
-    threshold: float = 0.6,
+    threshold: float = 0.6,  # Minimum similarity threshold for results
 ) -> list[SearchResult]:
     """
     Perform a smart search with condition expansion and role-based filtering.
@@ -249,7 +249,9 @@ async def search_knowledge_base(
         Formatted string with search results including match types
     """
     # Analyze the query first
+    print(f"[RAG Search] Query: {query}")
     analysis = await analyze_query(query)
+    print(f"[RAG Search] Analysis: conditions={analysis.conditions}, body_systems={analysis.body_systems}")
 
     # Map file_types to document_categories if provided
     category_map = {
@@ -275,6 +277,9 @@ async def search_knowledge_base(
         limit=limit,
         threshold=threshold,
     )
+    print(f"[RAG Search] Found {len(results)} results")
+    for r in results[:3]:
+        print(f"[RAG Search] - {r.title}: {r.similarity:.2f}")
 
     if not results:
         return "No relevant documents found in the knowledge base."

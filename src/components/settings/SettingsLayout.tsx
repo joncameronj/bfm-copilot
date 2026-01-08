@@ -8,6 +8,8 @@ import { NotificationsSection } from './NotificationsSection'
 import { AdminSettingsSection } from './AdminSettingsSection'
 import { PractitionerSettingsSection } from './PractitionerSettingsSection'
 import { MemberSettingsSection } from './MemberSettingsSection'
+import { EvalModeSection } from './EvalModeSection'
+import { EVAL_MODE_USERS } from '@/types/eval-mode'
 import type { UserRole } from '@/types/roles'
 import type { Profile, UserPreferences } from '@/types/settings'
 
@@ -17,7 +19,7 @@ interface SettingsLayoutProps {
   userEmail: string
 }
 
-type SettingsTab = 'profile' | 'password' | 'notifications' | 'role-specific'
+type SettingsTab = 'profile' | 'password' | 'notifications' | 'role-specific' | 'eval-mode'
 
 function getRoleTabLabel(role: UserRole): string {
   switch (role) {
@@ -50,11 +52,15 @@ function RoleSpecificSection({
 export function SettingsLayout({ profile, preferences, userEmail }: SettingsLayoutProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
 
+  // Check if user is eligible for eval mode
+  const isEvalModeUser = EVAL_MODE_USERS.includes(userEmail.toLowerCase() as typeof EVAL_MODE_USERS[number])
+
   // Admin users don't see Admin Settings in the Settings page tabs - they access it via sidebar
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'profile', label: 'Profile' },
     { id: 'password', label: 'Password' },
     { id: 'notifications', label: 'Notifications' },
+    ...(isEvalModeUser ? [{ id: 'eval-mode' as SettingsTab, label: 'Evaluation Mode' }] : []),
     ...(profile.role !== 'admin' ? [{ id: 'role-specific' as SettingsTab, label: getRoleTabLabel(profile.role) }] : []),
   ]
 
@@ -86,6 +92,7 @@ export function SettingsLayout({ profile, preferences, userEmail }: SettingsLayo
         {activeTab === 'profile' && <ProfileSection profile={profile} email={userEmail} />}
         {activeTab === 'password' && <PasswordSection />}
         {activeTab === 'notifications' && <NotificationsSection preferences={preferences} />}
+        {activeTab === 'eval-mode' && <EvalModeSection />}
         {activeTab === 'role-specific' && (
           <RoleSpecificSection role={profile.role} preferences={preferences} />
         )}

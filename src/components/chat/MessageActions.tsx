@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Copy01Icon, ThumbsUpIcon, ThumbsDownIcon, Tick01Icon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { useEvalMode } from '@/providers/EvalModeProvider'
+import { EvalModeRating } from '@/components/feedback/EvalModeRating'
 
 interface MessageActionsProps {
   messageId: string
@@ -12,6 +14,7 @@ interface MessageActionsProps {
 }
 
 export function MessageActions({ messageId, content, conversationId }: MessageActionsProps) {
+  const { isEvalModeEnabled } = useEvalMode()
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [showFeedbackInput, setShowFeedbackInput] = useState(false)
@@ -84,7 +87,7 @@ export function MessageActions({ messageId, content, conversationId }: MessageAc
   return (
     <div className="mt-2">
       <div className="flex items-center gap-1">
-        {/* Copy button */}
+        {/* Copy button - always shown */}
         <button
           onClick={handleCopy}
           className={cn(
@@ -100,37 +103,49 @@ export function MessageActions({ messageId, content, conversationId }: MessageAc
           />
         </button>
 
-        {/* Thumbs up */}
-        <button
-          onClick={handleThumbsUp}
-          className={cn(
-            'p-1.5 rounded-lg transition-colors',
-            feedback === 'up'
-              ? 'text-green-600 bg-green-50'
-              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-          )}
-          title="Good response"
-        >
-          <HugeiconsIcon icon={ThumbsUpIcon} size={16} color="currentColor" />
-        </button>
+        {/* Conditional feedback UI based on eval mode */}
+        {isEvalModeEnabled ? (
+          <EvalModeRating
+            messageId={messageId}
+            conversationId={conversationId}
+            content={content}
+            contentType="chat_response"
+          />
+        ) : (
+          <>
+            {/* Thumbs up */}
+            <button
+              onClick={handleThumbsUp}
+              className={cn(
+                'p-1.5 rounded-lg transition-colors',
+                feedback === 'up'
+                  ? 'text-green-600 bg-green-50'
+                  : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+              )}
+              title="Good response"
+            >
+              <HugeiconsIcon icon={ThumbsUpIcon} size={16} color="currentColor" />
+            </button>
 
-        {/* Thumbs down */}
-        <button
-          onClick={handleThumbsDown}
-          className={cn(
-            'p-1.5 rounded-lg transition-colors',
-            feedback === 'down'
-              ? 'text-red-600 bg-red-50'
-              : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
-          )}
-          title="Bad response"
-        >
-          <HugeiconsIcon icon={ThumbsDownIcon} size={16} color="currentColor" />
-        </button>
+            {/* Thumbs down */}
+            <button
+              onClick={handleThumbsDown}
+              className={cn(
+                'p-1.5 rounded-lg transition-colors',
+                feedback === 'down'
+                  ? 'text-red-600 bg-red-50'
+                  : 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100'
+              )}
+              title="Bad response"
+            >
+              <HugeiconsIcon icon={ThumbsDownIcon} size={16} color="currentColor" />
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Feedback input for thumbs down */}
-      {showFeedbackInput && (
+      {/* Feedback input for thumbs down - only in non-eval mode */}
+      {!isEvalModeEnabled && showFeedbackInput && (
         <div className="mt-2 p-3 bg-neutral-50 rounded-lg">
           <p className="text-sm text-neutral-600 mb-2">
             What was wrong with this response?

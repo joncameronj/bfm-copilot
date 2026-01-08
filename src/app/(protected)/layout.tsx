@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { RoleViewProvider } from '@/providers/RoleViewProvider'
+import { EvalModeProvider } from '@/providers/EvalModeProvider'
 import type { UserRole } from '@/types/roles'
 
 export default async function ProtectedLayout({
@@ -27,21 +28,23 @@ export default async function ProtectedLayout({
 
   return (
     <RoleViewProvider actualRole={userRole}>
-      <div className="h-screen flex overflow-hidden">
-        {/* Sidebar - Fixed */}
-        <Sidebar
-          user={{
-            email: user.email || '',
-            fullName: profile?.full_name || null,
-            avatarUrl: profile?.avatar_url || null,
-          }}
-        />
+      <EvalModeProvider userEmail={user.email}>
+        <div className="h-screen flex overflow-hidden">
+          {/* Sidebar - Fixed */}
+          <Sidebar
+            user={{
+              email: user.email || '',
+              fullName: profile?.full_name || null,
+              avatarUrl: profile?.avatar_url || null,
+            }}
+          />
 
-        {/* Main content - Scrollable */}
-        <main className="flex-1 bg-white dark:bg-neutral-900 overflow-y-auto">
-          {children}
-        </main>
-      </div>
+          {/* Main content - Scrollable */}
+          <main className="flex-1 bg-white dark:bg-neutral-900 overflow-y-auto">
+            {children}
+          </main>
+        </div>
+      </EvalModeProvider>
     </RoleViewProvider>
   )
 }

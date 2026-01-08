@@ -13,6 +13,7 @@ const ALLOWED_FIELDS = [
   'auto_save_notes',
   'health_reminder_frequency',
   'share_progress_with_practitioner',
+  'eval_mode_enabled',
 ] as const
 
 // GET /api/settings/preferences
