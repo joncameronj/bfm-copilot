@@ -539,14 +539,14 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const cancelGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
 
-    // Update the streaming message to show "Copilot interrupted."
+    // Preserve streamed content and mark as stopped
     if (streamingMessageId) {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === streamingMessageId
             ? {
                 ...m,
-                content: 'Copilot interrupted.',
+                content: m.content ? `${m.content}\n\n*[Stopped]*` : '*[Stopped]*',
                 metadata: { ...m.metadata, interrupted: true },
               }
             : m
