@@ -133,4 +133,5 @@ export const CONTENT_TYPE_LABELS: Record<EvaluationContentType, string> = {
 export const EVAL_MODE_USERS = [
   'drrob@shslasvegas.com',
   'joncameron@etho.net',
+  'patientadvocate@shslasvegas.com',
 ] as const
