@@ -89,20 +89,20 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_eval_mode
 -- Initialize eval_mode for specific users
 -- ============================================
 
--- Set eval_mode_enabled = TRUE for Dr. Rob and JonCameron
+-- Set eval_mode_enabled = TRUE for Dr. Rob, JonCameron, and Kayla Costa
 -- First, update existing preferences
 UPDATE public.user_preferences
 SET eval_mode_enabled = TRUE
 WHERE user_id IN (
     SELECT id FROM public.profiles
-    WHERE email IN ('drrob@shslasvegas.com', 'joncameron@etho.net')
+    WHERE email IN ('drrob@shslasvegas.com', 'joncameron@etho.net', 'patientadvocate@shslasvegas.com')
 );
 
 -- Insert preferences if they don't exist for these users
 INSERT INTO public.user_preferences (user_id, eval_mode_enabled)
 SELECT p.id, TRUE
 FROM public.profiles p
-WHERE p.email IN ('drrob@shslasvegas.com', 'joncameron@etho.net')
+WHERE p.email IN ('drrob@shslasvegas.com', 'joncameron@etho.net', 'patientadvocate@shslasvegas.com')
 AND NOT EXISTS (
     SELECT 1 FROM public.user_preferences up WHERE up.user_id = p.id
 )
