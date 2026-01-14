@@ -150,7 +150,13 @@ Return a JSON object with:
   "intent": "what the user is trying to accomplish",
   "should_expand": true/false (whether to search for related conditions),
   "search_queries": ["optimized search queries for the knowledge base"]
-}""",
+}
+
+Rules:
+- For body_systems, use ONLY these exact strings (lowercase): ["endocrine","cardiovascular","digestive","immune","nervous","respiratory","musculoskeletal","reproductive","urinary","integumentary","lymphatic"]
+- If none apply, return an empty array for body_systems.
+- Do not invent new body system names.
+""",
 }
 
 

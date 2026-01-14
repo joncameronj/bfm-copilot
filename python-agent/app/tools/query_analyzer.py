@@ -13,6 +13,21 @@ from openai import OpenAI
 from app.config import get_settings
 from app.services.prompt_service import get_query_analyzer_prompt
 
+# Canonical body systems used in the DB/search filters
+ALLOWED_BODY_SYSTEMS = {
+    "endocrine",
+    "cardiovascular",
+    "digestive",
+    "immune",
+    "nervous",
+    "respiratory",
+    "musculoskeletal",
+    "reproductive",
+    "urinary",
+    "integumentary",
+    "lymphatic",
+}
+
 
 @dataclass
 class QueryAnalysis:
@@ -93,13 +108,21 @@ async def analyze_query(
         content = response.choices[0].message.content
         if content:
             data = json.loads(content)
-            return QueryAnalysis.from_dict(data)
+            parsed = QueryAnalysis.from_dict(data)
+            parsed.body_systems = _filter_allowed_systems(
+                _normalize_body_systems(parsed.body_systems)
+            )
+            return parsed
 
     except Exception as e:
         print(f"Warning: Query analysis failed: {e}")
 
     # Fallback: basic keyword extraction
-    return _fallback_analysis(query)
+    fallback = _fallback_analysis(query)
+    fallback.body_systems = _filter_allowed_systems(
+        _normalize_body_systems(fallback.body_systems)
+    )
+    return fallback
 
 
 def _fallback_analysis(query: str) -> QueryAnalysis:
@@ -275,6 +298,29 @@ def _fallback_analysis(query: str) -> QueryAnalysis:
         search_queries=search_queries,
     )
 
+
+def _normalize_body_systems(systems: list[str]) -> list[str]:
+    """
+    Lightweight normalization: lowercase and trim trailing "system(s)".
+    Canonical enforcement happens in _filter_allowed_systems.
+    """
+    normalized = []
+    for s in systems or []:
+        key = s.strip().lower()
+        # Drop trailing "system"/"systems"
+        if key.endswith(" systems"):
+            key = key[: -len(" systems")]
+        elif key.endswith(" system"):
+            key = key[: -len(" system")]
+        key = key.strip()
+        normalized.append(key)
+
+    return normalized
+
+
+def _filter_allowed_systems(systems: list[str]) -> list[str]:
+    """Keep only body systems that are in the allowed canonical set."""
+    return [s for s in systems if s in ALLOWED_BODY_SYSTEMS]
 
 # Tool definition for the OpenAI Agents SDK
 QUERY_ANALYZER_TOOL_DEFINITION = {

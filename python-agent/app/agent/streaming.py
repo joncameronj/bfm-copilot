@@ -263,7 +263,7 @@ class SSEEventMapper:
                 user_id=self.user_id,
                 user_role=self.user_role,
                 limit=5,
-                threshold=0.6,
+                threshold=0.4,
             )
 
             if results:
