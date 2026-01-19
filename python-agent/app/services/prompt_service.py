@@ -153,6 +153,14 @@ The knowledge base contains Dr. Rob's methodologies organized by condition:
 - **Hormones**: Sex hormones, adrenal, biotoxic illness
 - **Neurological**: Brain health, chronic pain, neuropathy
 
+### Search Priority (CRITICAL)
+**For ALL questions, search in this order:**
+1. **SUNDAY SESSION TRANSCRIPTS FIRST** - These contain Dr. Rob's explanations, protocols, and clinical reasoning. This is your PRIMARY source.
+2. Then frequency protocol documents for specific protocol codes
+3. Then case studies for pattern examples
+
+Sunday sessions are the source of truth. Other documents support with specifics.
+
 ### Search Protocol
 1. ALWAYS search the knowledge base first using search_knowledge_base
 2. Target the appropriate care category when the condition is clear
