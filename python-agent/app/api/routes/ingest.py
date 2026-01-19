@@ -1,6 +1,7 @@
 import io
 from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, Depends, HTTPException
 from PyPDF2 import PdfReader
+from pptx import Presentation
 
 from app.config import get_settings, Settings
 from app.embeddings.indexer import index_document
@@ -121,6 +122,9 @@ def extract_text(content: bytes, mime_type: str) -> str:
     if mime_type == "application/pdf":
         return extract_pdf_text(content)
 
+    elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        return extract_pptx_text(content)
+
     elif mime_type in ["text/plain", "text/markdown"]:
         return content.decode("utf-8", errors="ignore")
 
@@ -146,6 +150,39 @@ def extract_pdf_text(content: bytes) -> str:
             text_parts.append(text)
 
     return "\n\n".join(text_parts)
+
+
+def extract_pptx_text(content: bytes) -> str:
+    """Extract text from PPTX content."""
+    prs = Presentation(io.BytesIO(content))
+    text_parts = []
+
+    for slide_num, slide in enumerate(prs.slides, start=1):
+        slide_texts = [f"## Slide {slide_num}"]
+
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        slide_texts.append(text)
+
+            if shape.has_table:
+                for row in shape.table.rows:
+                    row_text = " | ".join(cell.text.strip() for cell in row.cells)
+                    if row_text.strip(" |"):
+                        slide_texts.append(row_text)
+
+        # Extract speaker notes
+        if slide.has_notes_slide:
+            notes_text = slide.notes_slide.notes_text_frame.text.strip()
+            if notes_text:
+                slide_texts.append(f"\n**Notes:** {notes_text}")
+
+        if len(slide_texts) > 1:
+            text_parts.append("\n".join(slide_texts))
+
+    return "\n\n---\n\n".join(text_parts)
 
 
 async def process_document_task(

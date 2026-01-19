@@ -228,53 +228,85 @@ export async function generateDiagnosticAnalysis(
   // 5. Build query for RAG search
   const queryText = buildSearchQuery(patientContext, diagnosticFiles, extractedData)
 
-  // 6. Generate embedding and perform PRIORITIZED search (Sunday docs first)
-  const queryEmbedding = await generateEmbedding(queryText)
+  // 6. Perform RAG search via Python agent (single source of truth)
+  // This ensures consistent search behavior across chat and diagnostic analysis
+  const pythonAgentUrl = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
 
-  // Use prioritized search - Sunday BFM docs are searched FIRST
-  const { data: ragResults, error: ragError } = await supabase.rpc(
-    'prioritized_search_documents',
-    {
-      p_query_embedding: queryEmbedding,
-      p_user_id: practitionerId,
-      p_user_role: userRole,
-      p_match_threshold: 0.45, // Lower threshold to ensure Sunday docs are included
-      p_sunday_count: 5,       // Get at least 5 Sunday doc chunks
-      p_other_count: 10,       // Plus 10 from other sources
+  let ragChunks: RagChunk[] = []
+
+  try {
+    const ragResponse = await fetch(`${pythonAgentUrl}/agent/rag/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: queryText,
+        user_id: practitionerId,
+        user_role: userRole,
+        limit: 15,
+        threshold: 0.40, // Lowered to improve recall
+        include_related: true,
+      }),
+    })
+
+    if (!ragResponse.ok) {
+      throw new Error(`RAG search failed: ${ragResponse.status} ${ragResponse.statusText}`)
     }
-  )
 
-  if (ragError) {
-    console.error('RAG search error:', ragError)
-    // Fallback to old search if prioritized search fails
+    const ragData = await ragResponse.json()
+
+    // Convert Python agent response to RagChunk format
+    ragChunks = (ragData.results || []).map((r: Record<string, unknown>) => ({
+      chunk_id: '', // Not provided by Python agent
+      document_id: '', // Not provided by Python agent
+      content: r.content as string,
+      title: r.title as string | null,
+      filename: r.filename as string,
+      similarity: r.similarity as number,
+      care_category: undefined,
+      document_category: r.document_category as string | undefined,
+      seminar_day: undefined,
+      search_phase: r.match_type as string | undefined, // Use match_type as search_phase
+      priority_rank: undefined,
+    }))
+
+    console.log(`[RAG] Python agent returned ${ragChunks.length} results for diagnostic analysis`)
+  } catch (ragError) {
+    console.error('Python agent RAG search error:', ragError)
+
+    // Fallback to Supabase RPC if Python agent fails
+    console.warn('Falling back to Supabase RPC for RAG search')
+    const queryEmbedding = await generateEmbedding(queryText)
+
     const { data: fallbackResults } = await supabase.rpc(
       'smart_search_documents_v2',
       {
         p_query_embedding: queryEmbedding,
         p_user_id: practitionerId,
         p_user_role: userRole,
-        p_match_threshold: 0.5,
+        p_match_threshold: 0.40,
         p_match_count: 15,
       }
     )
+
     if (fallbackResults) {
-      console.warn('Using fallback RAG search (smart_search_documents_v2)')
+      ragChunks = (fallbackResults || []).map((r: Record<string, unknown>) => ({
+        chunk_id: r.chunk_id as string,
+        document_id: r.document_id as string,
+        content: r.content as string,
+        title: r.title as string | null,
+        filename: r.filename as string,
+        similarity: r.similarity as number,
+        care_category: r.care_category as string | undefined,
+        document_category: r.document_category as string | undefined,
+        seminar_day: r.seminar_day as string | undefined,
+        search_phase: undefined,
+        priority_rank: undefined,
+      }))
+      console.log(`[RAG] Fallback returned ${ragChunks.length} results`)
     }
   }
-
-  const ragChunks: RagChunk[] = (ragResults || []).map((r: Record<string, unknown>) => ({
-    chunk_id: r.chunk_id as string,
-    document_id: r.document_id as string,
-    content: r.content as string,
-    title: r.title as string | null,
-    filename: r.filename as string,
-    similarity: r.similarity as number,
-    care_category: r.care_category as string | undefined,
-    document_category: r.document_category as string | undefined,
-    seminar_day: r.seminar_day as string | undefined,
-    search_phase: r.search_phase as string | undefined,
-    priority_rank: r.priority_rank as number | undefined,
-  }))
 
   // 7. Fetch APPROVED frequency names (for validation)
   const { data: approvedFrequencies } = await supabase

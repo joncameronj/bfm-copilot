@@ -1,8 +1,66 @@
 # Clinic Copilot - Product Requirements Document (PRD)
 
-**Version**: 2.1
+**Version**: 2.2
 **Last Updated**: January 2026
 **Status**: Production Ready
+
+---
+
+## TL;DR - What This Product Does
+
+**For Practitioners (Primary Use Case):**
+```
+Upload diagnostic files → AI extracts data → RAG finds relevant protocols
+→ AI generates analysis in Dr. Rob's voice → Approve recommendations → Execute & track outcomes
+```
+
+**For Members:**
+Track personal health data → Chat with AI → Receive suggestions → Provide feedback
+
+**For Admins:**
+Monitor AI quality → Manage users → Maintain knowledge base
+
+---
+
+## Core Flow: Diagnostics to Protocols
+
+This is the primary value proposition for practitioners:
+
+| Step | What Happens | Endpoint |
+|------|--------------|----------|
+| 1. **Upload** | Diagnostic files stored in Supabase Storage | `POST /api/diagnostics/upload` |
+| 2. **Extract** | Vision API (GPT-4o) extracts structured data from images/PDFs | `POST /api/diagnostics/files/[id]/extract` |
+| 3. **Analyze** | Python agent performs RAG search + generates AI analysis | `POST /api/diagnostics/[id]/generate-analysis` |
+| 4. **Recommend** | AI suggests protocols with frequencies based on knowledge base | (part of analysis response) |
+| 5. **Validate** | Frequencies validated against approved list (prevents hallucination) | (post-processing) |
+| 6. **Approve** | Practitioner reviews and approves recommendations | `POST /api/protocol-recommendations/[id]/approve` |
+| 7. **Execute** | Protocol executed, outcome tracked for feedback loop | `POST /api/protocol-recommendations/[id]/execute` |
+
+### Key Files in This Flow
+- `src/lib/rag/analysis-generator.ts` - Orchestrates the analysis
+- `python-agent/app/api/routes/rag.py` - RAG search endpoint
+- `python-agent/app/tools/rag_search.py` - Smart semantic search
+- `src/lib/rag/frequency-validator.ts` - Validates AI-suggested frequencies
+
+---
+
+## RAG System Overview
+
+The RAG (Retrieval-Augmented Generation) system is the core intelligence layer:
+
+**What It Does:**
+1. **Stores Knowledge**: Dr. Rob's protocols, Sunday seminar transcripts, lab guides, care protocols
+2. **Searches Semantically**: Uses pgvector for vector similarity search (threshold: 0.40)
+3. **Expands Related Conditions**: thyroid issues → also searches adrenal, iron deficiency
+4. **Filters by Role**: Practitioners see clinical content, members see educational content
+
+**Architecture:**
+```
+Query → Python Agent → Query Analysis (GPT-4o-mini) → Embedding Generation
+    → Vector Search (pgvector) → Role Filtering → Results with Similarity Scores
+```
+
+**Single Source of Truth:** All RAG searches route through the Python agent at `/agent/rag/search`
 
 ---
 

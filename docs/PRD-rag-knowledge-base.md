@@ -3,6 +3,51 @@
 
 ---
 
+## TL;DR - What the RAG System Does
+
+```
+User asks question → Query analyzed → Embeddings generated → Vector search
+→ Related conditions expanded → Results filtered by role → AI uses context to respond
+```
+
+**Key Settings:**
+- Embedding model: `text-embedding-3-small` (1536 dimensions)
+- Similarity threshold: `0.40`
+- Chunk size: 500 tokens with 50 token overlap
+- Vector index: IVFFlat with cosine distance
+
+**Single Source of Truth:** Python agent at `/agent/rag/search`
+
+---
+
+## Known Issues (January 2026)
+
+### Issue 1: Exact Word Matches Failing
+**Symptom:** Searches for exact terms like "hypothyroidism" don't always return documents containing that exact word.
+
+**Root Cause:** Semantic search optimizes for meaning, not lexical matching. A query embedding for "hypothyroidism" may not have high similarity (>0.40) with a chunk that discusses thyroid conditions using different terminology.
+
+**Mitigation:** Lowered threshold from 0.60 → 0.45 → 0.40. Consider adding hybrid search (semantic + keyword).
+
+### Issue 2: Tags Not Being Used
+**Symptom:** The `bfm_search_20250122` SQL function accepts `p_tag_names` but ignores it.
+
+**Impact:** Direct tag-based matching doesn't work. All matches are semantic-only.
+
+**Status:** Documented for future fix. Requires SQL function update.
+
+### Issue 3: Two RAG Implementations (RESOLVED)
+**Previous State:** Python agent and JS `analysis-generator.ts` had separate RAG search logic.
+
+**Resolution:** Unified to Python agent as single source of truth. All RAG searches now go through `/agent/rag/search`.
+
+### Issue 4: Telemetry Gaps
+**Previous State:** Python agent RAG searches weren't logged to `rag_logs` table.
+
+**Resolution:** Added logging to track all searches for evaluation and debugging.
+
+---
+
 ## 1. Overview
 
 ### 1.1 Product Name

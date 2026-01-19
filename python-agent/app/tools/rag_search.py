@@ -19,6 +19,15 @@ from app.embeddings.embedder import embed_query
 from app.services.supabase import get_supabase_client
 from app.tools.query_analyzer import QueryAnalysis, analyze_query
 from app.config import get_settings
+from app.utils.logger import (
+    get_logger,
+    log_search_start,
+    log_query_analysis,
+    log_search_params,
+    log_search_results,
+    log_error,
+    log_timing,
+)
 
 
 # Role scope mappings
@@ -102,7 +111,7 @@ async def log_rag_query(
         ).execute()
     except Exception as e:
         # Don't fail the search if logging fails
-        print(f"Warning: Failed to log RAG query: {e}")
+        log_error("Failed to log RAG query", e)
 
 
 async def smart_search(
@@ -115,7 +124,7 @@ async def smart_search(
     document_categories: list[str] | None = None,
     include_related: bool = True,
     limit: int = 10,
-    threshold: float = 0.6,  # Minimum similarity threshold for results
+    threshold: float = 0.40,  # Minimum similarity threshold for results (lowered from 0.6)
 ) -> list[SearchResult]:
     """
     Perform a smart search with condition expansion and role-based filtering.
@@ -224,7 +233,7 @@ async def search_knowledge_base(
     conversation_id: str | None = None,
     file_types: list[str] | None = None,
     limit: int = 5,
-    threshold: float = 0.4,  # Lowered from 0.7 to capture more BFM content
+    threshold: float = 0.40,  # Standardized threshold (matches SQL function default)
 ) -> str:
     """
     Search the health knowledge base for relevant documents.
@@ -249,9 +258,15 @@ async def search_knowledge_base(
         Formatted string with search results including match types
     """
     # Analyze the query first
-    print(f"[RAG Search] Query: {query}")
+    log_search_start(query, user_role)
     analysis = await analyze_query(query)
-    print(f"[RAG Search] Analysis: conditions={analysis.conditions}, body_systems={analysis.body_systems}")
+    log_query_analysis(
+        conditions=analysis.conditions,
+        symptoms=analysis.symptoms,
+        body_systems=analysis.body_systems,
+        all_tags=analysis.all_tags(),
+        should_expand=analysis.should_expand,
+    )
 
     # Map file_types to document_categories if provided
     category_map = {
@@ -277,12 +292,10 @@ async def search_knowledge_base(
         limit=limit,
         threshold=threshold,
     )
-    print(f"[RAG Search] Found {len(results)} results")
-    for r in results[:3]:
-        print(f"[RAG Search] - {r.title}: {r.similarity:.2f}")
+    log_search_results(results, search_time_ms=0)  # Time logged elsewhere
 
     if not results:
-        return "No relevant documents found in the knowledge base."
+        return "Search complete. Please provide guidance based on your clinical expertise."
 
     # Format results with match type indicators
     formatted_results = []

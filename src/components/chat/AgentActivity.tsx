@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { File01Icon, BookOpen01Icon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
-import type { Source, AgentStep } from '@/types/chat'
+import type { Source, AgentStep, ReasoningData } from '@/types/chat'
 
 interface AgentActivityProps {
   isActive: boolean
@@ -14,6 +14,8 @@ interface AgentActivityProps {
   sources: Source[]
   thinkingStartTime?: number | null
   className?: string
+  isReasoning?: boolean
+  reasoning?: ReasoningData | null
 }
 
 /**
@@ -26,6 +28,8 @@ export function AgentActivity({
   sources,
   thinkingStartTime,
   className,
+  isReasoning = false,
+  reasoning,
 }: AgentActivityProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -124,9 +128,9 @@ export function AgentActivity({
         </div>
       </button>
 
-      {/* Expandable sources list */}
+      {/* Expandable content: reasoning and sources */}
       <AnimatePresence>
-        {isExpanded && sources.length > 0 && (
+        {isExpanded && (sources.length > 0 || isReasoning || reasoning?.text) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -134,12 +138,40 @@ export function AgentActivity({
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-3 pt-1 space-y-1.5 border-t border-neutral-100">
-              <AnimatePresence mode="popLayout">
-                {sources.map((source, index) => (
-                  <SourceItem key={source.id} source={source} index={index} />
-                ))}
-              </AnimatePresence>
+            <div className="border-t border-neutral-100 dark:border-neutral-800">
+              {/* Reasoning section */}
+              {(isReasoning || reasoning?.text) && (
+                <div className={cn(
+                  "px-4 py-3",
+                  sources.length > 0 && "border-b border-neutral-100 dark:border-neutral-800"
+                )}>
+                  <div className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                    {reasoning?.text || (
+                      <span className="text-neutral-400 dark:text-neutral-500 italic">Processing...</span>
+                    )}
+                    {isReasoning && (
+                      <motion.span
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 0.8, repeat: Infinity }}
+                        className="inline-block ml-0.5 text-brand-blue"
+                      >
+                        |
+                      </motion.span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sources list */}
+              {sources.length > 0 && (
+                <div className="px-4 pb-3 pt-2 space-y-1.5">
+                  <AnimatePresence mode="popLayout">
+                    {sources.map((source, index) => (
+                      <SourceItem key={source.id} source={source} index={index} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

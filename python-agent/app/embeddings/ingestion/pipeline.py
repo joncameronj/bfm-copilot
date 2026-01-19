@@ -24,6 +24,7 @@ from app.embeddings.preprocessing import (
     extract_pdf_text,
     process_pdf_with_vision_fallback,
     extract_docx_text,
+    extract_pptx_text,
 )
 from app.embeddings.chunker import chunk_by_paragraphs
 from app.embeddings.embedder import get_embeddings_batch
@@ -39,6 +40,7 @@ class AssetType(Enum):
     PDF = "pdf"
     IMAGE = "image"
     DOCX = "docx"
+    PPTX = "pptx"
 
 
 @dataclass
@@ -202,6 +204,11 @@ class IngestionPipeline:
         # Process DOCX
         for docx_file in case_dir.glob("*.docx"):
             result = await self._process_docx(docx_file, category, case_id)
+            results.append(result)
+
+        # Process PPTX
+        for pptx_file in case_dir.glob("*.pptx"):
+            result = await self._process_pptx(pptx_file, category, case_id)
             results.append(result)
 
         return results
@@ -470,6 +477,73 @@ class IngestionPipeline:
             return ProcessingResult(
                 asset_path=filepath,
                 asset_type=AssetType.DOCX,
+                care_category=category,
+                success=False,
+                error=str(e),
+            )
+
+    async def _process_pptx(
+        self, filepath: Path, category: str, case_id: str
+    ) -> ProcessingResult:
+        """Process a PPTX file."""
+        start_time = datetime.now()
+
+        try:
+            # Extract text from PPTX
+            result = extract_pptx_text(filepath)
+
+            if not result["has_content"]:
+                return ProcessingResult(
+                    asset_path=filepath,
+                    asset_type=AssetType.PPTX,
+                    care_category=category,
+                    success=False,
+                    error="No content found in presentation",
+                )
+
+            text_content = result["text_content"]
+
+            if self.dry_run:
+                return ProcessingResult(
+                    asset_path=filepath,
+                    asset_type=AssetType.PPTX,
+                    care_category=category,
+                    success=True,
+                )
+
+            # Generate metadata
+            doc_metadata = infer_metadata_from_filename(filepath)
+
+            # Index the document
+            doc_id, chunks_count = await self._index_content(
+                content=text_content,
+                title=doc_metadata.title,
+                care_category=category,
+                source_type="case_study",
+                filename=filepath.name,
+                metadata={
+                    "case_study_id": case_id,
+                    "slide_count": result["slide_count"],
+                    "has_notes": result["has_notes"],
+                },
+            )
+
+            elapsed_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            return ProcessingResult(
+                asset_path=filepath,
+                asset_type=AssetType.PPTX,
+                care_category=category,
+                document_id=doc_id,
+                success=True,
+                chunks_created=chunks_count,
+                processing_time_ms=elapsed_ms,
+            )
+
+        except Exception as e:
+            return ProcessingResult(
+                asset_path=filepath,
+                asset_type=AssetType.PPTX,
                 care_category=category,
                 success=False,
                 error=str(e),

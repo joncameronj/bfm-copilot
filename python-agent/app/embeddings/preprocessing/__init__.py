@@ -17,6 +17,7 @@ from .markdown_cleaner import clean_transcript, CleaningConfig
 from .image_processor import process_image_with_vision, detect_image_type
 from .pdf_processor import extract_pdf_text, process_pdf_with_vision_fallback
 from .docx_processor import extract_docx_text
+from .pptx_processor import extract_pptx_text
 
 __all__ = [
     "generate_frontmatter",
@@ -29,4 +30,5 @@ __all__ = [
     "extract_pdf_text",
     "process_pdf_with_vision_fallback",
     "extract_docx_text",
+    "extract_pptx_text",
 ]

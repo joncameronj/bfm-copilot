@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Settings cache TTL in seconds
     settings_cache_ttl: int = 60
 
+    # RAG logging settings
+    rag_log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

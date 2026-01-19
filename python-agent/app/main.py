@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api.routes import chat, ingest, health
+from app.api.routes import chat, ingest, health, rag
 from app.services.model_settings import init_model_settings_service, get_model_settings_service
 
 settings = get_settings()
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(chat.router, prefix="/agent", tags=["Chat"])
 app.include_router(ingest.router, prefix="/agent", tags=["Ingest"])
+app.include_router(rag.router, prefix="/agent", tags=["RAG"])
 
 
 @app.on_event("startup")

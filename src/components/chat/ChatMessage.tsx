@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { ReasoningDisplay } from './ReasoningDisplay'
 import { AgentActivity } from './AgentActivity'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { ShimmerEffect } from './ShimmerEffect'
@@ -104,21 +103,15 @@ export function ChatMessage({
           <ThinkingIndicator startTime={thinkingStartTime} />
         )}
 
-        {/* Agent activity display for assistant messages - shows when we have steps or sources */}
-        {isAssistant && (steps.length > 0 || sources.length > 0) && (
+        {/* Agent activity display for assistant messages - shows when we have steps, sources, or reasoning */}
+        {isAssistant && (steps.length > 0 || sources.length > 0 || isReasoning || reasoningData) && (
           <AgentActivity
             isActive={isThinking || isReasoning}
             steps={steps}
             sources={sources}
             thinkingStartTime={thinkingStartTime}
-          />
-        )}
-
-        {/* Reasoning display for assistant messages */}
-        {isAssistant && (isReasoning || reasoningData) && (
-          <ReasoningDisplay
             isReasoning={isReasoning}
-            reasoning={reasoningData || null}
+            reasoning={reasoningData}
           />
         )}
 

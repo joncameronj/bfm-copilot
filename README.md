@@ -144,6 +144,61 @@ Clinic Copilot serves three distinct user types:
 - **Storage**: Supabase Storage
 - **Containerization**: Docker & Docker Compose
 
+## RAG Architecture
+
+The RAG (Retrieval-Augmented Generation) system is the core intelligence layer that powers AI responses.
+
+### How It Works
+
+```
+User Query → Python Agent → Query Analysis (GPT-4o-mini)
+    ↓
+Embedding Generation (text-embedding-3-small)
+    ↓
+Vector Search (pgvector, threshold: 0.40)
+    ↓
+Role-Based Filtering → Results with Similarity Scores
+```
+
+### Key Settings
+| Setting | Value |
+|---------|-------|
+| Embedding Model | `text-embedding-3-small` (1536 dimensions) |
+| Similarity Threshold | 0.40 |
+| Chunk Size | 500 tokens |
+| Chunk Overlap | 50 tokens |
+| Vector Index | IVFFlat with cosine distance |
+
+### Single Source of Truth
+All RAG searches route through the Python agent endpoint: `POST /agent/rag/search`
+
+This ensures consistent search behavior across:
+- AI Chat conversations
+- Diagnostic analysis
+- Protocol recommendations
+
+### Diagnostics-to-Protocols Flow
+
+The primary practitioner workflow:
+
+```
+1. Upload    → Diagnostic files to Supabase Storage
+2. Extract   → Vision API (GPT-4o) extracts structured data
+3. Analyze   → Python agent RAG + AI generates analysis
+4. Recommend → AI suggests protocols based on knowledge base
+5. Validate  → Frequencies checked against approved list
+6. Approve   → Practitioner reviews recommendations
+7. Execute   → Track outcomes for feedback loop
+```
+
+| Step | Endpoint |
+|------|----------|
+| Upload | `POST /api/diagnostics/upload` |
+| Extract | `POST /api/diagnostics/files/[id]/extract` |
+| Analyze | `POST /api/diagnostics/[id]/generate-analysis` |
+| Approve | `POST /api/protocol-recommendations/[id]/approve` |
+| Execute | `POST /api/protocol-recommendations/[id]/execute` |
+
 ## Project Structure
 
 ```
