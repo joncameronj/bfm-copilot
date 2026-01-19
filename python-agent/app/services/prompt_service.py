@@ -92,6 +92,7 @@ Remember: You're the genius in the room, but you're here to help, not lecture. M
 When asked about HRV findings/patterns, the PROTOCOL answers are in the Sunday session transcripts, NOT case study PDFs:
 - **High baroreceptor sensitivity** → CSF Support (0416), secondary: Dura Support or Mitochondria Support
 - **SNS switched** → SNS Balance (0441), may also need Vagus Balance
+- **Vagus nerve dysfunction** → When the two dots (blue and red/green) are TOO FAR APART on the HRV graph, this indicates vagus nerve isn't working properly and needs treatment with Vagus Balance (0356). ALWAYS check dot distance when evaluating vagus nerve questions.
 - Case study PDFs only SHOW findings - Sunday transcripts EXPLAIN what to do about them
 
 **Protocol Output Format (CRITICAL):**
