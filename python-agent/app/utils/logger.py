@@ -138,10 +138,11 @@ def log_query_analysis(
 def log_search_params(
     threshold: float,
     limit: int,
-    tag_names: list[str] | None,
-    body_systems: list[str] | None,
-    document_categories: list[str] | None,
-    include_related: bool,
+    tag_names: list[str] | None = None,
+    body_systems: list[str] | None = None,
+    document_categories: list[str] | None = None,
+    include_related: bool = True,
+    seminar_day: str | None = None,  # NEW: Sunday-first search support
 ) -> None:
     """Log search parameters sent to Supabase."""
     logger = get_logger("search")
@@ -151,6 +152,8 @@ def log_search_params(
         f"limit={limit}",
     ]
 
+    if seminar_day:
+        params.append(f"seminar_day={_colorize(seminar_day, 'CYAN')}")
     if tag_names:
         params.append(f"tags={tag_names}")
     if body_systems:

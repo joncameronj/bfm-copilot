@@ -212,7 +212,7 @@ export async function generateDiagnosticAnalysis(
     fileType: f.file_type,
   }))
 
-  // 3. Check if patient has labs
+  // 3. Check if patient has existing labs in lab_results table
   const { data: labResults } = await supabase
     .from('lab_results')
     .select('id, test_date, ominous_count')
@@ -220,15 +220,22 @@ export async function generateDiagnosticAnalysis(
     .order('test_date', { ascending: false })
     .limit(1)
 
-  const hasLabs = Boolean(labResults && labResults.length > 0)
+  const hasExistingLabResults = Boolean(labResults && labResults.length > 0)
 
   // 4. Fetch extracted diagnostic values (from Vision API)
   const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
 
-  // 5. Build query for RAG search
+  // 5. Determine if we have lab data for supplementation recommendations
+  // Include labs if either:
+  // - Patient has existing lab_results records, OR
+  // - This diagnostic upload includes extracted blood panel data
+  const hasExtractedBloodPanel = extractedData?.bloodPanel !== null
+  const hasLabs = hasExistingLabResults || hasExtractedBloodPanel
+
+  // 7. Build query for RAG search
   const queryText = buildSearchQuery(patientContext, diagnosticFiles, extractedData)
 
-  // 6. Perform RAG search via Python agent (single source of truth)
+  // 8. Perform RAG search via Python agent (single source of truth)
   // This ensures consistent search behavior across chat and diagnostic analysis
   const pythonAgentUrl = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
 
@@ -308,7 +315,7 @@ export async function generateDiagnosticAnalysis(
     }
   }
 
-  // 7. Fetch APPROVED frequency names (for validation)
+  // 9. Fetch APPROVED frequency names (for validation)
   const { data: approvedFrequencies } = await supabase
     .from('approved_frequency_names')
     .select('name, aliases, category')
@@ -319,13 +326,13 @@ export async function generateDiagnosticAnalysis(
     ...(f.aliases || []),
   ])
 
-  // 8. Get FSM frequencies for reference (legacy, may be removed)
+  // 10. Get FSM frequencies for reference (legacy, may be removed)
   const { data: fsmFrequencies } = await supabase
     .from('fsm_frequencies')
     .select('id, name, frequency_a, frequency_b, category, condition, description')
     .eq('is_active', true)
 
-  // 9. Generate analysis with AI
+  // 11. Generate analysis with AI
   const analysis = await callAIForAnalysis(
     patientContext,
     diagnosticFiles,
@@ -387,10 +394,8 @@ function buildSearchQuery(
     parts.push('seven deal breakers D-Pulse energy assessment')
   }
 
-  // Add chief complaints
-  if (patient.chiefComplaints) {
-    parts.push(`Patient presents with: ${patient.chiefComplaints}`)
-  }
+  // NOTE: Chief complaints intentionally NOT included in search query
+  // Per Issue 4: Protocols should be driven by diagnostic data, not subjective complaints
 
   // Add medical history
   if (patient.medicalHistory) {
@@ -660,7 +665,6 @@ async function callAIForAnalysis(
 - Name: ${patient.firstName} ${patient.lastName}
 - Gender: ${patient.gender}
 - Date of Birth: ${patient.dateOfBirth}
-${patient.chiefComplaints ? `- Chief Complaints: ${patient.chiefComplaints}` : ''}
 ${patient.medicalHistory ? `- Medical History: ${patient.medicalHistory}` : ''}
 ${patient.currentMedications?.length ? `- Current Medications: ${patient.currentMedications.join(', ')}` : ''}
 ${patient.allergies?.length ? `- Allergies: ${patient.allergies.join(', ')}` : ''}

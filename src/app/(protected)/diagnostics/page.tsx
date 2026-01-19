@@ -121,8 +121,11 @@ export default function DiagnosticsPage() {
       // Refresh uploads
       await fetchPatientUploads()
 
-      // Navigate to protocols page filtered by patient
-      router.push(`/protocols?patientId=${selectedPatientId}`)
+      // Navigate to patient profile where they can see:
+      // - The newly generated analysis in "Diagnostic Analyses" section
+      // - Frequency protocols and supplementation when expanding the analysis
+      // - Lab Results count (when blood panels are uploaded)
+      router.push(`/patients/${selectedPatientId}`)
     } catch (error) {
       console.error('Analysis generation failed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to generate analysis')

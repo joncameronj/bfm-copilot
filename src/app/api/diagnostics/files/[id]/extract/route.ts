@@ -4,7 +4,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { extractDiagnosticValues } from '@/lib/vision'
+import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
 import type { DiagnosticType } from '@/types/shared'
+import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // 2 minutes for complex extractions
@@ -157,6 +159,26 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     // Mark file as processed
     await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', fileId)
+
+    // For blood_panel files, also persist to lab_results/lab_values tables
+    // This ensures blood work appears in the patient's lab section
+    if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
+      const labPersistResult = await persistBloodPanelToLabTables(
+        supabase,
+        result.data as BloodPanelExtractedData,
+        file.upload_id,
+        user.id
+      )
+
+      if (!labPersistResult.success) {
+        console.warn('[Extract] Failed to persist blood panel to lab tables:', labPersistResult.error)
+      } else {
+        console.log(
+          `[Extract] Blood panel persisted to lab tables: ${labPersistResult.labResultId}, ` +
+          `${labPersistResult.labValuesCount} values`
+        )
+      }
+    }
 
     // Log usage event
     await supabase.from('usage_events').insert({

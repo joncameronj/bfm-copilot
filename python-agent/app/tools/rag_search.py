@@ -51,6 +51,7 @@ class SearchResult:
     similarity: float
     match_type: str  # 'direct', 'related', or 'semantic'
     matched_tags: list[str]
+    seminar_day: str | None = None  # 'friday', 'saturday', 'sunday', or None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -64,6 +65,7 @@ class SearchResult:
             "similarity": self.similarity,
             "match_type": self.match_type,
             "matched_tags": self.matched_tags,
+            "seminar_day": self.seminar_day,
         }
 
 
@@ -112,6 +114,239 @@ async def log_rag_query(
     except Exception as e:
         # Don't fail the search if logging fails
         log_error("Failed to log RAG query", e)
+
+
+async def _search_with_day_filter(
+    query_embedding: list[float],
+    user_id: str,
+    user_role: str,
+    seminar_day: str | None = None,
+    body_systems: list[str] | None = None,
+    document_categories: list[str] | None = None,
+    tag_names: list[str] | None = None,
+    include_related: bool = True,
+    threshold: float = 0.40,
+    limit: int = 10,
+) -> list[SearchResult]:
+    """
+    Internal helper: Search with optional seminar_day filter.
+    Used by sunday_first_search for cascading searches.
+    """
+    settings = get_settings()
+    headers = {
+        'apikey': settings.supabase_service_key,
+        'Authorization': f'Bearer {settings.supabase_service_key}',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        "p_query_embedding": query_embedding,
+        "p_user_id": user_id,
+        "p_care_categories": None,
+        "p_body_systems": body_systems,
+        "p_document_categories": document_categories,
+        "p_tag_names": tag_names,
+        "p_include_related": include_related,
+        "p_match_threshold": threshold,
+        "p_match_count": limit,
+        "p_user_role": user_role,
+        "p_seminar_day": seminar_day,  # NEW: Filter by seminar day
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
+            headers=headers,
+            json=payload,
+            timeout=30.0
+        )
+        resp.raise_for_status()
+        result_data = resp.json()
+
+    results = []
+    for row in result_data or []:
+        results.append(
+            SearchResult(
+                content=row["content"],
+                title=row["title"] or row["filename"],
+                filename=row["filename"],
+                body_system=row.get("body_system"),
+                document_category=row.get("document_category"),
+                role_scope=row.get("role_scope"),
+                similarity=row["similarity"],
+                match_type=row["match_type"],
+                matched_tags=row.get("matched_tags") or [],
+                seminar_day=row.get("seminar_day"),
+            )
+        )
+    return results
+
+
+def _deduplicate_results(results: list[SearchResult]) -> list[SearchResult]:
+    """Remove duplicate results by content, keeping highest similarity."""
+    seen_content: dict[str, SearchResult] = {}
+    for r in results:
+        # Use first 200 chars of content as key
+        key = r.content[:200]
+        if key not in seen_content or r.similarity > seen_content[key].similarity:
+            seen_content[key] = r
+    return sorted(seen_content.values(), key=lambda x: x.similarity, reverse=True)
+
+
+async def sunday_first_search(
+    query: str,
+    user_id: str,
+    user_role: Literal["admin", "practitioner", "member"] = "member",
+    conversation_id: str | None = None,
+    analysis: QueryAnalysis | None = None,
+    body_systems: list[str] | None = None,
+    document_categories: list[str] | None = None,
+    include_related: bool = True,
+    limit: int = 10,
+    threshold: float = 0.40,
+    min_sunday_results: int = 3,
+) -> list[SearchResult]:
+    """
+    Cascading search: Sunday first, then Saturday, then Friday.
+
+    Strategy:
+    1. Search only Sunday docs first (tactical case studies, protocols)
+    2. If insufficient high-quality results, add Saturday docs
+    3. If still insufficient, add Friday docs
+    4. Always include case studies regardless of day
+
+    Args:
+        query: The search query
+        user_id: User ID for access control
+        user_role: User role for content filtering
+        conversation_id: Optional conversation ID for logging
+        analysis: Pre-computed query analysis (optional)
+        body_systems: Filter by body systems
+        document_categories: Filter by document categories
+        include_related: Whether to expand to related conditions
+        limit: Maximum results to return
+        threshold: Minimum similarity threshold
+        min_sunday_results: Minimum high-quality Sunday results before expanding
+
+    Returns:
+        List of SearchResult objects, prioritizing Sunday content
+    """
+    start_time = time.time()
+    error_msg = None
+    results: list[SearchResult] = []
+
+    try:
+        # Analyze query if not provided
+        if analysis is None:
+            analysis = await analyze_query(query)
+
+        # Use body systems from analysis if not specified
+        if body_systems is None and analysis.body_systems:
+            body_systems = analysis.body_systems
+
+        # Generate query embedding once
+        query_embedding = await embed_query(query)
+        tag_names = analysis.all_tags() if analysis else None
+        should_expand = include_related and (analysis.should_expand if analysis else True)
+
+        all_results: list[SearchResult] = []
+
+        # Phase 1: Sunday only (tactical case studies and protocols)
+        log_search_params(
+            threshold=threshold,
+            limit=limit,
+            body_systems=body_systems,
+            document_categories=document_categories,
+            seminar_day="sunday",
+        )
+        sunday_results = await _search_with_day_filter(
+            query_embedding=query_embedding,
+            user_id=user_id,
+            user_role=user_role,
+            seminar_day="sunday",
+            body_systems=body_systems,
+            document_categories=document_categories,
+            tag_names=tag_names,
+            include_related=should_expand,
+            threshold=threshold,
+            limit=limit,
+        )
+        all_results.extend(sunday_results)
+
+        # Count high-quality Sunday results
+        high_quality_count = len([r for r in sunday_results if r.similarity >= threshold])
+        get_logger().info(f"[RAG] Sunday search: {len(sunday_results)} results, {high_quality_count} high-quality")
+
+        # Phase 2: Add Saturday if insufficient Sunday results
+        if high_quality_count < min_sunday_results:
+            log_search_params(
+                threshold=threshold,
+                limit=limit // 2,
+                body_systems=body_systems,
+                document_categories=document_categories,
+                seminar_day="saturday",
+            )
+            saturday_results = await _search_with_day_filter(
+                query_embedding=query_embedding,
+                user_id=user_id,
+                user_role=user_role,
+                seminar_day="saturday",
+                body_systems=body_systems,
+                document_categories=document_categories,
+                tag_names=tag_names,
+                include_related=should_expand,
+                threshold=threshold,
+                limit=limit // 2,
+            )
+            all_results.extend(saturday_results)
+            get_logger().info(f"[RAG] Saturday search: {len(saturday_results)} additional results")
+
+            # Phase 3: Add Friday if still insufficient (last resort)
+            total_high_quality = len([r for r in all_results if r.similarity >= threshold])
+            if total_high_quality < min_sunday_results + 2:
+                log_search_params(
+                    threshold=threshold,
+                    limit=limit // 3,
+                    body_systems=body_systems,
+                    document_categories=document_categories,
+                    seminar_day="friday",
+                )
+                friday_results = await _search_with_day_filter(
+                    query_embedding=query_embedding,
+                    user_id=user_id,
+                    user_role=user_role,
+                    seminar_day="friday",
+                    body_systems=body_systems,
+                    document_categories=document_categories,
+                    tag_names=tag_names,
+                    include_related=should_expand,
+                    threshold=threshold,
+                    limit=limit // 3,
+                )
+                all_results.extend(friday_results)
+                get_logger().info(f"[RAG] Friday search: {len(friday_results)} additional results")
+
+        # Deduplicate and limit results
+        results = _deduplicate_results(all_results)[:limit]
+        get_logger().info(f"[RAG] Sunday-first search complete: {len(results)} total results")
+
+        return results
+
+    except Exception as e:
+        error_msg = str(e)
+        raise
+
+    finally:
+        # Log the search for telemetry
+        response_time_ms = int((time.time() - start_time) * 1000)
+        await log_rag_query(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            query=query,
+            user_role=user_role,
+            results=results,
+            response_time_ms=response_time_ms,
+            error=error_msg,
+        )
 
 
 async def smart_search(
@@ -197,12 +432,13 @@ async def smart_search(
                     content=row["content"],
                     title=row["title"] or row["filename"],
                     filename=row["filename"],
-                    body_system=row["body_system"],
-                    document_category=row["document_category"],
+                    body_system=row.get("body_system"),
+                    document_category=row.get("document_category"),
                     role_scope=row.get("role_scope"),
                     similarity=row["similarity"],
                     match_type=row["match_type"],
-                    matched_tags=row["matched_tags"] or [],
+                    matched_tags=row.get("matched_tags") or [],
+                    seminar_day=row.get("seminar_day"),
                 )
             )
 
@@ -281,8 +517,9 @@ async def search_knowledge_base(
             category_map.get(ft, ft) for ft in file_types if ft in category_map
         ]
 
-    # Perform smart search with role filtering
-    results = await smart_search(
+    # Perform Sunday-first cascading search with role filtering
+    # This prioritizes Sunday docs (tactical case studies) over Saturday/Friday
+    results = await sunday_first_search(
         query=query,
         user_id=user_id,
         user_role=user_role,
@@ -291,6 +528,7 @@ async def search_knowledge_base(
         document_categories=document_categories,
         limit=limit,
         threshold=threshold,
+        min_sunday_results=3,  # Require at least 3 Sunday results before expanding
     )
     log_search_results(results, search_time_ms=0)  # Time logged elsewhere
 
