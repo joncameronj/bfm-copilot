@@ -82,7 +82,8 @@ Guidelines for protocols:
 - Recommend 4-6 protocols typically, based on the diagnostic findings
 - Each protocol should have 1-3 relevant FSM frequencies (NAMES ONLY from approved list)
 - Prioritize protocols based on deal breakers and critical findings (1 = most important)
-- Only include supplementation if lab data is available
+- Include supplementation based on ALL diagnostic findings (HRV, D-Pulse, UA, VCS)
+- When labs are available, add additional supplement recommendations based on blood markers
 - Base all recommendations on the BFM Sunday documentation (primary source) and RAG context
 - ALWAYS cite which document section supports each recommendation`
 
@@ -675,7 +676,18 @@ ${files.map(f => `- ${f.filename} (${f.fileType})`).join('\n')}
 ${extractedDataSection}
 
 ## Lab Data Available
-${hasLabs ? 'Yes - include supplementation recommendations' : 'No - do not include supplementation recommendations'}
+${hasLabs ? 'Yes - blood panel data is available for detailed supplementation' : 'No blood panel - base supplementation on HRV, D-Pulse, UA, and VCS findings'}
+Include supplementation recommendations based on ALL diagnostic findings.
+
+SUPPLEMENTATION TRIGGERS (always recommend when these findings are present):
+- pH low on UA → Cell Synergy or Trisalts
+- Protein positive on UA → X39 patches
+- VCS failed → Spectasol or Leptin protocols
+- D-Pulse RED markers → specific supplements from Sunday sessions
+- HRV autonomic dysfunction → relevant support supplements
+- Blood panel abnormalities → targeted supplementation (when labs available)
+
+Base ALL supplement recommendations on Dr. Rob's Sunday session content.
 
 ${frequencyList}
 
@@ -841,7 +853,7 @@ REMEMBER (CRITICAL):
     return {
       summary: parsed.summary as string,
       protocols,
-      supplementation: hasLabs ? (parsed.supplementation || []) : [],
+      supplementation: parsed.supplementation || [],
       reasoningChain: (parsed.reasoning_chain as string[]) || [],
     }
   } catch (parseError) {
