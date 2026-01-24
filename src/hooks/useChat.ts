@@ -360,6 +360,17 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                 )
               }
 
+              // Handle step label updates (e.g., showing search query)
+              if (parsed.type === 'step_update') {
+                setCurrentSteps((prev) =>
+                  prev.map((step) =>
+                    step.id === parsed.step_id
+                      ? { ...step, label: parsed.label || step.label }
+                      : step
+                  )
+                )
+              }
+
               if (parsed.type === 'step_error') {
                 setCurrentSteps((prev) =>
                   prev.map((step) =>
@@ -398,14 +409,19 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                 setCurrentAgentHandoffs((prev) => [...prev, handoff])
 
                 // Also add as a step for visibility in the UI
+                const agentDisplayNames: Record<string, string> = {
+                  bfm_copilot: 'Copilot',
+                }
+                const displayName = agentDisplayNames[handoff.toAgent] || handoff.toAgent
+
                 setCurrentSteps((prev) => [
                   ...prev,
                   {
                     id: `handoff-${Date.now()}`,
-                    label: `Handing off to ${handoff.toAgent}...`,
+                    label: `Handing off to ${displayName}...`,
                     status: 'completed',
                     startTime: Date.now(),
-                    endTime: Date.now(),
+                    // No endTime - handoff steps are instantaneous, don't show duration
                   },
                 ])
               }
