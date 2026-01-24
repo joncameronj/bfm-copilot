@@ -7,15 +7,18 @@ Provides intelligent knowledge base search that:
 3. Searches across multiple document categories
 4. Returns results with match type (direct vs related)
 5. Filters results by user role (educational vs clinical content)
+6. Boosts results containing matching protocols (from diagnostic mappings)
 """
 
+import re
 import time
 import httpx
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from app.embeddings.embedder import embed_query
+from app.embeddings.chunker import extract_protocols_from_text, normalize_protocol_name
 from app.services.supabase import get_supabase_client
 from app.tools.query_analyzer import QueryAnalysis, analyze_query
 from app.config import get_settings
@@ -52,6 +55,9 @@ class SearchResult:
     match_type: str  # 'direct', 'related', or 'semantic'
     matched_tags: list[str]
     seminar_day: str | None = None  # 'friday', 'saturday', 'sunday', or None
+    # Protocol boosting fields
+    matched_protocols: list[str] = field(default_factory=list)
+    protocol_boost: float = 0.0  # Boost applied for protocol matches
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -66,6 +72,8 @@ class SearchResult:
             "match_type": self.match_type,
             "matched_tags": self.matched_tags,
             "seminar_day": self.seminar_day,
+            "matched_protocols": self.matched_protocols,
+            "protocol_boost": self.protocol_boost,
         }
 
 
@@ -190,6 +198,100 @@ def _deduplicate_results(results: list[SearchResult]) -> list[SearchResult]:
         if key not in seen_content or r.similarity > seen_content[key].similarity:
             seen_content[key] = r
     return sorted(seen_content.values(), key=lambda x: x.similarity, reverse=True)
+
+
+def _boost_by_protocols(
+    results: list[SearchResult],
+    target_protocols: list[str],
+    boost_factor: float = 0.15,
+) -> list[SearchResult]:
+    """
+    Boost search results that contain matching protocols.
+
+    This post-processing step increases the effective similarity score
+    for results that mention protocols suggested by the query analysis.
+    Sunday content with matching protocols gets priority.
+
+    Args:
+        results: Search results to process
+        target_protocols: Protocols to look for (from QueryAnalysis)
+        boost_factor: Amount to boost similarity (0.0-0.3)
+
+    Returns:
+        Results sorted by boosted similarity score
+    """
+    if not target_protocols:
+        return results
+
+    # Normalize target protocols for matching
+    target_normalized = {
+        normalize_protocol_name(p).lower()
+        for p in target_protocols
+    }
+
+    boosted_results: list[SearchResult] = []
+
+    for result in results:
+        # Extract protocols from result content
+        content_protocols = extract_protocols_from_text(result.content)
+        all_content_protocols = (
+            content_protocols["frequencies"] +
+            content_protocols["supplements"]
+        )
+        content_normalized = {
+            normalize_protocol_name(p).lower()
+            for p in all_content_protocols
+        }
+
+        # Find matching protocols
+        matched = target_normalized.intersection(content_normalized)
+
+        if matched:
+            # Calculate boost based on number of matches
+            match_ratio = len(matched) / max(len(target_normalized), 1)
+            protocol_boost = boost_factor * match_ratio
+
+            # Extra boost for Sunday content (tactical/case study)
+            if result.seminar_day == "sunday":
+                protocol_boost *= 1.5
+
+            result.matched_protocols = list(matched)
+            result.protocol_boost = protocol_boost
+            result.similarity = min(1.0, result.similarity + protocol_boost)
+        else:
+            result.matched_protocols = []
+            result.protocol_boost = 0.0
+
+        boosted_results.append(result)
+
+    # Re-sort by boosted similarity
+    return sorted(boosted_results, key=lambda x: x.similarity, reverse=True)
+
+
+def _extract_target_protocols(analysis: QueryAnalysis) -> list[str]:
+    """
+    Extract all target protocols from a query analysis.
+
+    Combines suggested frequencies and supplements from diagnostic mappings.
+
+    Args:
+        analysis: Analyzed query with protocol suggestions
+
+    Returns:
+        List of protocol names to search for
+    """
+    protocols: set[str] = set()
+
+    # From diagnostic mappings
+    if analysis.suggested_frequencies:
+        protocols.update(analysis.suggested_frequencies)
+    if analysis.suggested_supplements:
+        protocols.update(analysis.suggested_supplements)
+
+    # Also check if query mentions specific protocols directly
+    # (already handled in enrich_analysis_with_protocols)
+
+    return list(protocols)
 
 
 async def sunday_first_search(
@@ -325,8 +427,19 @@ async def sunday_first_search(
                 all_results.extend(friday_results)
                 get_logger().info(f"[RAG] Friday search: {len(friday_results)} additional results")
 
-        # Deduplicate and limit results
-        results = _deduplicate_results(all_results)[:limit]
+        # Deduplicate results
+        deduped = _deduplicate_results(all_results)
+
+        # Apply protocol boosting if analysis has suggested protocols
+        target_protocols = _extract_target_protocols(analysis)
+        if target_protocols:
+            get_logger().info(f"[RAG] Boosting for protocols: {target_protocols}")
+            results = _boost_by_protocols(deduped, target_protocols)[:limit]
+            boosted_count = len([r for r in results if r.protocol_boost > 0])
+            get_logger().info(f"[RAG] Protocol boost applied to {boosted_count} results")
+        else:
+            results = deduped[:limit]
+
         get_logger().info(f"[RAG] Sunday-first search complete: {len(results)} total results")
 
         return results
@@ -547,6 +660,10 @@ async def search_knowledge_base(
             "semantic": "[Semantic Match]",
         }.get(result.match_type, "[Match]")
 
+        # Add protocol boost indicator if present
+        if result.protocol_boost > 0:
+            match_indicator += " [Protocol Match]"
+
         # Build result block
         header = f"[{i}] {match_indicator} {result.title}"
         if result.body_system:
@@ -558,9 +675,16 @@ async def search_knowledge_base(
         if result.matched_tags:
             tags_line = f"Tags: {', '.join(result.matched_tags[:5])}"
 
+        # Add matched protocols if present
+        protocols_line = ""
+        if result.matched_protocols:
+            protocols_line = f"Protocols: {', '.join(result.matched_protocols[:5])}"
+
         block = f"{header}\n"
         if tags_line:
             block += f"{tags_line}\n"
+        if protocols_line:
+            block += f"{protocols_line}\n"
         block += f"\n{result.content}"
 
         formatted_results.append(block)
