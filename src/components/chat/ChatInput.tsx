@@ -120,6 +120,10 @@ export function ChatInput({
     onUpdate: ({ editor }) => {
       setIsEditorEmpty(editor.isEmpty)
     },
+    onCreate: ({ editor }) => {
+      // Ensure no marks are active on initial load
+      editor.commands.unsetAllMarks()
+    },
   })
 
   // Handle clicks outside to blur
@@ -146,7 +150,7 @@ export function ChatInput({
     const markdown = htmlToMarkdown(html)
 
     onSend(markdown, files.length > 0 ? files : undefined)
-    editor.commands.clearContent()
+    editor.chain().clearContent().unsetAllMarks().run()
     setIsEditorEmpty(true)
     setFiles([])
   }, [editor, files, isLoading, disabled, onSend, isEditorEmpty])

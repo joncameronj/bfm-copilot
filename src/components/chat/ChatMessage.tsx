@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { AgentActivity } from './AgentActivity'
+import { AgentSteps } from './AgentSteps'
+import { SourcesList } from './SourcesList'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { ShimmerEffect } from './ShimmerEffect'
 import { ActionButtons } from './ActionButtons'
@@ -103,16 +104,18 @@ export function ChatMessage({
           <ThinkingIndicator startTime={thinkingStartTime} />
         )}
 
-        {/* Agent activity display for assistant messages - shows when we have steps, sources, or reasoning */}
-        {isAssistant && (steps.length > 0 || sources.length > 0 || isReasoning || reasoningData) && (
-          <AgentActivity
-            isActive={isThinking || isReasoning}
+        {/* Agent steps - detailed task list */}
+        {isAssistant && (steps.length > 0 || isReasoning || reasoningData) && (
+          <AgentSteps
             steps={steps}
-            sources={sources}
+            isActive={isThinking || isReasoning}
             thinkingStartTime={thinkingStartTime}
-            isReasoning={isReasoning}
-            reasoning={reasoningData}
           />
+        )}
+
+        {/* Sources being reviewed */}
+        {isAssistant && sources.length > 0 && (
+          <SourcesList sources={sources} isActive={isThinking || isReasoning} />
         )}
 
         {/* Message bubble with shimmer effect */}

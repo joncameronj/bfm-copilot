@@ -60,7 +60,7 @@ export function AgentSteps({
   return (
     <div
       className={cn(
-        'rounded-xl border border-neutral-200 bg-white overflow-hidden',
+        'rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden',
         isActive && 'border-brand-blue/30 shadow-sm',
         className
       )}
@@ -68,7 +68,7 @@ export function AgentSteps({
       {/* Header - Always visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-neutral-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
       >
         <div className="flex items-center gap-3">
           {/* Status indicator */}
@@ -93,10 +93,17 @@ export function AgentSteps({
 
           {/* Title and stats */}
           <div className="text-left">
-            <div className="text-sm font-medium text-neutral-900">
-              {isActive ? 'Thinking...' : `Thought for ${totalSeconds}s`}
+            <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+              {isActive ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="text-shimmer">Thinking</span>
+                  <span className="animate-pulse">...</span>
+                </span>
+              ) : (
+                `Thought for ${totalSeconds}s`
+              )}
             </div>
-            <div className="text-xs text-neutral-500">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400">
               {isActive
                 ? `${steps.length} step${steps.length !== 1 ? 's' : ''}`
                 : `${completedCount}/${steps.length} steps completed`}
@@ -129,7 +136,7 @@ export function AgentSteps({
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-3 pt-1 space-y-2 border-t border-neutral-100">
+            <div className="px-4 pb-3 pt-1 space-y-2 border-t border-neutral-100 dark:border-neutral-800">
               <AnimatePresence mode="popLayout">
                 {steps.map((step, index) => (
                   <StepItem key={step.id} step={step} index={index} />
@@ -141,10 +148,10 @@ export function AgentSteps({
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 py-2 px-3 rounded-lg bg-neutral-50"
+                  className="flex items-center gap-3 py-2 px-3 rounded-lg bg-neutral-50 dark:bg-neutral-800"
                 >
-                  <div className="w-5 h-5 rounded-full bg-neutral-200 animate-pulse" />
-                  <div className="h-3 bg-neutral-200 rounded animate-pulse flex-1 max-w-32" />
+                  <div className="w-5 h-5 rounded-full bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+                  <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse flex-1 max-w-32" />
                 </motion.div>
               )}
             </div>
@@ -170,9 +177,9 @@ function StepItem({ step, index }: { step: AgentStep; index: number }) {
       transition={{ delay: index * 0.05 }}
       className={cn(
         'flex items-center gap-3 py-2 px-3 rounded-lg transition-colors',
-        step.status === 'in_progress' && 'bg-brand-blue/5',
-        step.status === 'completed' && 'bg-neutral-50',
-        step.status === 'error' && 'bg-red-50'
+        step.status === 'in_progress' && 'bg-brand-blue/5 dark:bg-brand-blue/10',
+        step.status === 'completed' && 'bg-neutral-50 dark:bg-neutral-800',
+        step.status === 'error' && 'bg-red-50 dark:bg-red-900/20'
       )}
     >
       {/* Status icon */}
@@ -191,7 +198,7 @@ function StepItem({ step, index }: { step: AgentStep; index: number }) {
           </div>
         )}
         {step.status === 'pending' && (
-          <div className="w-5 h-5 rounded-full bg-neutral-200" />
+          <div className="w-5 h-5 rounded-full bg-neutral-200 dark:bg-neutral-700" />
         )}
       </div>
 
@@ -201,9 +208,9 @@ function StepItem({ step, index }: { step: AgentStep; index: number }) {
           className={cn(
             'text-sm',
             step.status === 'in_progress' && 'text-brand-blue font-medium',
-            step.status === 'completed' && 'text-neutral-600',
-            step.status === 'error' && 'text-red-600',
-            step.status === 'pending' && 'text-neutral-400'
+            step.status === 'completed' && 'text-neutral-600 dark:text-neutral-400',
+            step.status === 'error' && 'text-red-600 dark:text-red-400',
+            step.status === 'pending' && 'text-neutral-400 dark:text-neutral-500'
           )}
         >
           {step.label}
@@ -215,7 +222,7 @@ function StepItem({ step, index }: { step: AgentStep; index: number }) {
 
       {/* Duration */}
       {duration !== null && step.status === 'completed' && (
-        <span className="text-xs text-neutral-400 font-mono">{duration}s</span>
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{duration}s</span>
       )}
     </motion.div>
   )
