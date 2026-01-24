@@ -12,8 +12,6 @@ from typing import AsyncGenerator, Literal
 
 from agents import Runner
 
-from app.tools.rag_search import smart_search, SearchResult
-
 
 class SSEEventMapper:
     """
@@ -79,6 +77,11 @@ class SSEEventMapper:
         try:
             async for event in result.stream_events():
                 event_type = getattr(event, "type", None)
+
+                # Debug: Log all event types to diagnose missing reasoning events
+                if event_type == "raw_response_event":
+                    raw_type = getattr(event.data, "type", "unknown")
+                    print(f"[SSE Debug] raw_response_event: {raw_type}")
 
                 # ============================================================
                 # Raw Response Events (token-level streaming)
@@ -177,25 +180,32 @@ class SSEEventMapper:
                     # Function call arguments done
                     elif raw_data.type == "response.function_call_arguments.done":
                         item_id = getattr(raw_data, "item_id", None)
-                        final_arguments = getattr(raw_data, "arguments", self.current_tool_arguments)
 
-                        # Proactively emit sources for search tools
-                        if self.current_tool_name in ["search_knowledge_base_tool", "search_knowledge_base"]:
-                            try:
-                                args = json.loads(final_arguments) if final_arguments else {}
-                                query = args.get("query", "")
-                                if query:
-                                    async for source_event in self._emit_search_sources(query):
-                                        yield source_event
-                            except json.JSONDecodeError:
-                                pass
+                        # Note: We no longer proactively emit sources here.
+                        # The search tool will run its own search and return results.
+                        # This eliminates a duplicate RAG search (saves 10-20s).
+                        # Sources will be emitted when the tool completes via run_item_stream_event.
 
-                        # Mark step complete
+                        # Emit step update with search query details (if applicable)
                         if item_id and item_id in self.active_tool_steps:
                             step_info = self.active_tool_steps[item_id]
-                            yield await self.emit_sse("step_complete", {
-                                "step_id": step_info["step_id"],
-                            })
+
+                            # Parse query from arguments for search tools
+                            if step_info["name"] in ["search_knowledge_base_tool", "search_knowledge_base"]:
+                                try:
+                                    args = json.loads(self.current_tool_arguments)
+                                    query = args.get("query", "")
+                                    if query:
+                                        truncated = query[:50] + ("..." if len(query) > 50 else "")
+                                        yield await self.emit_sse("step_update", {
+                                            "step_id": step_info["step_id"],
+                                            "label": f"Searching: {truncated}",
+                                        })
+                                except Exception:
+                                    pass
+
+                        # Note: step_complete is emitted when the tool actually finishes
+                        # (in run_item_stream_event when function_call_output is received)
 
                 # ============================================================
                 # Run Item Events (semantic boundaries)
@@ -203,10 +213,16 @@ class SSEEventMapper:
                 elif event_type == "run_item_stream_event":
                     run_item = event.item
 
-                    # Tool call output completed
+                    # Tool call output completed - mark the step as complete now
                     if hasattr(run_item, "type") and run_item.type == "function_call_output":
-                        # Could emit additional events here if needed
-                        pass
+                        # Find the step by call_id and mark complete
+                        call_id = getattr(run_item, "call_id", None)
+                        for item_id, step_info in self.active_tool_steps.items():
+                            if step_info.get("call_id") == call_id:
+                                yield await self.emit_sse("step_complete", {
+                                    "step_id": step_info["step_id"],
+                                })
+                                break
 
                     # Message output completed
                     elif hasattr(run_item, "type") and run_item.type == "message":
@@ -237,64 +253,3 @@ class SSEEventMapper:
             yield await self.emit_sse("error", {"error": str(e)})
             yield "data: [DONE]\n\n"
 
-    async def _emit_search_sources(
-        self,
-        query: str,
-    ) -> AsyncGenerator[str, None]:
-        """
-        Proactively emit sources when a search tool is called.
-
-        This maintains the current UX where sources appear immediately
-        when the agent starts searching, rather than waiting for the
-        search to complete.
-
-        Args:
-            query: The search query
-
-        Yields:
-            SSE events for sources and rag_chunks
-        """
-        if not query:
-            return
-
-        try:
-            results: list[SearchResult] = await smart_search(
-                query=query,
-                user_id=self.user_id,
-                user_role=self.user_role,
-                limit=5,
-                threshold=0.4,
-            )
-
-            if results:
-                # Emit sources (compact format for UI display)
-                sources = [
-                    {
-                        "id": f"src-{i}",
-                        "title": r.title,
-                        "type": "knowledge",
-                        "category": r.document_category,
-                        "bodySystem": r.body_system,
-                    }
-                    for i, r in enumerate(results)
-                ]
-                yield await self.emit_sse("sources", {"sources": sources})
-
-                # Emit RAG chunks (detailed format for debugging)
-                chunks = [
-                    {
-                        "id": f"chunk-{i}",
-                        "content": r.content,
-                        "title": r.title,
-                        "filename": r.filename,
-                        "bodySystem": r.body_system,
-                        "documentCategory": r.document_category,
-                        "matchType": r.match_type,
-                        "similarity": r.similarity,
-                    }
-                    for i, r in enumerate(results)
-                ]
-                yield await self.emit_sse("rag_chunks", {"chunks": chunks})
-
-        except Exception as e:
-            print(f"[SSE Mapper Warning] Failed to emit sources: {e}")

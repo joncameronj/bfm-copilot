@@ -91,7 +91,8 @@ async def chat_stream(
     async def event_generator():
         """Generate SSE events from Agent SDK streaming response."""
         print(f"[CHAT] Starting Agent SDK stream for: {request.message[:50]}...")
-        print(f"[CHAT] Model: {model_settings.chat_model}, Reasoning: {reasoning_effort}")
+        print(f"[CHAT] Model: {model_settings.chat_model}, Reasoning effort: {reasoning_effort}")
+        print(f"[CHAT] Agent model_settings: {agent.model_settings}")
 
         try:
             # Create SSE event mapper
