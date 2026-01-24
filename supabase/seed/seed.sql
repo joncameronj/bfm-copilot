@@ -19,6 +19,9 @@
 -- Load condition relationships
 \ir 03_condition_relationships.sql
 
+-- Load Jack Kruse educational content tags
+\ir 05_jack_kruse_tags.sql
+
 -- ============================================
 -- Verification queries (optional - uncomment to debug)
 -- ============================================

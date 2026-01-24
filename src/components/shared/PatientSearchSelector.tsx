@@ -127,8 +127,8 @@ export function PatientSearchSelector({
     setSearchQuery('')
   }, [onChange])
 
-  // Show dropdown when focused and either searching or has recent patients
-  const showDropdown = isFocused && !selectedPatient && (filteredPatients.length > 0 || (recentPatients.length > 0 && !searchQuery))
+  // Show dropdown when focused and no patient selected
+  const showDropdown = isFocused && !selectedPatient
 
   if (isLoading) {
     return (
@@ -267,10 +267,40 @@ export function PatientSearchSelector({
             </div>
           )}
 
-          {/* Empty state - no recent and no search */}
-          {!searchQuery && recentPatients.length === 0 && (
+          {/* All patients (when no search query and patients exist) */}
+          {!searchQuery && patients.length > 0 && (
+            <div className="p-2">
+              <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                <HugeiconsIcon icon={UserIcon} size={14} />
+                All Patients
+              </div>
+              {patients.map(patient => (
+                <button
+                  key={patient.id}
+                  type="button"
+                  onClick={() => handleSelect(patient)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <HugeiconsIcon icon={UserIcon} size={16} className="text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 truncate">
+                      {patient.firstName} {patient.lastName}
+                    </p>
+                    <p className="text-sm text-neutral-500">
+                      {calculateAge(new Date(patient.dateOfBirth))} years • {patient.gender}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Empty state - no patients exist */}
+          {!searchQuery && patients.length === 0 && (
             <div className="p-4 text-center text-neutral-500 text-sm">
-              Start typing to search for patients
+              No patients available. Create a patient first.
             </div>
           )}
         </div>

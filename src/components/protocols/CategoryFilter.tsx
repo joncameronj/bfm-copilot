@@ -11,10 +11,11 @@ interface CategoryFilterProps {
 
 const CATEGORIES: Array<{ value: FrequencyCategory | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
+  { value: 'general', label: 'General' },
   { value: 'thyroid', label: 'Thyroid' },
   { value: 'diabetes', label: 'Diabetes' },
   { value: 'neurological', label: 'Neurological' },
-  { value: 'hormone', label: 'Hormones' },
+  { value: 'hormones', label: 'Hormones' },
 ]
 
 /**

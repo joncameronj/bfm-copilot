@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 import Link from 'next/link'
+import { DemoModeToggle } from '@/components/admin/DemoModeToggle'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -44,6 +45,8 @@ export default async function AdminPage() {
 
   return (
     <>
+      {/* Demo Mode Toggle */}
+      <DemoModeToggle />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

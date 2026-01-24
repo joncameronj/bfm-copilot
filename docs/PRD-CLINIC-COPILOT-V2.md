@@ -664,6 +664,60 @@ src/
 
 ---
 
+## Legal Compliance - Member-Side Restrictions
+
+### Critical Requirements
+
+The member-facing AI operates under strict legal constraints to ensure compliance with healthcare regulations. These restrictions are enforced at the system prompt level and cannot be overridden.
+
+#### What Members CANNOT Receive
+
+| Restricted Content | Reason |
+|--------------------|--------|
+| Treatment protocols | Requires licensed practitioner supervision |
+| FSM frequencies | Clinical intervention requiring training |
+| Supplement dosages (mg, IU, ml) | Medical recommendation requiring evaluation |
+| Medication recommendations | Requires prescription authority |
+| Clinical treatment sequences | Practitioner-only content |
+| Case study clinical details | Protected health information concerns |
+
+#### What Members CAN Receive
+
+| Allowed Content | Examples |
+|-----------------|----------|
+| Educational explanations | "Research suggests vitamin D supports immune function" |
+| General wellness concepts | How circadian rhythm affects sleep quality |
+| Lifestyle information | Benefits of morning light exposure |
+| Lab result explanations | What HRV measurements indicate |
+| Source citations | PubMed references, Jack Kruse content |
+
+#### Mandatory Disclaimers
+
+Every health-related response to members must include:
+
+> "This information is for educational purposes only and is not medical advice. Please consult with your healthcare practitioner for personalized recommendations."
+
+#### Deferral Language
+
+When members ask for protocols or treatments, the AI must respond:
+
+> "For specific treatment protocols, please work with your BFM practitioner who can provide personalized recommendations based on your individual health data and history."
+
+### Implementation
+
+Legal restrictions are enforced via:
+1. **System Prompts**: `MEMBER_LEGAL_RESTRICTIONS` constant in `python-agent/app/agent/system_prompts.py`
+2. **Role-Based Filtering**: RAG search filters clinical content from member queries
+3. **Role Scope**: Documents tagged with `role_scope: "clinical"` are hidden from members
+
+### Compliance Monitoring
+
+- Admin telemetry tracks all member AI responses
+- RAG logs show which content was retrieved per role
+- Evaluation system allows quality review of member interactions
+
+---
+
 ## Notes
 
 - All features use Supabase RLS for row-level security
@@ -671,3 +725,4 @@ src/
 - RAG uses pgvector for semantic search
 - File uploads go to Supabase Storage
 - Real-time features use Supabase subscriptions where needed
+- **Member AI responses are subject to legal compliance restrictions (see above)**

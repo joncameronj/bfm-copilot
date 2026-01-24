@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
@@ -19,13 +19,17 @@ interface UserMenuProps {
 const VIEW_MODE_CONFIG = {
   practitioner: {
     label: 'Practitioner',
+    shortLabel: 'P',
     color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     dotColor: 'bg-blue-500',
+    ringColor: 'ring-blue-500',
   },
   member: {
     label: 'Member',
+    shortLabel: 'M',
     color: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300',
     dotColor: 'bg-green-500',
+    ringColor: 'ring-green-500',
   },
 } as const
 
@@ -37,6 +41,27 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { isAdmin, viewMode, setViewMode, actualRole } = useRoleView()
+
+  // Keyboard shortcut: Cmd/Ctrl + Shift + M to toggle view mode (admin only)
+  const toggleViewMode = useCallback(() => {
+    if (!isAdmin) return
+    setViewMode(viewMode === 'practitioner' ? 'member' : 'practitioner')
+  }, [isAdmin, viewMode, setViewMode])
+
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + Shift + M
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault()
+        toggleViewMode()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isAdmin, toggleViewMode])
 
   const handleLogout = async () => {
     setIsLoading(true)
@@ -85,10 +110,18 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
         {isCollapsed && !isOpen && (
           <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
             {user.fullName || user.email}
+            {isAdmin && (
+              <span className="block text-[10px] text-neutral-400 mt-0.5">
+                Viewing as: {currentViewConfig.label}
+              </span>
+            )}
           </span>
         )}
-        {/* Avatar */}
-        <div className="w-7 h-7 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+        {/* Avatar with view mode indicator ring for admins when collapsed */}
+        <div className={cn(
+          "w-7 h-7 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0 overflow-hidden relative",
+          isCollapsed && isAdmin && `ring-2 ${currentViewConfig.ringColor} ring-offset-1 ring-offset-white dark:ring-offset-neutral-900`
+        )}>
           {user.avatarUrl ? (
             <Image
               src={user.avatarUrl}
@@ -99,6 +132,18 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
             />
           ) : (
             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{initials}</span>
+          )}
+          {/* View mode badge when collapsed (admin only) */}
+          {isCollapsed && isAdmin && (
+            <span
+              className={cn(
+                'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center',
+                currentViewConfig.color
+              )}
+              title={`Viewing as ${currentViewConfig.label}`}
+            >
+              {currentViewConfig.shortLabel}
+            </span>
           )}
         </div>
 
@@ -176,8 +221,13 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
             {/* View mode switcher for admins */}
             {isAdmin && (
               <>
-                <div className="px-3 py-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                  Preview As
+                <div className="px-3 py-1.5 flex items-center justify-between">
+                  <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                    Preview As
+                  </span>
+                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+                    {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘⇧M' : 'Ctrl+Shift+M'}
+                  </span>
                 </div>
                 {(['practitioner', 'member'] as const).map((mode) => {
                   const config = VIEW_MODE_CONFIG[mode]

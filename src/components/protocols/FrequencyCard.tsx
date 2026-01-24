@@ -10,10 +10,11 @@ interface FrequencyCardProps {
 }
 
 const CATEGORY_COLORS: Record<FrequencyCategory, string> = {
+  general: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-400',
   thyroid: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
   diabetes: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
   neurological: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400',
-  hormone: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400',
+  hormones: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400',
 }
 
 /**

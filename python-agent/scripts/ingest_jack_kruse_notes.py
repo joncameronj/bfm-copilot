@@ -41,6 +41,24 @@ PDF_PATH = Path("/Users/joncameron/Downloads/Documents/Jack Kruse Notes.pdf")
 DOCUMENT_TITLE = "Jack Kruse Notes - Dr. Rob DeMartino"
 DOCUMENT_FILENAME = "Jack_Kruse_Notes_DiMartino.pdf"
 
+
+def detect_seminar_day(filename: str, title: str) -> str | None:
+    """Detect seminar day from filename or title.
+
+    Used to enable Sunday-first RAG search strategy:
+    - Sunday: tactical case studies, protocols
+    - Saturday: intermediate content
+    - Friday: foundational content
+    """
+    text = f"{filename} {title}".lower()
+    if 'sun ' in text or 'sun.' in text or 'sunday' in text:
+        return 'sunday'
+    elif 'sat ' in text or 'sat.' in text or 'saturday' in text:
+        return 'saturday'
+    elif 'fri ' in text or 'fri.' in text or 'friday' in text:
+        return 'friday'
+    return None
+
 # System user ID for global documents (admin user for BFM)
 SYSTEM_USER_ID = "dd78e6d8-09a2-4754-8834-870c36ed89ce"
 
@@ -98,7 +116,13 @@ async def ingest_jack_kruse_notes():
         else:
             # Create new document record
             print("Creating document record...")
-            doc_result = client.table("documents").insert({
+
+            # Detect seminar day for Sunday-first RAG search
+            seminar_day = detect_seminar_day(DOCUMENT_FILENAME, DOCUMENT_TITLE)
+            if seminar_day:
+                print(f"  Detected seminar day: {seminar_day}")
+
+            doc_payload = {
                 "user_id": SYSTEM_USER_ID,
                 "filename": DOCUMENT_FILENAME,
                 "file_type": "ip_material",
@@ -125,7 +149,12 @@ async def ingest_jack_kruse_notes():
                         "quantum biology"
                     ]
                 }
-            }).execute()
+            }
+            # Add seminar_day if detected (enables Sunday-first RAG search)
+            if seminar_day:
+                doc_payload["seminar_day"] = seminar_day
+
+            doc_result = client.table("documents").insert(doc_payload).execute()
 
             doc_id = doc_result.data[0]["id"]
             print(f"✓ Created document: {doc_id}")

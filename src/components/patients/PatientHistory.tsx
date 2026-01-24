@@ -12,26 +12,26 @@ interface LabResult {
   created_at: string
 }
 
-interface Conversation {
+interface PatientNote {
   id: string
-  title: string
-  conversation_type: string
+  content: string
+  created_at: string
   updated_at: string
 }
 
 interface PatientHistoryProps {
   patientId: string
   labs: LabResult[]
-  conversations: Conversation[]
+  notes: PatientNote[]
 }
 
-export function PatientHistory({ patientId, labs, conversations }: PatientHistoryProps) {
+export function PatientHistory({ patientId, labs, notes }: PatientHistoryProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Lab Results */}
-      <div className="bg-neutral-50 rounded-2xl p-6">
+      <div className="bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-neutral-900">Lab Results</h3>
+          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-50">Lab Results</h3>
           <Link
             href={`/labs?patient=${patientId}`}
             className="text-sm text-brand-blue hover:underline"
@@ -41,21 +41,21 @@ export function PatientHistory({ patientId, labs, conversations }: PatientHistor
         </div>
 
         {labs.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No lab results yet</p>
+          <p className="text-neutral-500 dark:text-neutral-400 text-sm">No lab results yet</p>
         ) : (
           <div className="space-y-3">
             {labs.slice(0, 5).map((lab) => (
               <Link
                 key={lab.id}
                 href={`/labs/${lab.id}`}
-                className="block p-3 bg-white rounded-xl hover:bg-neutral-100 transition-colors"
+                className="block p-3 bg-white dark:bg-neutral-700 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-neutral-900">
+                    <p className="font-medium text-neutral-900 dark:text-neutral-50">
                       {formatDate(lab.test_date)}
                     </p>
-                    <p className="text-sm text-neutral-500">
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
                       {formatRelativeTime(lab.created_at)}
                     </p>
                   </div>
@@ -77,43 +77,34 @@ export function PatientHistory({ patientId, labs, conversations }: PatientHistor
         )}
       </div>
 
-      {/* Conversations */}
-      <div className="bg-neutral-50 rounded-2xl p-6">
+      {/* Notes */}
+      <div className="bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-neutral-900">Conversations</h3>
-          <Link
-            href={`/?patient=${patientId}`}
-            className="text-sm text-brand-blue hover:underline"
-          >
-            View all
-          </Link>
+          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-50">Notes</h3>
         </div>
 
-        {conversations.length === 0 ? (
-          <p className="text-neutral-500 text-sm">No conversations yet</p>
+        {notes.length === 0 ? (
+          <p className="text-neutral-500 dark:text-neutral-400 text-sm">No notes yet</p>
         ) : (
           <div className="space-y-3">
-            {conversations.slice(0, 5).map((conversation) => (
-              <Link
-                key={conversation.id}
-                href={`/?conversation=${conversation.id}`}
-                className="block p-3 bg-white rounded-xl hover:bg-neutral-100 transition-colors"
+            {notes.slice(0, 5).map((note) => (
+              <div
+                key={note.id}
+                className="p-3 bg-white dark:bg-neutral-700 rounded-xl"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-neutral-900 truncate">
-                      {conversation.title || 'Untitled conversation'}
-                    </p>
-                    <p className="text-sm text-neutral-500">
-                      {formatRelativeTime(conversation.updated_at)}
-                    </p>
-                  </div>
-                  <Badge variant="neutral" size="sm">
-                    {conversation.conversation_type}
-                  </Badge>
-                </div>
-              </Link>
+                <p className="text-neutral-900 dark:text-neutral-50 text-sm line-clamp-2">
+                  {note.content}
+                </p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                  {formatRelativeTime(note.created_at)}
+                </p>
+              </div>
             ))}
+            {notes.length > 5 && (
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center pt-2">
+                +{notes.length - 5} more notes
+              </p>
+            )}
           </div>
         )}
       </div>

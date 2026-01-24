@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Add01Icon } from '@hugeicons/core-free-icons'
 import { format } from 'date-fns'
 import type { Patient, CreatePatientInput } from '@/types/patient'
 
@@ -221,8 +223,9 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
             ))}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <Input
+            className="w-full"
             value={medicationInput}
             onChange={(e) => setMedicationInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addMedication()}
@@ -230,9 +233,12 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
           />
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
+            size="sm"
+            className="flex items-center"
             onClick={addMedication}
           >
+            <HugeiconsIcon icon={Add01Icon} size={16} className="mr-1.5" />
             Add Medication
           </Button>
         </div>
@@ -259,8 +265,9 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
             ))}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <Input
+            className="w-full"
             value={allergyInput}
             onChange={(e) => setAllergyInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addAllergy()}
@@ -268,9 +275,12 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
           />
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
+            size="sm"
+            className="flex items-center"
             onClick={addAllergy}
           >
+            <HugeiconsIcon icon={Add01Icon} size={16} className="mr-1.5" />
             Add Allergy
           </Button>
         </div>
@@ -278,7 +288,7 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
 
       {/* Form Actions */}
       <div className="flex justify-end gap-3 pt-4">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button type="button" variant="danger" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" isLoading={isSubmitting}>

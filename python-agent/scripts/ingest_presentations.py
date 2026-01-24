@@ -44,6 +44,24 @@ def detect_category(filename: str) -> str:
     return "general"
 
 
+def detect_seminar_day(filename: str, title: str) -> str | None:
+    """Detect seminar day from filename or title.
+
+    Used to enable Sunday-first RAG search strategy:
+    - Sunday: tactical case studies, protocols
+    - Saturday: intermediate content
+    - Friday: foundational content
+    """
+    text = f"{filename} {title}".lower()
+    if 'sun ' in text or 'sun.' in text or 'sunday' in text:
+        return 'sunday'
+    elif 'sat ' in text or 'sat.' in text or 'saturday' in text:
+        return 'saturday'
+    elif 'fri ' in text or 'fri.' in text or 'friday' in text:
+        return 'friday'
+    return None
+
+
 async def ingest_presentation(filepath: Path) -> dict:
     """Ingest a single PPTX presentation."""
     print(f"\nProcessing: {filepath.name}")
@@ -57,13 +75,14 @@ async def ingest_presentation(filepath: Path) -> dict:
 
     print(f"  📊 Extracted {result['slide_count']} slides, has_notes={result['has_notes']}")
 
-    # Detect category
+    # Generate metadata first (needed for seminar day detection)
+    doc_metadata = infer_metadata_from_filename(filepath)
+
+    # Detect category and seminar day
     category = detect_category(filepath.name)
     body_system = BODY_SYSTEM_MAP.get(category, "multi_system")
-    print(f"  📁 Category: {category}, Body System: {body_system}")
-
-    # Generate metadata
-    doc_metadata = infer_metadata_from_filename(filepath)
+    seminar_day = detect_seminar_day(filepath.name, doc_metadata.title if doc_metadata else "")
+    print(f"  📁 Category: {category}, Body System: {body_system}, Seminar Day: {seminar_day or 'none'}")
 
     # Add header to content
     header = f"""# {doc_metadata.title}
@@ -92,7 +111,7 @@ async def ingest_presentation(filepath: Path) -> dict:
     client = get_supabase_client()
 
     # Create document record
-    doc_result = client.table("documents").insert({
+    doc_payload = {
         "user_id": SYSTEM_USER_ID,
         "filename": filepath.name,
         "file_type": "ip_material",
@@ -107,7 +126,12 @@ async def ingest_presentation(filepath: Path) -> dict:
             "slide_count": result["slide_count"],
             "has_notes": result["has_notes"],
         },
-    }).execute()
+    }
+    # Add seminar_day if detected (enables Sunday-first RAG search)
+    if seminar_day:
+        doc_payload["seminar_day"] = seminar_day
+
+    doc_result = client.table("documents").insert(doc_payload).execute()
 
     doc_id = doc_result.data[0]["id"]
     print(f"  📄 Created document: {doc_id}")

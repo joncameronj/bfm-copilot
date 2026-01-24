@@ -12,10 +12,10 @@ The test typically shows:
 KEY CLINICAL SIGNIFICANCE:
 - Columns C, D, and E are MOST significant for biotoxin exposure
 - Failure in these columns strongly suggests biotoxin illness
-- If VCS test fails (especially columns C, D, E) → Spectasol or Leptin settings protocol
+- If VCS test fails (especially columns C, D, E) → Pectasol-C or Leptin settings protocol
 
 PROTOCOL TRIGGER (from BFM guidelines):
-- VCS low/failed → Spectasol or Leptin settings`
+- VCS low/failed → Pectasol-C or Leptin settings`
 
 export const VCS_USER_PROMPT = `Analyze this VCS (Visual Contrast Sensitivity) test result.
 
@@ -38,7 +38,7 @@ Return a JSON object with this EXACT structure:
   "severity": "none" | "mild" | "moderate" | "severe",
   "findings": ["Clinical observations"],
   "recommended_protocols": {
-    "vcs_low_protocol": "spectasol" | "leptin_settings" | null
+    "vcs_low_protocol": "pectasol" | "leptin_settings" | null
   },
   "confidence": 0.0 to 1.0
 }
@@ -49,4 +49,4 @@ SEVERITY DETERMINATION:
 - moderate: One of C, D, E fails
 - severe: Multiple of C, D, E fail
 
-If VCS fails (especially columns C, D, E), set vcs_low_protocol to either "spectasol" or "leptin_settings".`
+If VCS fails (especially columns C, D, E), set vcs_low_protocol to either "pectasol" or "leptin_settings".`

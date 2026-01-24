@@ -23,7 +23,11 @@ export function PatientCard({ patient, selectable = false, selected = false, onS
   }
 
   const cardContent = (
-    <div className={`bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-6 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer ${selected ? 'ring-2 ring-blue-500' : ''}`}>
+    <div
+      className={`bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-6 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer ${selected ? 'ring-2 ring-blue-500' : ''}`}
+      data-patient-id={patient.id}
+      data-selected={selected}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3">
           {selectable && (
@@ -31,7 +35,7 @@ export function PatientCard({ patient, selectable = false, selected = false, onS
               <input
                 type="checkbox"
                 checked={selected}
-                onChange={() => {}}
+                readOnly
                 className="w-5 h-5 rounded border-2 border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-950 accent-blue-600 cursor-pointer"
               />
             </div>
@@ -56,12 +60,6 @@ export function PatientCard({ patient, selectable = false, selected = false, onS
         <span>{patient.labCount} labs</span>
         <span>{patient.conversationCount} conversations</span>
       </div>
-
-      {patient.chiefComplaints && (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
-          {patient.chiefComplaints}
-        </p>
-      )}
 
       <div className="flex items-center justify-between text-xs text-neutral-400 dark:text-neutral-500">
         <span>Added {formatRelativeTime(patient.createdAt)}</span>

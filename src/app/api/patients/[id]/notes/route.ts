@@ -29,11 +29,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
-    // Get notes - Note: patient_notes table would need to be created if not exists
-    // For now, we'll use feedback table filtered by patient
+    // Get patient notes
     const { data, error } = await supabase
-      .from('feedback')
-      .select('*')
+      .from('patient_notes')
+      .select('id, content, created_at, updated_at')
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false })
 
@@ -49,7 +48,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// POST /api/patients/[id]/notes - Add note to patient
+// POST /api/patients/[id]/notes - Create a new note
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { id: patientId } = await params
@@ -73,23 +72,21 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json()
-    const { content, noteType } = body
+    const { content } = body
 
-    if (!content) {
-      return NextResponse.json({ error: 'Content is required' }, { status: 400 })
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return NextResponse.json({ error: 'Note content is required' }, { status: 400 })
     }
 
-    // Store as feedback with general type
+    // Create the note
     const { data, error } = await supabase
-      .from('feedback')
+      .from('patient_notes')
       .insert({
-        user_id: user.id,
         patient_id: patientId,
-        feedback_type: 'general',
-        rating: 'neutral',
-        comment: content,
+        user_id: user.id,
+        content: content.trim()
       })
-      .select()
+      .select('id, content, created_at, updated_at')
       .single()
 
     if (error) {

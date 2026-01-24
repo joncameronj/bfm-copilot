@@ -147,9 +147,9 @@ export interface VCSExtractedData {
   findings: string[]
 
   // Protocol triggers based on BFM rules
-  // VCS low/failed → Spectasol or Leptin settings
+  // VCS low/failed → Pectasol-C or Leptin settings
   recommended_protocols: {
-    vcs_low_protocol?: 'spectasol' | 'leptin_settings'
+    vcs_low_protocol?: 'pectasol' | 'leptin_settings'
   }
 }
 

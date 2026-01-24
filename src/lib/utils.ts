@@ -27,6 +27,19 @@ export function formatDate(date: Date | string): string {
   })
 }
 
+export function formatDateTime(date: Date | string): string {
+  const d = new Date(date)
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }) + ' at ' + d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export function formatRelativeTime(date: Date | string): string {
   const now = new Date()
   const then = new Date(date)

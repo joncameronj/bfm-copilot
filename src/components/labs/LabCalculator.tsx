@@ -236,7 +236,7 @@ export function LabCalculator({ onSave, patientId: _patientId, patient }: LabCal
             values={values}
             results={results?.categorizedResults[category.id]}
             onValueChange={handleValueChange}
-            defaultExpanded={category.order <= 2}
+            defaultExpanded={false}
           />
         ))}
       </div>

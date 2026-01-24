@@ -329,7 +329,7 @@ describe('Analysis Generator Supplementation Config', () => {
     expect(content).toContain('SUPPLEMENTATION TRIGGERS')
     expect(content).toContain('Cell Synergy')
     expect(content).toContain('X39')
-    expect(content).toContain('Spectasol')
+    expect(content).toContain('Pectasol')
     expect(content).toContain('pH low on UA')
     expect(content).toContain('VCS failed')
   })

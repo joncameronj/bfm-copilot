@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { DiagnosticAnalysisPanel } from '@/components/diagnostics/DiagnosticAnalysisPanel'
 import type { DiagnosticAnalysisWithRecommendations, ProtocolRecommendation } from '@/types/diagnostic-analysis'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
 
 interface PatientDiagnosticAnalysesProps {
@@ -261,7 +261,7 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="font-medium text-neutral-900 dark:text-neutral-50 text-left">
-                      Analysis from {formatDate(analysis.created_at)}
+                      Analysis from {formatDateTime(analysis.created_at)}
                     </p>
                     <p className="text-sm text-neutral-500 dark:text-neutral-400 text-left">
                       {analysis.diagnostic_uploads?.diagnostic_files?.length || 0} files •{' '}

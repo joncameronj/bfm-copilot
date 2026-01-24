@@ -248,7 +248,7 @@ function buildDiagnosticTriggers(
         type: 'vcs',
         finding: 'VCS Failed',
         value: 'Failed',
-        interpretation: 'Biotoxin likely - Recommend Spectasol or Leptin settings',
+        interpretation: 'Biotoxin likely - Recommend Pectasol-C or Leptin settings',
       })
     }
   }

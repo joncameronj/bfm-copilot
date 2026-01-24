@@ -11,6 +11,7 @@ import {
   type BatchValidationResult,
 } from './frequency-validator'
 import { logValidationTelemetry } from './validation-telemetry'
+import { checkDemoMode } from '@/lib/demo-mode'
 import type { RecommendedFrequency, Supplementation } from '@/types/diagnostic-analysis'
 import type { DiagnosticDataSummary } from '@/types/diagnostic-extraction'
 
@@ -41,7 +42,7 @@ DIAGNOSTIC ANALYSIS ORDER:
 2. Then brainwave patterns - what FSM protocols does this indicate?
 3. Then D-Pulse - identify "seven deal breakers" (critical red markers)
 4. Then UA (urinalysis): pH low → Cell Synergy/Trisalts; Protein off → X39 patches
-5. Then VCS: if failed → Spectasol or Leptin settings
+5. Then VCS: if failed → Pectasol-C or Leptin settings
 6. Finally Labs → supplementation recommendations
 
 Structure your response as JSON with the following format:
@@ -212,6 +213,18 @@ export async function generateDiagnosticAnalysis(
     filename: f.filename,
     fileType: f.file_type,
   }))
+
+  // 2a. Check for demo mode - return hard-coded response for case study files
+  const demoResponse = await checkDemoMode(supabase, diagnosticFiles)
+  if (demoResponse) {
+    // Get extracted data to include in response
+    const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
+    return {
+      ...demoResponse,
+      ragContext: [], // No RAG context in demo mode
+      extractedData,
+    }
+  }
 
   // 3. Check if patient has existing labs in lab_results table
   const { data: labResults } = await supabase
@@ -384,7 +397,7 @@ function buildSearchQuery(
     const triggers: string[] = []
     if (extractedData.protocolTriggers.phLow) triggers.push('pH low - cell synergy or trisalts')
     if (extractedData.protocolTriggers.proteinPositive) triggers.push('protein positive - X39 patches')
-    if (extractedData.protocolTriggers.vcsLow) triggers.push('VCS low - spectasol or leptin settings')
+    if (extractedData.protocolTriggers.vcsLow) triggers.push('VCS failed - biotoxin illness, elevated cytokines, leptin resistance')
     if (triggers.length > 0) {
       parts.push(`Protocol triggers: ${triggers.join(', ')}`)
     }
@@ -602,7 +615,7 @@ These MUST be addressed first in protocol recommendations.`)
   if (extractedData.vcs) {
     const vcs = extractedData.vcs
     sections.push(`### VCS (Visual Contrast Sensitivity)
-- Result: ${vcs.passed ? 'PASSED' : '**FAILED**'}${!vcs.passed ? ' → **Recommend: Spectasol or Leptin settings**' : ''}
+- Result: ${vcs.passed ? 'PASSED' : '**FAILED**'}${!vcs.passed ? ' → **Recommend: Pectasol-C or Leptin settings**' : ''}
 - Biotoxin Likely: ${vcs.biotoxin_likely ? 'Yes' : 'No'}
 - Severity: ${vcs.severity || 'N/A'}
 - Failed Columns: ${vcs.failed_columns?.join(', ') || 'None'}`)
@@ -682,7 +695,7 @@ Include supplementation recommendations based on ALL diagnostic findings.
 SUPPLEMENTATION TRIGGERS (always recommend when these findings are present):
 - pH low on UA → Cell Synergy or Trisalts
 - Protein positive on UA → X39 patches
-- VCS failed → Spectasol or Leptin protocols
+- VCS failed → Pectasol-C or Leptin protocols
 - D-Pulse RED markers → specific supplements from Sunday sessions
 - HRV autonomic dysfunction → relevant support supplements
 - Blood panel abnormalities → targeted supplementation (when labs available)

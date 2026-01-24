@@ -21,38 +21,40 @@ export default async function PatientPage({ params }: PatientPageProps) {
     redirect('/login')
   }
 
-  // Fetch patient with related data
-  const { data: patient, error } = await supabase
-    .from('patients')
-    .select(`
-      *,
-      lab_results:lab_results(
-        id,
-        test_date,
-        ominous_count,
-        ominous_markers_triggered,
-        created_at
-      ),
-      conversations:conversations(
-        id,
-        title,
-        conversation_type,
-        updated_at
-      )
-    `)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single()
+  // Fetch patient and related data in parallel
+  const [patientResult, labsResult, notesResult] = await Promise.all([
+    supabase
+      .from('patients')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single(),
+    supabase
+      .from('lab_results')
+      .select('id, test_date, ominous_count, ominous_markers_triggered, created_at')
+      .eq('patient_id', id)
+      .order('test_date', { ascending: false }),
+    supabase
+      .from('patient_notes')
+      .select('id, content, created_at, updated_at')
+      .eq('patient_id', id)
+      .order('created_at', { ascending: false })
+  ])
 
-  if (error || !patient) {
+  const patient = patientResult.data
+  const patientError = patientResult.error
+  const labResults = labsResult.data || []
+  const notes = notesResult.data || []
+
+  if (patientError || !patient) {
     notFound()
   }
 
   const age = calculateAge(new Date(patient.date_of_birth))
   const fullName = `${patient.first_name} ${patient.last_name}`
-  const hasOminousAlerts = patient.lab_results?.some(
+  const hasOminousAlerts = labResults.some(
     (lab: { ominous_count: number }) => lab.ominous_count >= 3
-  ) || false
+  )
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -69,8 +71,8 @@ export default async function PatientPage({ params }: PatientPageProps) {
             {patient.status}
           </Badge>
           <LabStatusBadge
-            labCount={patient.lab_results?.length || 0}
-            lastLabDate={patient.lab_results?.[0]?.test_date}
+            labCount={labResults.length}
+            lastLabDate={labResults[0]?.test_date}
           />
         </div>
         <p className="text-neutral-500 dark:text-neutral-400 mt-1">
@@ -129,15 +131,15 @@ export default async function PatientPage({ params }: PatientPageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
-                {patient.lab_results?.length || 0}
+                {labResults.length}
               </p>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">Lab Results</p>
             </div>
             <div>
               <p className="text-3xl font-semibold text-neutral-900 dark:text-neutral-50">
-                {patient.conversations?.length || 0}
+                {notes.length}
               </p>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">Conversations</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">Notes</p>
             </div>
           </div>
         </div>
@@ -208,8 +210,8 @@ export default async function PatientPage({ params }: PatientPageProps) {
       {/* History Section */}
       <PatientHistory
         patientId={id}
-        labs={patient.lab_results || []}
-        conversations={patient.conversations || []}
+        labs={labResults}
+        notes={notes}
       />
     </div>
   )

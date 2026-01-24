@@ -2,9 +2,13 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateDiagnosticAnalysis, saveAnalysisToDatabase } from '@/lib/rag'
 import { createReasoningRecords } from '@/lib/rag/reasoning-generator'
+import { extractDiagnosticValues } from '@/lib/vision'
+import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
+import type { DiagnosticType } from '@/types/shared'
+import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Allow up to 60 seconds for AI generation
+export const maxDuration = 120 // Allow up to 120 seconds for extraction + AI generation
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -64,6 +68,121 @@ export async function POST(request: Request, { params }: RouteParams) {
         message: 'Analysis already exists',
         data: { analysisId: existingAnalysis.id, status: existingAnalysis.status }
       })
+    }
+
+    // AUTO-EXTRACT: Ensure all files are extracted before generating analysis
+    // This bridges the gap between upload and analysis, ensuring blood panels get persisted to lab tables
+    const { data: files, error: filesError } = await supabase
+      .from('diagnostic_files')
+      .select(`
+        id,
+        filename,
+        file_type,
+        mime_type,
+        storage_path,
+        upload_id,
+        diagnostic_extracted_values(id, status)
+      `)
+      .eq('upload_id', diagnosticUploadId)
+
+    if (!filesError && files) {
+      for (const file of files) {
+        // Check if file already has successful extraction
+        const existingExtraction = (file.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
+        if (existingExtraction?.status === 'complete') {
+          continue // Skip already extracted files
+        }
+
+        try {
+          // Get file URL from storage
+          const { data: urlData } = supabase.storage
+            .from('diagnostics')
+            .getPublicUrl(file.storage_path)
+
+          if (!urlData?.publicUrl) {
+            console.warn(`[Auto-Extract] Failed to get URL for file ${file.id}`)
+            continue
+          }
+
+          // Create or update extraction record
+          let extractionId = existingExtraction?.id
+          if (!extractionId) {
+            const { data: newExtraction } = await supabase
+              .from('diagnostic_extracted_values')
+              .insert({
+                diagnostic_file_id: file.id,
+                status: 'processing',
+                extraction_method: 'vision_api',
+                extraction_model: 'gpt-4o',
+              })
+              .select('id')
+              .single()
+            extractionId = newExtraction?.id
+          } else {
+            await supabase
+              .from('diagnostic_extracted_values')
+              .update({ status: 'processing' })
+              .eq('id', extractionId)
+          }
+
+          // Perform extraction
+          const result = await extractDiagnosticValues(
+            urlData.publicUrl,
+            file.file_type as DiagnosticType,
+            file.mime_type
+          )
+
+          // Determine status based on confidence
+          const CONFIDENCE_THRESHOLD = 0.7
+          const status = !result.success
+            ? 'error'
+            : result.confidence < CONFIDENCE_THRESHOLD
+              ? 'needs_review'
+              : 'complete'
+
+          // Update extraction record
+          if (extractionId) {
+            await supabase
+              .from('diagnostic_extracted_values')
+              .update({
+                extracted_data: result.data,
+                extraction_confidence: result.confidence,
+                raw_response: { response: result.rawResponse },
+                status,
+                error_message: result.error || null,
+              })
+              .eq('id', extractionId)
+          }
+
+          // Mark file as processed
+          await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', file.id)
+
+          // CRITICAL: Persist blood panel to lab tables
+          // This ensures labs uploaded via diagnostics appear in patient Lab Results section
+          if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
+            const labPersistResult = await persistBloodPanelToLabTables(
+              supabase,
+              result.data as BloodPanelExtractedData,
+              file.upload_id,
+              user.id
+            )
+
+            if (labPersistResult.success) {
+              console.log(
+                `[Auto-Extract] Blood panel persisted to lab tables: ${labPersistResult.labResultId}, ` +
+                `${labPersistResult.labValuesCount} values`
+              )
+            } else {
+              console.warn('[Auto-Extract] Failed to persist blood panel to lab tables:', labPersistResult.error)
+            }
+          }
+
+          console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
+        } catch (extractError) {
+          console.error(`[Auto-Extract] Failed to extract file ${file.id}:`, extractError)
+          // Continue with other files - don't fail the whole analysis
+        }
+      }
     }
 
     // Create pending analysis record
@@ -130,7 +249,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       // Create protocol recommendations with reasoning records
       const recommendationIds: string[] = []
+      console.log(`[Demo Mode Debug] Creating ${analysis.protocols.length} protocol recommendations`)
       for (const protocol of analysis.protocols) {
+        console.log(`[Demo Mode Debug] Saving protocol: "${protocol.title}" (category: ${protocol.category}, frequencies: ${protocol.frequencies.length})`)
         const { data: recRecord, error: recError } = await supabase
           .from('protocol_recommendations')
           .insert({
@@ -146,6 +267,10 @@ export async function POST(request: Request, { params }: RouteParams) {
           })
           .select('id')
           .single()
+
+        if (recError) {
+          console.error(`[Demo Mode Debug] Failed to save protocol "${protocol.title}":`, recError)
+        }
 
         if (!recError && recRecord) {
           recommendationIds.push(recRecord.id)

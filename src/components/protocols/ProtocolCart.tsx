@@ -2,7 +2,10 @@
 
 import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { TimePicker } from '@/components/ui/TimePicker'
+import { PatientSelectorModal } from './PatientSelectorModal'
+import { format, parse } from 'date-fns'
 import type { ApprovedFrequency } from '@/types/frequency'
 
 interface ProtocolCartProps {
@@ -12,7 +15,6 @@ interface ProtocolCartProps {
   selectedPatientId?: string
   selectedPatientName?: string
   onPatientSelect: (patientId: string, patientName: string) => void
-  patients: Array<{ id: string; firstName: string; lastName: string }>
   onSubmit: (input: {
     patientId: string
     sessionDate: string
@@ -32,23 +34,14 @@ export function ProtocolCart({
   selectedPatientId,
   selectedPatientName,
   onPatientSelect,
-  patients,
   onSubmit,
   isLoading = false,
 }: ProtocolCartProps) {
-  const [patientSearch, setPatientSearch] = useState('')
-  const [showPatientResults, setShowPatientResults] = useState(false)
+  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false)
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0])
   const [sessionTime, setSessionTime] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  // Filter patients based on search term
-  const filteredPatients = patientSearch.trim()
-    ? patients.filter((p) =>
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(patientSearch.toLowerCase())
-      )
-    : patients
 
   const handleSubmit = useCallback(async () => {
     if (!selectedPatientId || selectedFrequencies.length === 0) {
@@ -134,68 +127,52 @@ export function ProtocolCart({
         <label className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
           Patient
         </label>
-        <div className="relative">
-          <Input
-            type="text"
-            placeholder="Search for patient..."
-            value={selectedPatientName || patientSearch}
-            onChange={(e) => {
-              const value = e.target.value
-              if (!selectedPatientId || value !== selectedPatientName) {
-                setPatientSearch(value)
-                setShowPatientResults(true)
-              }
-            }}
-            onFocus={() => {
-              if (patientSearch || !selectedPatientId) {
-                setShowPatientResults(true)
-              }
-            }}
-            onBlur={() => {
-              setTimeout(() => setShowPatientResults(false), 200)
-            }}
+        {selectedPatientName ? (
+          <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 rounded-lg px-4 py-3">
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">
+              {selectedPatientName}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsPatientModalOpen(true)}
+              disabled={isLoading || submitting}
+            >
+              Change
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="secondary"
+            onClick={() => setIsPatientModalOpen(true)}
             disabled={isLoading || submitting}
             className="w-full"
-          />
-
-          {/* Patient Results */}
-          {showPatientResults && (patientSearch || !selectedPatientId) && (
-            <div className="absolute top-full mt-2 w-full bg-white dark:bg-neutral-950 border-2 border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-              {filteredPatients.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-neutral-500 dark:text-neutral-400">
-                  {patients.length === 0 ? 'No patients found' : 'No matching patients'}
-                </div>
-              ) : (
-                filteredPatients.map((patient) => (
-                  <button
-                    key={patient.id}
-                    onClick={() => {
-                      onPatientSelect(patient.id, `${patient.firstName} ${patient.lastName}`)
-                      setPatientSearch('')
-                      setShowPatientResults(false)
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-neutral-900 dark:text-neutral-100"
-                  >
-                    {patient.firstName} {patient.lastName}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+          >
+            Find Patient
+          </Button>
+        )}
       </div>
+
+      <PatientSelectorModal
+        isOpen={isPatientModalOpen}
+        onClose={() => setIsPatientModalOpen(false)}
+        selectedPatientId={selectedPatientId}
+        onSelect={(id, name) => {
+          onPatientSelect(id, name)
+          setIsPatientModalOpen(false)
+        }}
+      />
 
       {/* Session Date */}
       <div>
         <label className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
           Session Date
         </label>
-        <Input
-          type="date"
-          value={sessionDate}
-          onChange={(e) => setSessionDate(e.target.value)}
+        <DatePicker
+          value={sessionDate ? parse(sessionDate, 'yyyy-MM-dd', new Date()) : null}
+          onChange={(date) => setSessionDate(date ? format(date, 'yyyy-MM-dd') : '')}
+          placeholder="Select session date"
           disabled={isLoading || submitting}
-          className="w-full"
         />
       </div>
 
@@ -204,12 +181,11 @@ export function ProtocolCart({
         <label className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
           Session Time <span className="text-xs text-neutral-500 dark:text-neutral-400">(optional)</span>
         </label>
-        <Input
-          type="time"
-          value={sessionTime}
-          onChange={(e) => setSessionTime(e.target.value)}
+        <TimePicker
+          value={sessionTime || null}
+          onChange={(time) => setSessionTime(time || '')}
+          placeholder="Select session time"
           disabled={isLoading || submitting}
-          className="w-full"
         />
       </div>
 

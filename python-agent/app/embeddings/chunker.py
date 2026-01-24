@@ -14,38 +14,18 @@ from dataclasses import dataclass, field
 # PROTOCOL DETECTION PATTERNS (for Sunday content chunking)
 # =============================================================================
 
-# Frequency/FSM protocol patterns (case-insensitive)
-FREQUENCY_PATTERNS = [
-    r"\b(SNS\s*Balance)\b",
-    r"\b(Medula\s*Support)\b",
-    r"\b(Pit\s*P\s*Support|Pituitary\s*P\s*Support)\b",
-    r"\b(Vagus\s*Support)\b",
-    r"\b(PNS\s*Support)\b",
-    r"\b(Cyto\s*Lower)\b",
-    r"\b(Leptin\s*Resist)\b",
-    r"\b(Kidney\s*Support)\b",
-    r"\b(Kidney\s*Vitality)\b",
-    r"\b(Kidney\s*Repair)\b",
-    r"\b(CP-?P|Central\s*Pain\s*Protocol?)\b",
-    r"\b(Alpha\s*Theta)\b",
-    r"\b(Biotoxin)\b",
-    r"\b(Sacral\s*Plexus)\b",
-    r"\b(NS\s*EMF)\b",
-    r"\b(Melanin)\b",
-    r"\b(Concussion\s*Brain\s*Balance)\b",
-]
+# Dynamic protocol loading from database
+from app.services.protocol_loader import get_frequency_patterns, get_supplement_patterns
 
-# Supplement patterns (case-insensitive)
-SUPPLEMENT_PATTERNS = [
-    r"\b(Serculate)\b",
-    r"\b(Cell\s*Synergy)\b",
-    r"\b(Tri\s*Salts)\b",
-    r"\b(X[-\s]?39)\b",
-    r"\b(Deuterium\s*Drops?|Deuterium)\b",
-    r"\b(Pectasol[-\s]?C|Pectasol)\b",
-    r"\b(Apex)\b",
-    r"\b(LifeWave)\b",
-]
+
+def _get_frequency_patterns() -> list[str]:
+    """Get frequency patterns (loaded from DB with caching)."""
+    return get_frequency_patterns()
+
+
+def _get_supplement_patterns() -> list[str]:
+    """Get supplement patterns."""
+    return get_supplement_patterns()
 
 # Diagnostic pattern keywords that indicate protocol context
 DIAGNOSTIC_CONTEXT_PATTERNS = [
@@ -76,13 +56,17 @@ def extract_protocols_from_text(text: str) -> dict[str, list[str]]:
     """
     text_lower = text.lower()
 
+    # Use dynamic patterns from database
+    frequency_patterns = _get_frequency_patterns()
+    supplement_patterns = _get_supplement_patterns()
+
     frequencies = set()
-    for pattern in FREQUENCY_PATTERNS:
+    for pattern in frequency_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         frequencies.update(m if isinstance(m, str) else m[0] for m in matches)
 
     supplements = set()
-    for pattern in SUPPLEMENT_PATTERNS:
+    for pattern in supplement_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         supplements.update(m if isinstance(m, str) else m[0] for m in matches)
 

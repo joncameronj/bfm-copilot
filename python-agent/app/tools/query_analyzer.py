@@ -121,6 +121,12 @@ DIAGNOSTIC_TO_FREQUENCY: dict[str, list[str]] = {
 
 # Supplement mappings derived from Sunday teaching sessions
 DIAGNOSTIC_TO_SUPPLEMENT: dict[str, list[str]] = {
+    # VCS/Biotoxin triggers (must address early)
+    "vcs fail": ["Pectasol-C", "Apex", "Cell Synergy"],
+    "failed vcs": ["Pectasol-C", "Apex", "Cell Synergy"],
+    "vcs failure": ["Pectasol-C", "Apex", "Cell Synergy"],
+    "vcs low": ["Pectasol-C", "Apex", "Cell Synergy"],
+
     # pH issues
     "low ph": ["Cell Synergy", "Tri Salts"],
     "acidic ph": ["Cell Synergy", "Tri Salts"],
@@ -179,19 +185,19 @@ DIAGNOSTIC_TO_SUPPLEMENT: dict[str, list[str]] = {
     "low hemoglobin": ["Deuterium Drops"],
 }
 
-# Known frequency names for detection
-KNOWN_FREQUENCIES = {
-    "sns balance", "medula support", "pit p support", "vagus support",
-    "pns support", "cyto lower", "leptin resist", "kidney support",
-    "kidney vitality", "kidney repair", "cp-p", "alpha theta", "biotoxin",
-    "sacral plexus", "ns emf", "melanin", "concussion brain balance",
-}
+# Dynamic protocol loading from database
+# Loaded lazily on first use, cached with TTL
+from app.services.protocol_loader import get_known_frequencies, get_known_supplements
 
-# Known supplement names for detection
-KNOWN_SUPPLEMENTS = {
-    "serculate", "cell synergy", "tri salts", "x39", "x-39",
-    "deuterium drops", "deuterium", "pectasol-c", "pectasol", "apex",
-}
+
+def _get_frequencies() -> set[str]:
+    """Get known frequency names (loaded from DB with caching)."""
+    return get_known_frequencies()
+
+
+def _get_supplements() -> set[str]:
+    """Get known supplement names."""
+    return get_known_supplements()
 
 # Canonical body systems used in the DB/search filters
 ALLOWED_BODY_SYSTEMS = {
@@ -307,13 +313,17 @@ def detect_explicit_protocols(text: str) -> tuple[list[str], list[str]]:
     """
     text_lower = text.lower()
 
+    # Use dynamic protocol lists from database
+    known_frequencies = _get_frequencies()
+    known_supplements = _get_supplements()
+
     mentioned_frequencies = [
-        freq for freq in KNOWN_FREQUENCIES
+        freq for freq in known_frequencies
         if freq in text_lower
     ]
 
     mentioned_supplements = [
-        supp for supp in KNOWN_SUPPLEMENTS
+        supp for supp in known_supplements
         if supp in text_lower
     ]
 

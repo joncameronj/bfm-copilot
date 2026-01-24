@@ -2,7 +2,7 @@
  * Types for approved frequency protocols and manual protocol builder
  */
 
-export type FrequencyCategory = 'thyroid' | 'diabetes' | 'neurological' | 'hormone'
+export type FrequencyCategory = 'general' | 'thyroid' | 'diabetes' | 'neurological' | 'hormones'
 
 /**
  * Approved frequency from the approved_frequency_names table

@@ -34,6 +34,7 @@ export function FrequencyBrowser({
     category: 'all',
     search: '',
     isActive: true,
+    limit: 500, // Fetch all frequencies for accurate category counts
   })
 
   // Fetch frequencies with current filters for display
@@ -41,16 +42,18 @@ export function FrequencyBrowser({
     category: selectedCategory,
     search: debouncedSearch,
     isActive: true,
+    limit: 500, // Ensure we display all frequencies in each category
   })
 
   // Calculate category counts from ALL frequencies (not filtered)
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: allFrequencies.length,
+      general: 0,
       thyroid: 0,
       diabetes: 0,
       neurological: 0,
-      hormone: 0,
+      hormones: 0,
     }
 
     allFrequencies.forEach((f) => {

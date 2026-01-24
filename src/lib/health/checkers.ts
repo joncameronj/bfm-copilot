@@ -131,28 +131,46 @@ export async function checkPythonAgent(): Promise<ServiceHealth> {
   try {
     const result = await timedFetch(`${PYTHON_AGENT_URL}/health`)
 
+    // Handle auth errors as degraded (service is up but auth may be misconfigured)
+    const isAuthError = result.status === 401 || result.status === 403
+    const status = result.ok
+      ? getStatusFromResponseTime(result.responseTimeMs, 'external')
+      : isAuthError
+        ? 'degraded'
+        : 'unhealthy'
+
     return {
       name: 'Python Agent',
       category: 'external',
-      status: result.ok
-        ? getStatusFromResponseTime(result.responseTimeMs, 'external')
-        : 'unhealthy',
+      status,
       responseTimeMs: result.responseTimeMs,
       lastChecked: new Date().toISOString(),
-      message: result.ok ? 'Agent responding' : undefined,
-      error: result.ok ? undefined : `HTTP ${result.status}`,
+      message: result.ok
+        ? 'Agent responding'
+        : isAuthError
+          ? 'Agent reachable but auth error'
+          : undefined,
+      error: result.ok
+        ? undefined
+        : `HTTP ${result.status}${isAuthError ? ' (check API key configuration)' : ''}`,
       details: result.data as Record<string, unknown>,
     }
   } catch (error) {
+    const errorMessage = error instanceof Error
+      ? error.name === 'AbortError'
+        ? 'Request timeout (agent may be starting up)'
+        : error.message.includes('ECONNREFUSED')
+          ? `Connection refused at ${PYTHON_AGENT_URL} - agent not running`
+          : error.message
+      : 'Connection failed'
+
     return {
       name: 'Python Agent',
       category: 'external',
       status: 'unhealthy',
       responseTimeMs: Math.round(performance.now() - start),
       lastChecked: new Date().toISOString(),
-      error: error instanceof Error
-        ? (error.name === 'AbortError' ? 'Request timeout' : error.message)
-        : 'Connection failed',
+      error: errorMessage,
     }
   }
 }
@@ -217,16 +235,28 @@ export async function checkInternalEndpoint(
       },
     })
 
+    // Handle auth errors as degraded (endpoint exists but auth token may be invalid/missing)
+    const isAuthError = result.status === 401 || result.status === 403
+    const status = result.ok
+      ? getStatusFromResponseTime(result.responseTimeMs, 'internal')
+      : isAuthError
+        ? 'degraded'
+        : 'unhealthy'
+
     return {
       name,
       category: 'internal',
-      status: result.ok
-        ? getStatusFromResponseTime(result.responseTimeMs, 'internal')
-        : 'unhealthy',
+      status,
       responseTimeMs: result.responseTimeMs,
       lastChecked: new Date().toISOString(),
-      message: result.ok ? 'Endpoint responding' : undefined,
-      error: result.ok ? undefined : `HTTP ${result.status}`,
+      message: result.ok
+        ? 'Endpoint responding'
+        : isAuthError
+          ? 'Endpoint reachable but requires auth'
+          : undefined,
+      error: result.ok
+        ? undefined
+        : `HTTP ${result.status}${isAuthError ? ' (auth required)' : ''}`,
     }
   } catch (error) {
     return {

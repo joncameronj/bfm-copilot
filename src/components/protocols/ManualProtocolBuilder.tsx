@@ -1,17 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { FrequencyBrowser } from './FrequencyBrowser'
 import { ProtocolCart } from './ProtocolCart'
 import { useManualProtocol } from '@/hooks/useManualProtocol'
 import { useRouter } from 'next/navigation'
 import type { ApprovedFrequency } from '@/types/frequency'
-
-interface Patient {
-  id: string
-  firstName: string
-  lastName: string
-}
 
 /**
  * Main Manual Protocol Builder component
@@ -19,34 +13,13 @@ interface Patient {
  */
 export function ManualProtocolBuilder() {
   const router = useRouter()
-  const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<string>()
   const [selectedPatientName, setSelectedPatientName] = useState<string>()
-  const [patientsLoading, setPatientsLoading] = useState(true)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
   const { selectedFrequencies, toggleFrequency, clearSelection, createSession, isLoading, error } =
     useManualProtocol()
-
-  // Fetch patients on mount
-  useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        const response = await fetch('/api/patients')
-        if (response.ok) {
-          const data = await response.json()
-          setPatients(data.data || [])
-        }
-      } catch (err) {
-        console.error('Failed to fetch patients:', err)
-      } finally {
-        setPatientsLoading(false)
-      }
-    }
-
-    fetchPatients()
-  }, [])
 
   const handleCreateSession = async (input: {
     patientId: string
@@ -117,9 +90,8 @@ export function ManualProtocolBuilder() {
               setSelectedPatientId(id)
               setSelectedPatientName(name)
             }}
-            patients={patients}
             onSubmit={handleCreateSession}
-            isLoading={isLoading || patientsLoading}
+            isLoading={isLoading}
           />
         </div>
       </div>

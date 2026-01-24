@@ -13,6 +13,7 @@ from openai.types.shared import Reasoning
 from app.agent.system_prompts import get_system_prompt
 from app.models.messages import PatientContext
 from app.tools.rag_search import create_search_knowledge_base_tool
+from app.tools.web_search import create_web_search_tool
 
 
 def create_base_agent(
@@ -61,12 +62,20 @@ def create_base_agent(
         conversation_id=conversation_id,
     )
 
+    # Build tools list - all roles get RAG search
+    tools = [search_tool]
+
+    # Add web search tool for educational content lookup
+    # Available to all roles for research purposes
+    web_search_tool = create_web_search_tool()
+    tools.append(web_search_tool)
+
     # Create agent with all current features preserved
     agent = Agent(
         name="bfm_copilot",
         model=model,
         instructions=instructions,
-        tools=[search_tool],
+        tools=tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(
                 effort=reasoning_effort,  # Dynamic: low/medium/high

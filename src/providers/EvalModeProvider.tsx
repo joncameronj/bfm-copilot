@@ -21,6 +21,7 @@ interface EvalModeProviderProps {
 const EVAL_MODE_USERS = [
   'drrob@shslasvegas.com',
   'joncameron@etho.net',
+  'patientadvocate@shslasvegas.com',
 ]
 
 export function EvalModeProvider({ children, userEmail }: EvalModeProviderProps) {
