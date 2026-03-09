@@ -8,6 +8,7 @@ import type { AgentStep } from '@/types/chat'
 
 interface AgentStepsProps {
   steps: AgentStep[]
+  notices?: string[]
   isActive?: boolean
   thinkingStartTime?: number | null
   className?: string
@@ -19,6 +20,7 @@ interface AgentStepsProps {
  */
 export function AgentSteps({
   steps,
+  notices = [],
   isActive = false,
   thinkingStartTime,
   className,
@@ -50,7 +52,7 @@ export function AgentSteps({
         )
       : 0
 
-  if (steps.length === 0 && !isActive) {
+  if (steps.length === 0 && !isActive && notices.length === 0) {
     return null
   }
 
@@ -137,9 +139,19 @@ export function AgentSteps({
             className="overflow-hidden"
           >
             <div className="px-4 pb-3 pt-1 space-y-2 border-t border-neutral-100 dark:border-neutral-800">
+              {notices.map((notice, index) => (
+                <div
+                  key={`deep-dive-notice-${index}`}
+                  className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200"
+                >
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                  <span>{notice}</span>
+                </div>
+              ))}
+
               <AnimatePresence mode="popLayout">
                 {steps.map((step, index) => (
-                  <StepItem key={step.id} step={step} index={index} />
+                  <StepItem key={step.id || `step-${index}`} step={step} index={index} />
                 ))}
               </AnimatePresence>
 

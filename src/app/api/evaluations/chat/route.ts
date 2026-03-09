@@ -76,11 +76,43 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate that message exists and belongs to the same conversation before insert.
+    // This avoids raw FK errors when client-side temporary IDs are submitted.
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('id, conversation_id')
+      .eq('id', messageId)
+      .single()
+
+    let resolvedMessageId = messageId
+    if (messageError || !message || message.conversation_id !== conversationId) {
+      // Compatibility fallback for older client sessions where temporary message IDs
+      // were not persisted to DB. Resolve by exact assistant message content.
+      const { data: fallbackMessage } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('role', 'assistant')
+        .eq('content', messageContent)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!fallbackMessage?.id) {
+        return NextResponse.json(
+          { error: 'Invalid messageId for this conversation. Reload the conversation and try again.' },
+          { status: 400 }
+        )
+      }
+
+      resolvedMessageId = fallbackMessage.id
+    }
+
     // Insert the evaluation
     const { data, error } = await supabase
       .from('chat_evaluations')
       .insert({
-        message_id: messageId,
+        message_id: resolvedMessageId,
         conversation_id: conversationId,
         evaluator_id: user.id,
         content_type: contentType,

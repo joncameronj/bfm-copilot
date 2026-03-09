@@ -64,12 +64,12 @@ export async function* parseSSELines(
  * Returns null for non-data lines or [DONE] signal.
  */
 export function parseSSEData<T = unknown>(line: string): T | null {
-  if (!line.startsWith('data: ')) {
+  if (!line.startsWith('data:')) {
     return null
   }
 
-  const data = line.slice(6) // Remove 'data: ' prefix
-  if (data === '[DONE]') {
+  const data = line.slice(5).trimStart() // Remove 'data:' prefix (+ optional space)
+  if (!data || data === '[DONE]') {
     return null
   }
 

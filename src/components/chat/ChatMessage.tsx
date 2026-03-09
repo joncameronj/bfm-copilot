@@ -46,6 +46,7 @@ interface ChatMessageProps {
   currentActions?: ActionButton[]
   currentSources?: Source[]
   currentRagChunks?: RagChunk[]
+  currentDeepDiveNotices?: string[]
   thinkingStartTime?: number | null
 }
 
@@ -59,6 +60,7 @@ export function ChatMessage({
   currentActions = [],
   currentSources = [],
   currentRagChunks = [],
+  currentDeepDiveNotices = [],
   thinkingStartTime,
 }: ChatMessageProps) {
   const { resolvedTheme } = useTheme()
@@ -79,6 +81,11 @@ export function ChatMessage({
 
   // Use current RAG chunks if available, otherwise use stored chunks
   const ragChunks = currentRagChunks.length > 0 ? currentRagChunks : message.metadata?.ragChunks || []
+
+  const deepDiveNotices =
+    currentDeepDiveNotices.length > 0
+      ? currentDeepDiveNotices
+      : (message.metadata?.deepDiveNotices as string[] | undefined) || []
 
   // Check if message was interrupted
   const isInterrupted = message.metadata?.interrupted === true
@@ -105,9 +112,10 @@ export function ChatMessage({
         )}
 
         {/* Agent steps - detailed task list */}
-        {isAssistant && (steps.length > 0 || isReasoning || reasoningData) && (
+        {isAssistant && (steps.length > 0 || isReasoning || reasoningData || deepDiveNotices.length > 0) && (
           <AgentSteps
             steps={steps}
+            notices={deepDiveNotices}
             isActive={isThinking || isReasoning}
             thinkingStartTime={thinkingStartTime}
           />
@@ -239,7 +247,7 @@ function RagChunksDisplay({ chunks }: { chunks: RagChunk[] }) {
         <div className="mt-3 space-y-3 pl-6 border-l border-neutral-200 dark:border-neutral-800">
           {chunks.map((chunk, idx) => (
             <div
-              key={chunk.id}
+              key={chunk.id || `chunk-${idx}`}
               className="p-3 bg-neutral-50 dark:bg-neutral-900/50 rounded border border-neutral-200 dark:border-neutral-800 text-xs"
             >
               <div className="space-y-2">

@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { type UserRole, ROUTE_RULES } from '@/types/roles'
+import { type UserRole, canAccessRouteForRole, getHomeRoute } from '@/types/roles'
 
 interface CookieToSet {
   name: string
@@ -8,34 +8,41 @@ interface CookieToSet {
   options?: CookieOptions
 }
 
-// Get the home route based on user role
-function getHomeRoute(role: UserRole): string {
-  switch (role) {
-    case 'admin':
-      return '/'
-    case 'practitioner':
-      return '/'
-    case 'member':
-      return '/my-health'
-    default:
-      return '/'
-  }
+const AUTH_COOKIE_PREFIX = 'sb-'
+const AUTH_COOKIE_KEY_FRAGMENT = '-auth-token'
+
+function getAuthCookieNames(request: NextRequest): string[] {
+  return request.cookies
+    .getAll()
+    .filter(
+      ({ name }) =>
+        name.startsWith(AUTH_COOKIE_PREFIX) &&
+        name.includes(AUTH_COOKIE_KEY_FRAGMENT)
+    )
+    .map(({ name }) => name)
 }
 
-// Check if a route is accessible by a given role
-function canAccessRoute(pathname: string, role: UserRole): boolean {
-  // Check each route rule
-  for (const [route, allowedRoles] of Object.entries(ROUTE_RULES)) {
-    if (pathname === route || pathname.startsWith(`${route}/`)) {
-      return allowedRoles.includes(role)
-    }
-  }
-  // Default: allow access for routes not in ROUTE_RULES
-  return true
+function isMissingRefreshTokenError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const authError = error as { code?: string }
+  return authError.code === 'refresh_token_not_found'
+}
+
+function clearAuthCookies(
+  request: NextRequest,
+  response: NextResponse,
+  cookieNames: string[]
+) {
+  cookieNames.forEach((cookieName) => {
+    request.cookies.delete(cookieName)
+    response.cookies.delete(cookieName)
+  })
 }
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const pathname = request.nextUrl.pathname
+  const authCookieNames = getAuthCookieNames(request)
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,16 +65,32 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  if (authCookieNames.length > 0) {
+    try {
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
+      if (authError && isMissingRefreshTokenError(authError)) {
+        // Clear stale auth cookies so logged-out users don't trigger refresh errors repeatedly.
+        clearAuthCookies(request, supabaseResponse, authCookieNames)
+      } else {
+        user = authUser
+      }
+    } catch (error) {
+      if (isMissingRefreshTokenError(error)) {
+        clearAuthCookies(request, supabaseResponse, authCookieNames)
+      } else {
+        throw error
+      }
+    }
+  }
 
   // Check if this is an auth page
   const isAuthPage =
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/reset-password')
+    pathname.startsWith('/login') || pathname.startsWith('/reset-password')
 
   // If user is not logged in and trying to access protected route
   if (!user && !isAuthPage) {
@@ -106,7 +129,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check role-based route access
-    if (!canAccessRoute(pathname, userRole)) {
+    if (!canAccessRouteForRole(pathname, userRole)) {
       const url = request.nextUrl.clone()
       url.pathname = getHomeRoute(userRole)
       return NextResponse.redirect(url)

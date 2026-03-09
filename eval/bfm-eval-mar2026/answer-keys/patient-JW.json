@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "patient": "Jennifer Weber",
+    "initials": "JW",
+    "age_sex": "52F",
+    "test_dates": ["2026-02-24"],
+    "reviewed_by": "Dr. Rob",
+    "review_date": "2026-03-08",
+    "overall_grade": "4.3/5",
+    "review_notes": "Lower-left quadrant triggers Midbrain Support, NOT SNS Balance. No 'Brain Activity Support' or 'Stress Index Regulation' settings — these don't exist. Low Specific Gravity 1.005 triggers Deuterium Drops supplement."
+  },
+  "urgency_min": 2.0,
+  "urgency_max": 3.0,
+  "expected_deal_breakers": [
+    "Alpha/Theta Imbalance",
+    "PNS Negative Zone",
+    "Vagus Nerve Dysfunction",
+    "Low pH"
+  ],
+  "not_expected_deal_breakers": [
+    "SNS Switched"
+  ],
+  "expected_protocols": [
+    "Alpha Theta",
+    "Midbrain Support",
+    "PNS Support",
+    "Vagus Support",
+    "Pineal Support",
+    "Sacral Plexus",
+    "Leptin Resist"
+  ],
+  "not_expected_protocols": [
+    "SNS Balance",
+    "Brain Activity Support",
+    "Stress Index Regulation",
+    "Cervical Support"
+  ],
+  "expected_supplements_day1": [
+    "Cell Synergy",
+    "X-39",
+    "D-Ribose",
+    "Innovita Vagus Nerve"
+  ],
+  "expected_supplements": [
+    "Cell Synergy",
+    "X-39",
+    "D-Ribose",
+    "Innovita Vagus Nerve",
+    "Deuterium Drops",
+    "Adipothin",
+    "Epi Pineal"
+  ],
+  "corrections": {
+    "lower_left_quadrant": "Lower-left ANS depletion triggers Midbrain Support, NOT SNS Balance",
+    "fake_protocols": "Do not use 'Brain Activity Support', 'Stress Index Regulation' — these are not real BFM frequency settings",
+    "deuterium_drops": "Low Specific Gravity 1.005 triggers Deuterium Drops supplement",
+    "vagus_type": "This is Vagus deficiency (not trauma) — Vagus Support only, NOT Vagus Trauma",
+    "cell_synergy_dose": "1 scoop (standard dose for mild presentation)"
+  },
+  "expected_five_levers": 5,
+  "cyto_lower_gated": false,
+  "passing_vcs": true,
+  "vcs_score": "25/32",
+  "best_prognosis_of_cohort": true,
+  "grading": {
+    "urgency_assessment": 5,
+    "diagnostic_interpretation": 5,
+    "deal_breaker_identification": 4,
+    "frequency_protocol_appropriateness": 4,
+    "frequency_sequencing": 5,
+    "supplement_accuracy": 3,
+    "supplement_dosing_timing": 5,
+    "five_levers": 5,
+    "clinical_concerns": 5,
+    "monitoring_plan": 5,
+    "safety_contraindications": 5,
+    "overall": 4
+  }
+}

@@ -4,6 +4,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { ModelSettings, ModelSettingsUpdatePayload } from '@/types/settings'
+import {
+  getDefaultChatModel,
+  normalizeChatModelForProvider,
+} from '@/lib/ai/provider'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +55,7 @@ export async function GET() {
 
   // Transform to ModelSettings format
   const modelSettings: ModelSettings = {
-    chat_model: 'gpt-5.2',
+    chat_model: getDefaultChatModel(),
     reasoning_effort: 'high',
     reasoning_summary: 'detailed',
   }
@@ -62,7 +66,7 @@ export async function GET() {
       : setting.value
 
     if (setting.key === 'chat_model') {
-      modelSettings.chat_model = value as string
+      modelSettings.chat_model = normalizeChatModelForProvider(value as string)
     } else if (setting.key === 'reasoning_effort') {
       modelSettings.reasoning_effort = value as ModelSettings['reasoning_effort']
     } else if (setting.key === 'reasoning_summary') {
@@ -102,10 +106,14 @@ export async function PUT(request: Request) {
     )
   }
 
+  const normalizedChatModel = body.chat_model !== undefined
+    ? normalizeChatModelForProvider(body.chat_model)
+    : undefined
+
   // Update each setting that was provided
   const updates: Promise<unknown>[] = []
 
-  if (body.chat_model !== undefined) {
+  if (normalizedChatModel !== undefined) {
     updates.push(
       (async () => {
         const { error } = await supabase
@@ -113,8 +121,8 @@ export async function PUT(request: Request) {
           .upsert(
             {
               key: 'chat_model',
-              value: JSON.stringify(body.chat_model),
-              description: 'The OpenAI model used for the main chat agent',
+              value: JSON.stringify(normalizedChatModel),
+              description: 'The AI model used for the main chat agent',
               updated_by: auth.user.id,
             },
             { onConflict: 'key' }
@@ -179,7 +187,7 @@ export async function PUT(request: Request) {
       .in('key', ['chat_model', 'reasoning_effort', 'reasoning_summary'])
 
     const modelSettings: ModelSettings = {
-      chat_model: 'gpt-5.2',
+      chat_model: getDefaultChatModel(),
       reasoning_effort: 'high',
       reasoning_summary: 'detailed',
     }
@@ -190,7 +198,7 @@ export async function PUT(request: Request) {
         : setting.value
 
       if (setting.key === 'chat_model') {
-        modelSettings.chat_model = value as string
+        modelSettings.chat_model = normalizeChatModelForProvider(value as string)
       } else if (setting.key === 'reasoning_effort') {
         modelSettings.reasoning_effort = value as ModelSettings['reasoning_effort']
       } else if (setting.key === 'reasoning_summary') {

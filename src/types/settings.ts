@@ -58,14 +58,19 @@ export interface ModelSettingsUpdatePayload {
   reasoning_summary?: ReasoningSummary
 }
 
-// Available model options for the dropdown
+// AI Provider type
+export type AIProvider = 'anthropic'
+
+// Available AI providers
+export const AVAILABLE_PROVIDERS = [
+  { value: 'anthropic', label: 'Anthropic (Claude)', description: 'Extended thinking, tool use, vision' },
+] as const
+
+// Available Anthropic model options for the dropdown
 export const AVAILABLE_MODELS = [
-  { value: 'gpt-5.2', label: 'GPT-5.2', description: 'Latest flagship model with extended thinking' },
-  { value: 'gpt-4.5-preview', label: 'GPT-4.5 Preview', description: 'Preview of next generation model' },
-  { value: 'gpt-4o', label: 'GPT-4o', description: 'Fast multimodal model' },
-  { value: 'o1', label: 'o1', description: 'Advanced reasoning model' },
-  { value: 'o1-mini', label: 'o1-mini', description: 'Efficient reasoning model' },
-  { value: 'o3-mini', label: 'o3-mini', description: 'Latest efficient reasoning model' },
+  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6', description: 'Most capable, deep reasoning', provider: 'anthropic' },
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Best balance of speed and capability', provider: 'anthropic' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Fast model for simple tasks', provider: 'anthropic' },
 ] as const
 
 export const REASONING_EFFORT_OPTIONS = [

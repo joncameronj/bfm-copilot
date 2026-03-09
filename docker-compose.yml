@@ -6,15 +6,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.2}
+      - XAI_API_KEY=${XAI_API_KEY}
+      - XAI_BASE_URL=${XAI_BASE_URL:-https://api.x.ai/v1}
+      - XAI_CHAT_MODEL=${XAI_CHAT_MODEL:-grok-4-1-fast-reasoning}
+      - XAI_FAST_MODEL=${XAI_FAST_MODEL:-grok-4-1-fast-non-reasoning}
+      - XAI_VISION_MODEL=${XAI_VISION_MODEL:-grok-vision-beta}
+      - XAI_EMBEDDING_MODEL=${XAI_EMBEDDING_MODEL:-grok-embedding-small}
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - FRONTEND_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       - DEBUG=true
       - CORS_ORIGINS=["http://localhost:3000"]
       - REASONING_EFFORT=${REASONING_EFFORT:-high}
       - REASONING_SUMMARY=${REASONING_SUMMARY:-detailed}
+      - CHAT_HISTORY_MESSAGE_LIMIT=${CHAT_HISTORY_MESSAGE_LIMIT:-400}
+      - CHAT_HISTORY_CHAR_BUDGET=${CHAT_HISTORY_CHAR_BUDGET:-1800000}
     volumes:
       - ./python-agent:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

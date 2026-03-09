@@ -1,5 +1,5 @@
 // Vision API Module
-// Provides diagnostic file extraction using GPT-4o Vision
+// Provides diagnostic file extraction using the configured provider vision model
 
 export { extractFromImage, extractFromMultipleImages, extractFrequencyNames } from './vision-client'
 export { extractDiagnosticValues } from './extractors'

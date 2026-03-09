@@ -4,9 +4,22 @@ import { createClient } from '@supabase/supabase-js'
 // Test data matching expected case study outputs
 const EXPECTED_FREQUENCIES = {
   thyroid: ['SNS Balance', 'Medula Support', 'Pit P Support'],
-  neurological: ['Vagus Support', 'PNS Support', 'Cyto Lower', 'Leptin Resist', 'Kidney Support'],
+  neurological: [
+    'Vagus Support',
+    'PNS Support',
+    'Cyto Lower',
+    'Leptin Resist',
+    'Kidney Support',
+  ],
   hormones: ['CP-P', 'Alpha Theta', 'Biotoxin'],
-  diabetes: ['SNS Balance', 'Alpha Theta', 'Sacral Plexus', 'NS EMF', 'Kidney Vitality', 'Kidney Repair'],
+  diabetes: [
+    'SNS Balance',
+    'Alpha Theta',
+    'Sacral Plexus',
+    'NS EMF',
+    'Kidney Vitality',
+    'Kidney Repair',
+  ],
 }
 
 const EXPECTED_SUPPLEMENTS = {
@@ -18,11 +31,17 @@ const EXPECTED_SUPPLEMENTS = {
 
 // Supabase client for direct database testing
 let supabase: ReturnType<typeof createClient>
-let approvedFrequencies: Array<{ name: string; aliases: string[]; category: string | null }>
+let approvedFrequencies: Array<{
+  name: string
+  aliases: string[]
+  category: string | null
+}>
 
 beforeAll(async () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Missing Supabase credentials in environment')
@@ -97,14 +116,26 @@ function matchFrequency(input: string): MatchResult {
   let closestMatch: { name: string; distance: number } | null = null
 
   for (const freq of approvedFrequencies) {
-    const distance = levenshteinDistance(normalizedInput, freq.name.toLowerCase())
-    if (distance <= FUZZY_THRESHOLD && (!closestMatch || distance < closestMatch.distance)) {
+    const distance = levenshteinDistance(
+      normalizedInput,
+      freq.name.toLowerCase()
+    )
+    if (
+      distance <= FUZZY_THRESHOLD &&
+      (!closestMatch || distance < closestMatch.distance)
+    ) {
       closestMatch = { name: freq.name, distance }
     }
 
     for (const alias of freq.aliases || []) {
-      const aliasDistance = levenshteinDistance(normalizedInput, alias.toLowerCase())
-      if (aliasDistance <= FUZZY_THRESHOLD && (!closestMatch || aliasDistance < closestMatch.distance)) {
+      const aliasDistance = levenshteinDistance(
+        normalizedInput,
+        alias.toLowerCase()
+      )
+      if (
+        aliasDistance <= FUZZY_THRESHOLD &&
+        (!closestMatch || aliasDistance < closestMatch.distance)
+      ) {
         closestMatch = { name: freq.name, distance: aliasDistance }
       }
     }
@@ -129,8 +160,9 @@ describe('Database Alias Configuration', () => {
       .eq('name', 'Pituitary P Supp')
       .single()
 
-    expect(data).toBeTruthy()
-    expect(data?.aliases).toContain('Pit P Support')
+    const row = data as { name: string; aliases: string[] | null } | null
+    expect(row).toBeTruthy()
+    expect(row?.aliases || []).toContain('Pit P Support')
   })
 
   it('should have "NS EMF" alias for "EMF NS"', async () => {
@@ -140,8 +172,9 @@ describe('Database Alias Configuration', () => {
       .eq('name', 'EMF NS')
       .single()
 
-    expect(data).toBeTruthy()
-    expect(data?.aliases).toContain('NS EMF')
+    const row = data as { name: string; aliases: string[] | null } | null
+    expect(row).toBeTruthy()
+    expect(row?.aliases || []).toContain('NS EMF')
   })
 
   it('should have "Kidney Support" frequency', async () => {
@@ -151,8 +184,9 @@ describe('Database Alias Configuration', () => {
       .eq('name', 'Kidney Support')
       .single()
 
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe('Kidney Support')
+    const row = data as { name: string } | null
+    expect(row).toBeTruthy()
+    expect(row?.name).toBe('Kidney Support')
   })
 
   it('should have "Medulla Support" for fuzzy matching "Medula Support"', async () => {
@@ -162,8 +196,9 @@ describe('Database Alias Configuration', () => {
       .eq('name', 'Medulla Support')
       .single()
 
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe('Medulla Support')
+    const row = data as { name: string } | null
+    expect(row).toBeTruthy()
+    expect(row?.name).toBe('Medulla Support')
   })
 })
 
@@ -250,31 +285,43 @@ describe('Frequency Matching Logic', () => {
 
 describe('Case Study Expected Frequencies', () => {
   describe('Thyroid Case Study (thyroid-cs1)', () => {
-    it.each(EXPECTED_FREQUENCIES.thyroid)('should match expected frequency "%s"', (freq) => {
-      const result = matchFrequency(freq)
-      expect(result.valid).toBe(true)
-    })
+    it.each(EXPECTED_FREQUENCIES.thyroid)(
+      'should match expected frequency "%s"',
+      (freq) => {
+        const result = matchFrequency(freq)
+        expect(result.valid).toBe(true)
+      }
+    )
   })
 
   describe('Neurological Case Study (neurological-cs5)', () => {
-    it.each(EXPECTED_FREQUENCIES.neurological)('should match expected frequency "%s"', (freq) => {
-      const result = matchFrequency(freq)
-      expect(result.valid).toBe(true)
-    })
+    it.each(EXPECTED_FREQUENCIES.neurological)(
+      'should match expected frequency "%s"',
+      (freq) => {
+        const result = matchFrequency(freq)
+        expect(result.valid).toBe(true)
+      }
+    )
   })
 
   describe('Hormones Case Study (hormones-cs2)', () => {
-    it.each(EXPECTED_FREQUENCIES.hormones)('should match expected frequency "%s"', (freq) => {
-      const result = matchFrequency(freq)
-      expect(result.valid).toBe(true)
-    })
+    it.each(EXPECTED_FREQUENCIES.hormones)(
+      'should match expected frequency "%s"',
+      (freq) => {
+        const result = matchFrequency(freq)
+        expect(result.valid).toBe(true)
+      }
+    )
   })
 
   describe('Diabetes Case Study (diabetes-cs4)', () => {
-    it.each(EXPECTED_FREQUENCIES.diabetes)('should match expected frequency "%s"', (freq) => {
-      const result = matchFrequency(freq)
-      expect(result.valid).toBe(true)
-    })
+    it.each(EXPECTED_FREQUENCIES.diabetes)(
+      'should match expected frequency "%s"',
+      (freq) => {
+        const result = matchFrequency(freq)
+        expect(result.valid).toBe(true)
+      }
+    )
   })
 })
 
@@ -303,8 +350,9 @@ describe('Sunday RAG Content Availability', () => {
       .eq('seminar_day', 'sunday')
       .limit(5)
 
-    if (sundayDocs && sundayDocs.length > 0) {
-      const docIds = sundayDocs.map(d => d.id)
+    const typedSundayDocs = (sundayDocs || []) as Array<{ id: string }>
+    if (typedSundayDocs.length > 0) {
+      const docIds = typedSundayDocs.map((d) => d.id)
       const { count, error } = await supabase
         .from('document_chunks')
         .select('*', { count: 'exact', head: true })
@@ -324,7 +372,10 @@ describe('Analysis Generator Supplementation Config', () => {
   it('should include supplementation triggers in prompt', async () => {
     // Read the analysis-generator.ts file and verify supplementation triggers exist
     const fs = await import('fs/promises')
-    const content = await fs.readFile('src/lib/rag/analysis-generator.ts', 'utf-8')
+    const content = await fs.readFile(
+      'src/lib/rag/analysis-generator.ts',
+      'utf-8'
+    )
 
     expect(content).toContain('SUPPLEMENTATION TRIGGERS')
     expect(content).toContain('Cell Synergy')
@@ -336,11 +387,16 @@ describe('Analysis Generator Supplementation Config', () => {
 
   it('should NOT gate supplementation on hasLabs', async () => {
     const fs = await import('fs/promises')
-    const content = await fs.readFile('src/lib/rag/analysis-generator.ts', 'utf-8')
+    const content = await fs.readFile(
+      'src/lib/rag/analysis-generator.ts',
+      'utf-8'
+    )
 
     // Verify the old pattern is removed - supplementation should always be included
     expect(content).toContain('supplementation: parsed.supplementation || []')
     // The prompt should say to include supplements for ALL diagnostics
-    expect(content).toContain('Include supplementation recommendations based on ALL diagnostic findings')
+    expect(content).toContain(
+      'Include supplementation recommendations based on ALL diagnostic findings'
+    )
   })
 })

@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateDiagnosticAnalysis, saveAnalysisToDatabase } from '@/lib/rag'
+import { generateDiagnosticAnalysis } from '@/lib/rag'
 import { createReasoningRecords } from '@/lib/rag/reasoning-generator'
 import { extractDiagnosticValues } from '@/lib/vision'
 import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
+import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { DiagnosticType } from '@/types/shared'
 import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
@@ -14,11 +15,74 @@ interface RouteParams {
   params: Promise<{ id: string }>
 }
 
+type UploadLookup = {
+  id: string
+  status: string
+  patient_id: string | null
+}
+
+/**
+ * Resolve a diagnostic upload from multiple ID types:
+ * - direct diagnostic_uploads.id
+ * - diagnostic_files.id (maps to upload_id)
+ * - diagnostic_analyses.id (maps to diagnostic_upload_id)
+ */
+async function resolveDiagnosticUpload(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  inputId: string,
+  userId: string
+): Promise<UploadLookup | null> {
+  const loadUploadById = async (uploadId: string): Promise<UploadLookup | null> => {
+    const { data } = await supabase
+      .from('diagnostic_uploads')
+      .select('id, status, patient_id')
+      .eq('id', uploadId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    return data
+  }
+
+  const directUpload = await loadUploadById(inputId)
+  if (directUpload) {
+    return directUpload
+  }
+
+  const { data: fileRef } = await supabase
+    .from('diagnostic_files')
+    .select('upload_id')
+    .eq('id', inputId)
+    .maybeSingle()
+
+  if (fileRef?.upload_id) {
+    const uploadFromFile = await loadUploadById(fileRef.upload_id)
+    if (uploadFromFile) {
+      return uploadFromFile
+    }
+  }
+
+  const { data: analysisRef } = await supabase
+    .from('diagnostic_analyses')
+    .select('diagnostic_upload_id')
+    .eq('id', inputId)
+    .eq('practitioner_id', userId)
+    .maybeSingle()
+
+  if (analysisRef?.diagnostic_upload_id) {
+    const uploadFromAnalysis = await loadUploadById(analysisRef.diagnostic_upload_id)
+    if (uploadFromAnalysis) {
+      return uploadFromAnalysis
+    }
+  }
+
+  return null
+}
+
 // POST /api/diagnostics/[id]/generate-analysis
 // Triggers RAG-powered analysis and protocol recommendation generation
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const { id: diagnosticUploadId } = await params
+    const { id: inputId } = await params
+    const visionModel = getDefaultVisionModel()
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -26,28 +90,26 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user role
+    // Get user role (fallback to practitioner for resilience)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    if (profileError) {
+      console.warn('Profile lookup failed while generating analysis:', profileError.message)
     }
 
-    // Verify upload belongs to user and has a patient
-    const { data: upload, error: uploadError } = await supabase
-      .from('diagnostic_uploads')
-      .select('id, status, patient_id')
-      .eq('id', diagnosticUploadId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (uploadError || !upload) {
-      return NextResponse.json({ error: 'Diagnostic upload not found' }, { status: 404 })
+    // Resolve upload across upload/file/analysis ID types
+    const upload = await resolveDiagnosticUpload(supabase, inputId, user.id)
+    if (!upload) {
+      return NextResponse.json(
+        { error: 'Diagnostic upload not found (checked upload, file, and analysis IDs)' },
+        { status: 404 }
+      )
     }
+    const diagnosticUploadId = upload.id
 
     if (!upload.patient_id) {
       return NextResponse.json(
@@ -94,13 +156,16 @@ export async function POST(request: Request, { params }: RouteParams) {
         }
 
         try {
-          // Get file URL from storage
-          const { data: urlData } = supabase.storage
+          // Generate short-lived signed URL (diagnostics bucket is private).
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
             .from('diagnostics')
-            .getPublicUrl(file.storage_path)
+            .createSignedUrl(file.storage_path, 60 * 10)
 
-          if (!urlData?.publicUrl) {
-            console.warn(`[Auto-Extract] Failed to get URL for file ${file.id}`)
+          if (signedUrlError || !signedUrlData?.signedUrl) {
+            console.warn(
+              `[Auto-Extract] Failed to create signed URL for file ${file.id}:`,
+              signedUrlError
+            )
             continue
           }
 
@@ -113,7 +178,7 @@ export async function POST(request: Request, { params }: RouteParams) {
                 diagnostic_file_id: file.id,
                 status: 'processing',
                 extraction_method: 'vision_api',
-                extraction_model: 'gpt-4o',
+                extraction_model: visionModel,
               })
               .select('id')
               .single()
@@ -127,7 +192,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
           // Perform extraction
           const result = await extractDiagnosticValues(
-            urlData.publicUrl,
+            signedUrlData.signedUrl,
             file.file_type as DiagnosticType,
             file.mime_type
           )
@@ -213,7 +278,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     try {
       // Generate the analysis with RAG
-      const userRole = profile.role === 'member' ? 'member' : 'practitioner'
+      const userRole = profile?.role === 'member' ? 'member' : 'practitioner'
       const analysis = await generateDiagnosticAnalysis(
         diagnosticUploadId,
         upload.patient_id,
@@ -352,13 +417,19 @@ export async function POST(request: Request, { params }: RouteParams) {
 // Get the analysis status/results for a diagnostic upload
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const { id: diagnosticUploadId } = await params
+    const { id: inputId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const upload = await resolveDiagnosticUpload(supabase, inputId, user.id)
+    if (!upload) {
+      return NextResponse.json({ error: 'Diagnostic upload not found' }, { status: 404 })
+    }
+    const diagnosticUploadId = upload.id
 
     // Get analysis with recommendations
     const { data: analysis, error: analysisError } = await supabase

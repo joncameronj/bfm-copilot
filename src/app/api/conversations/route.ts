@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createThread } from '@/lib/openai'
 import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
@@ -92,9 +91,6 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { title, patientId, conversationType } = body
 
-    // Create OpenAI thread
-    const thread = await createThread()
-
     // Create conversation in database
     const { data: conversation, error } = await supabase
       .from('conversations')
@@ -102,7 +98,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         patient_id: patientId || null,
         title: title || 'New Conversation',
-        thread_id: thread.id,
+        thread_id: null,
         conversation_type: conversationType || 'general',
         message_count: 0,
       })
@@ -133,7 +129,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       conversation: transformedConversation,
-      threadId: thread.id,
     })
   } catch (error) {
     console.error('Error in POST /api/conversations:', error)

@@ -11,7 +11,7 @@ User asks question → Query analyzed → Embeddings generated → Vector search
 ```
 
 **Key Settings:**
-- Embedding model: `text-embedding-3-small` (1536 dimensions)
+- Embedding model: `grok-embedding-small` (1536 dimensions)
 - Similarity threshold: `0.40`
 - Chunk size: 500 tokens with 50 token overlap
 - Vector index: IVFFlat with cosine distance
@@ -207,7 +207,7 @@ User Query: "Patient has thyroid issues and fatigue"
                     |
                     v
 +---------------------------------------+
-|         Query Analyzer (GPT-4o)       |
+|         Query Analyzer (grok-4-1-fast-reasoning)       |
 |  Extract: thyroid, fatigue            |
 |  Body systems: endocrine              |
 |  Should expand: true                  |

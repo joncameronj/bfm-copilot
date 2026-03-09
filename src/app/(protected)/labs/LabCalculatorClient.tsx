@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { LabCalculator, type LabSaveOptions } from '@/components/labs/LabCalculator';
 import { PatientSelectorCompact } from '@/components/labs/PatientSelectorCompact';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import type { LabCalculationResult, LabFormValues } from '@/types/labs';
 import type { Patient } from '@/types/patient';
 
@@ -20,6 +21,8 @@ interface RecentResult {
   patients: PatientJoin | PatientJoin[] | null;
 }
 
+type TabId = 'import' | 'recent';
+
 interface LabCalculatorClientProps {
   recentResults: RecentResult[];
 }
@@ -28,6 +31,7 @@ export function LabCalculatorClient({
   recentResults,
 }: LabCalculatorClientProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabId>('import');
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(undefined);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
@@ -105,62 +109,63 @@ export function LabCalculatorClient({
 
   return (
     <div className="w-full">
-      {/* Main Layout: Content + Sticky Sidebar */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Main Content - 2/3 width */}
-        <div className="lg:w-2/3 space-y-6">
-          {/* Compact Patient Selector */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="w-full">
+        <TabsList className="mb-6 rounded-full bg-neutral-100 dark:bg-neutral-800 p-1">
+          <TabsTrigger value="import" className="rounded-full">
+            Import Labs
+          </TabsTrigger>
+          <TabsTrigger value="recent" className="rounded-full">
+            Recent Results
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="import" className="space-y-6">
           <PatientSelectorCompact
             selectedPatient={selectedPatient}
             onPatientChange={setSelectedPatientId}
           />
-
-          {/* Lab Calculator */}
           <LabCalculator
             onSave={handleSave}
             patientId={selectedPatientId}
             patient={selectedPatient}
           />
-        </div>
+        </TabsContent>
 
-        {/* Sidebar - 1/3 width - Sticky */}
-        <div className="lg:w-1/3">
-          <div className="lg:sticky lg:top-6">
-            <div className="card-flat">
-              <h2 className="text-lg font-medium mb-4">Recent Results</h2>
-              {recentResults.length === 0 ? (
-                <p className="text-neutral-500 text-sm">No recent lab results</p>
-              ) : (
-                <div className="space-y-2">
-                  {recentResults.map((result) => (
-                    <button
-                      key={result.id}
-                      onClick={() => router.push(`/labs/${result.id}`)}
-                      className="w-full text-left p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-sm font-medium">
-                            {getPatientName(result)}
-                          </p>
-                          <p className="text-xs text-neutral-500">
-                            {new Date(result.test_date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        {result.ominous_count > 0 && (
-                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                            {result.ominous_count} ominous
-                          </span>
-                        )}
+        <TabsContent value="recent">
+          <div className="card-flat">
+            <h2 className="text-lg font-medium mb-4">Recent Results</h2>
+            {recentResults.length === 0 ? (
+              <p className="text-neutral-500 text-sm">No recent lab results</p>
+            ) : (
+              <div className="space-y-2">
+                {recentResults.map((result) => (
+                  <button
+                    key={result.id}
+                    onClick={() => router.push(`/labs/${result.id}`)}
+                    className="w-full text-left p-3 rounded-lg bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {getPatientName(result)}
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          {new Date(result.test_date).toLocaleDateString()}
+                        </p>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                      {result.ominous_count > 0 && (
+                        <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                          {result.ominous_count} ominous
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

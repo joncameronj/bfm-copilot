@@ -101,7 +101,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json()
-    const { role, content, metadata } = body
+    const { id: clientMessageId, role, content, metadata } = body
 
     if (!role || !content) {
       return NextResponse.json(
@@ -110,15 +110,36 @@ export async function POST(request: Request, { params }: RouteParams) {
       )
     }
 
+    // If client provides a message ID (optimistic UI), preserve it so downstream
+    // references (feedback/evaluations) use a stable FK-valid ID.
+    if (clientMessageId && typeof clientMessageId !== 'string') {
+      return NextResponse.json(
+        { error: 'Message id must be a string UUID when provided' },
+        { status: 400 }
+      )
+    }
+
     // Insert message
+    const insertPayload: {
+      id?: string
+      conversation_id: string
+      role: string
+      content: string
+      metadata: Record<string, unknown>
+    } = {
+      conversation_id: id,
+      role,
+      content,
+      metadata: metadata || {},
+    }
+
+    if (clientMessageId) {
+      insertPayload.id = clientMessageId
+    }
+
     const { data: message, error } = await supabase
       .from('messages')
-      .insert({
-        conversation_id: id,
-        role,
-        content,
-        metadata: metadata || {},
-      })
+      .insert(insertPayload)
       .select()
       .single()
 

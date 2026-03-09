@@ -9,8 +9,9 @@ import {
   type UserRole,
   ROLE_PERMISSIONS,
   type RolePermissions,
+  getTerminology,
+  getHomeRoute,
 } from '@/types/roles'
-import { getTerminology, getHomeRoute } from '@/lib/auth/roles'
 
 interface UseRoleReturn {
   role: UserRole | null

@@ -104,7 +104,7 @@ export function ModelSettingsForm() {
         <CardHeader>
           <CardTitle>Chat Model</CardTitle>
           <CardDescription>
-            Select the OpenAI model used for the main AI chat agent. Changes take effect immediately for new conversations.
+            Select the model used for the main AI chat agent. Changes take effect immediately for new conversations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -139,10 +139,10 @@ export function ModelSettingsForm() {
               <Input
                 value={customModel}
                 onChange={(e) => setCustomModel(e.target.value)}
-                placeholder="e.g., gpt-5.3-preview"
+                placeholder="e.g., claude-opus-4-6"
               />
               <p className="mt-1 text-xs text-neutral-500">
-                Enter the exact model name as specified by OpenAI
+                Enter the exact model name as specified by your provider
               </p>
             </div>
           ) : (

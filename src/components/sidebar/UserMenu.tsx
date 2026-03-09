@@ -225,7 +225,7 @@ export function UserMenu({ user, isCollapsed = false }: UserMenuProps) {
                   <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                     Preview As
                   </span>
-                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
                     {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘⇧M' : 'Ctrl+Shift+M'}
                   </span>
                 </div>

@@ -4,12 +4,19 @@ import { ChatInput } from './ChatInput'
 import { getGreeting } from '@/lib/greetings'
 
 interface EmptyStateProps {
-  onSend: (message: string, files?: File[]) => void
+  onSend: (
+    message: string,
+    files?: File[],
+    options?: { webSearch?: boolean; deepDive?: boolean }
+  ) => void
   onStop?: () => void
-  onVoiceStart?: () => void
-  onVoiceEnd?: () => void
   isLoading?: boolean
   isListening?: boolean
+  isVoiceSupported?: boolean
+  transcript?: string
+  interimTranscript?: string
+  onStartListening?: () => void
+  onStopListening?: () => void
   firstName?: string | null
 }
 
@@ -32,6 +39,8 @@ function renderGreetingWithGradientName(greeting: string, firstName: string | nu
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
+          paddingRight: '0.05em',
+          marginRight: '-0.05em',
         }}
       >
         {firstName}
@@ -45,6 +54,12 @@ export function EmptyState({
   onSend,
   onStop,
   isLoading = false,
+  isListening = false,
+  isVoiceSupported = false,
+  transcript = '',
+  interimTranscript = '',
+  onStartListening,
+  onStopListening,
   firstName,
 }: EmptyStateProps) {
   const greeting = getGreeting(firstName)
@@ -62,8 +77,17 @@ export function EmptyState({
           onSend={onSend}
           onStop={onStop}
           isLoading={isLoading}
+          isListening={isListening}
+          isVoiceSupported={isVoiceSupported}
+          transcript={transcript}
+          interimTranscript={interimTranscript}
+          onStartListening={onStartListening}
+          onStopListening={onStopListening}
           placeholder="Ask Copilot"
         />
+        <p className="text-xs text-neutral-400 text-center mt-2">
+          Copilot can make mistakes. Always verify information before taking action on protocols.
+        </p>
       </div>
     </div>
   )

@@ -1,0 +1,113 @@
+{
+  "_meta": {
+    "patient": "Tim Haskins",
+    "initials": "TH",
+    "age_sex": "53M",
+    "test_dates": ["2026-02-03", "2026-02-10"],
+    "reviewed_by": "Dr. Rob",
+    "review_date": "2026-03-08",
+    "overall_grade": "4.2/5",
+    "review_notes": "Red dot superimposed on blue dot (fight/flight freeze) → Locus Coeruleus. High BUN/Creatinine ratio → EMF Cord. No 'Cervical Support' setting. BE MORE ATTENTIVE double = 2 scoops (standard 1, double 2). X-39 Day 1. Deuterium Drops for redox lab findings. Everyone is seen 2x/week; BE MORE ATTENTIVE means more than that."
+  },
+  "urgency_min": 4.9,
+  "expected_deal_breakers": [
+    "SNS Switched",
+    "Alpha/Theta Imbalance",
+    "PNS Negative Zone",
+    "Vagus Nerve Dysfunction",
+    "Low Heart",
+    "Low pH",
+    "VCS Failed",
+    "Elevated Liver Enzymes"
+  ],
+  "expected_protocols": [
+    "SNS Balance",
+    "Locus Coeruleus",
+    "Alpha Theta",
+    "PNS Support",
+    "Vagus Support",
+    "Vagus Balance",
+    "Heart Health",
+    "Terrain",
+    "Biotoxin",
+    "Liver Inflame",
+    "Kidney Repair",
+    "EMF Cord",
+    "Insulin Resist",
+    "Pancreas T2D",
+    "SIBO",
+    "Mito Leak",
+    "Ferritin Lower",
+    "Leptin Resist",
+    "Pineal Support",
+    "Pit A Support",
+    "Pars Intermedia"
+  ],
+  "not_expected_protocols": [
+    "Cervical Support"
+  ],
+  "expected_supplements_day1": [
+    "Cell Synergy",
+    "Tri-Salts",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39"
+  ],
+  "expected_supplements_week1_2": [
+    "Vitamin D",
+    "IP6 Gold",
+    "Homocysteine Factor",
+    "Livergy",
+    "Pancreos",
+    "Kidney Clear",
+    "Deuterium Drops"
+  ],
+  "expected_supplements": [
+    "Cell Synergy",
+    "Tri-Salts",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39",
+    "Vitamin D",
+    "IP6 Gold",
+    "Homocysteine Factor",
+    "Livergy",
+    "Pancreos",
+    "Rejuvenation H2",
+    "Kidney Clear",
+    "Deuterium Drops",
+    "Innovita Vagus Nerve"
+  ],
+  "corrections": {
+    "locus_coeruleus": "Red dot superimposed on blue dot (fight/flight freeze pattern) → Locus Coeruleus frequency required alongside SNS Balance",
+    "emf_cord": "High BUN/Creatinine ratio → EMF Cord frequency",
+    "cell_synergy_dose": "Standard = 1 scoop. BE MORE ATTENTIVE double = 2 scoops. Never 4 scoops.",
+    "cervical_support": "No such frequency setting — do not use it",
+    "x39_timing": "Day 1 for all patients",
+    "deuterium_drops": "Redox lab findings (elevated LDH, oxidative markers) trigger Deuterium Drops",
+    "session_frequency": "Standard is 2x/week for all patients. BE MORE ATTENTIVE means MORE than 2x/week (e.g. 3x/week).",
+    "be_more_attentive_dose": "BE MORE ATTENTIVE double dose = 2 scoops (not 4)"
+  },
+  "be_more_attentive_double_triggered": true,
+  "session_frequency_recommendation": "3+ times per week (BE MORE ATTENTIVE on both Ortho and Valsalva)",
+  "expected_five_levers": 5,
+  "cyto_lower_gated": true,
+  "cytolower_gate_reason": "VCS 12/32; must address Leptin first (Biotoxin + Leptin Resist + Adipothin + diet), then MSH",
+  "t2d_protocols_required": ["Insulin Resist", "Pancreas T2D", "SIBO"],
+  "grading": {
+    "urgency_assessment": 5,
+    "diagnostic_interpretation": 5,
+    "deal_breaker_identification": 4,
+    "frequency_protocol_appropriateness": 4,
+    "frequency_sequencing": 4,
+    "supplement_accuracy": 3,
+    "supplement_dosing_timing": 4,
+    "five_levers": 5,
+    "clinical_concerns": 5,
+    "monitoring_plan": 5,
+    "safety_contraindications": 5,
+    "overall": 4
+  }
+}

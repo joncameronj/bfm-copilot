@@ -17,12 +17,13 @@ interface SidebarProps {
     fullName?: string | null
     avatarUrl?: string | null
   }
+  unreadChatsCount?: number
 }
 
 const TRANSITION_TIMING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 const TRANSITION_DURATION = '300ms'
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, unreadChatsCount = 0 }: SidebarProps) {
   const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -30,7 +31,7 @@ export function Sidebar({ user }: SidebarProps) {
     <>
       <aside
         className={cn(
-          'h-screen flex flex-col flex-shrink-0 overflow-hidden',
+          'h-screen flex flex-col flex-shrink-0',
           isCollapsed ? 'bg-white dark:bg-neutral-900' : 'bg-neutral-50 dark:bg-neutral-900'
         )}
         style={{
@@ -117,7 +118,7 @@ export function Sidebar({ user }: SidebarProps) {
               New chat
             </span>
           </button>
-          <Navigation isCollapsed={isCollapsed} />
+          <Navigation isCollapsed={isCollapsed} unreadChatsCount={unreadChatsCount} />
         </div>
 
         {/* Spacer */}

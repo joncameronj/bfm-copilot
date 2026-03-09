@@ -38,6 +38,7 @@ export interface Supplementation {
   dosage: string;
   timing: string;
   rationale: string;
+  layer?: number;
 }
 
 // ============================================

@@ -100,17 +100,14 @@
   .input-wrapper-unified {
     @apply bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700;
     border-radius: 24px;
-    overflow: hidden;
+    overflow: visible;
     transition: border-color 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .input-wrapper-unified.expanded {
-    border-radius: 24px;
   }
 
   /* ChatGPT-style input container - no longer has its own border */
   .input-container-chatgpt {
     @apply bg-white dark:bg-neutral-800;
+    border-radius: 24px;
   }
 
   /* Send button - black in light, stays dark for contrast in dark mode */
@@ -129,56 +126,11 @@
            hover:bg-red-600 dark:hover:bg-red-600;
   }
 
-  /* Morphing button - animates between circle and rounded square */
-  .btn-morph {
-    transition: border-radius 250ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease;
-    will-change: border-radius;
-  }
-
-  .btn-morph.circular {
-    border-radius: 12px;
-  }
-
-  .btn-morph.squared {
-    border-radius: 12px;
-  }
-
   /* Icon button for sidebar */
   .btn-icon {
     @apply p-2 rounded-2xl text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800
            hover:text-neutral-900 dark:hover:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-700
            transition-all duration-200 active:scale-[0.98];
-  }
-
-  /* Formatting toolbar - slides down inside unified wrapper */
-  .toolbar-inner {
-    @apply bg-white dark:bg-neutral-800;
-    overflow: hidden;
-    display: grid;
-    grid-template-rows: 0fr;
-    opacity: 0;
-    transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .toolbar-inner.expanded {
-    grid-template-rows: 1fr;
-    opacity: 1;
-  }
-
-  .toolbar-inner > div {
-    overflow: hidden;
-  }
-
-  /* Divider between toolbar and input */
-  .toolbar-divider {
-    @apply border-t border-neutral-200 dark:border-neutral-700;
-    opacity: 0;
-    transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .toolbar-divider.visible {
-    opacity: 1;
   }
 
   /* Quick action buttons container */
@@ -194,7 +146,7 @@
 
   /* TipTap editor styling */
   .tiptap-editor {
-    @apply flex-1 bg-transparent py-2 px-2 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-neutral-900 dark:text-neutral-50 focus:outline-none font-semibold;
+    @apply flex-1 bg-transparent py-2 px-2 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-neutral-900 dark:text-neutral-50 focus:outline-none;
     min-height: 24px;
     max-height: 200px;
     overflow-y: auto;

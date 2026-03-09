@@ -187,7 +187,14 @@ export function DiagnosticsUpload({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate analysis')
+        let message = 'Failed to generate analysis'
+        try {
+          const errorPayload = await response.json()
+          message = errorPayload?.error || message
+        } catch {
+          // Ignore parse failures and keep fallback message.
+        }
+        throw new Error(message)
       }
 
       const result = await response.json()

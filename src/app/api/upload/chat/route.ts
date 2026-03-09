@@ -1,7 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
-import { uploadFile } from '@/lib/openai'
 import { NextResponse } from 'next/server'
+
 export const dynamic = 'force-dynamic'
+
+const CHAT_UPLOAD_BUCKET = 'diagnostics'
+const CHAT_UPLOAD_PREFIX = 'chat'
+
+function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
 
 // POST /api/upload/chat - Upload files for chat
 export async function POST(request: Request) {
@@ -17,6 +24,7 @@ export async function POST(request: Request) {
 
     const formData = await request.formData()
     const files = formData.getAll('files') as File[]
+    const conversationId = formData.get('conversationId') as string | null
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 })
@@ -50,6 +58,7 @@ export async function POST(request: Request) {
       'image/png',
       'image/jpeg',
       'image/jpg',
+      'image/webp',
     ]
 
     for (const file of files) {
@@ -61,19 +70,47 @@ export async function POST(request: Request) {
       }
     }
 
-    // Upload files to OpenAI
-    const uploadedFiles = await Promise.all(
-      files.map(async (file) => {
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const uploaded = await uploadFile(buffer, file.name, 'assistants')
-        return {
-          id: uploaded.id,
-          filename: file.name,
-          size: file.size,
-          type: file.type,
+    const safeConversationFolder = conversationId || 'adhoc'
+    const uploadedPaths: string[] = []
+    const uploadedFiles: Array<{
+      id: string
+      filename: string
+      size: number
+      type: string
+    }> = []
+
+    for (const file of files) {
+      const sanitizedName = sanitizeFilename(file.name)
+      const storagePath =
+        `${user.id}/${CHAT_UPLOAD_PREFIX}/${safeConversationFolder}/` +
+        `${Date.now()}-${crypto.randomUUID()}-${sanitizedName}`
+
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from(CHAT_UPLOAD_BUCKET)
+        .upload(storagePath, file, {
+          contentType: file.type,
+          upsert: false,
+        })
+
+      if (storageError || !storageData?.path) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(CHAT_UPLOAD_BUCKET).remove(uploadedPaths)
         }
+        console.error('Chat file upload failed:', storageError)
+        return NextResponse.json(
+          { error: `Failed to upload ${file.name}` },
+          { status: 500 }
+        )
+      }
+
+      uploadedPaths.push(storageData.path)
+      uploadedFiles.push({
+        id: `storage:${storageData.path}`,
+        filename: file.name,
+        size: file.size,
+        type: file.type,
       })
-    )
+    }
 
     return NextResponse.json({
       fileIds: uploadedFiles.map((f) => f.id),

@@ -1,7 +1,9 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types/roles'
+import { canAccessRouteForRole, getHomeRoute } from '@/types/roles'
 
 // View mode for admins - they preview as practitioner or member
 type ViewMode = 'practitioner' | 'member'
@@ -9,7 +11,7 @@ type ViewMode = 'practitioner' | 'member'
 interface RoleViewContextType {
   actualRole: UserRole | null
   viewMode: ViewMode
-  setViewMode: (mode: ViewMode) => void
+  setViewMode: (_mode: ViewMode) => void
   isAdmin: boolean
   // Effective role for navigation/permissions (what the user sees as)
   effectiveRole: UserRole | null
@@ -26,6 +28,8 @@ const STORAGE_KEY = 'bfm-admin-view-mode'
 
 export function RoleViewProvider({ children, actualRole }: RoleViewProviderProps) {
   const [viewMode, setViewModeState] = useState<ViewMode>('practitioner')
+  const pathname = usePathname()
+  const router = useRouter()
 
   const isAdmin = actualRole === 'admin'
 
@@ -49,6 +53,14 @@ export function RoleViewProvider({ children, actualRole }: RoleViewProviderProps
   // - Admins: see admin panel + preview as practitioner or member
   // - Others: see their actual role's view
   const effectiveRole: UserRole | null = isAdmin ? viewMode : actualRole
+
+  useEffect(() => {
+    if (!effectiveRole) return
+    // Admin pages remain accessible to admins regardless of preview mode.
+    if (isAdmin && pathname.startsWith('/admin')) return
+    if (canAccessRouteForRole(pathname, effectiveRole)) return
+    router.replace(getHomeRoute(effectiveRole))
+  }, [effectiveRole, isAdmin, pathname, router])
 
   return (
     <RoleViewContext.Provider

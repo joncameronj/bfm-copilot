@@ -3,25 +3,40 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Attachment02Icon } from '@hugeicons/core-free-icons'
+import {
+  PlusSignIcon,
+  Mic01Icon,
+  InternetIcon,
+  Image01Icon,
+  UserIcon,
+  AiSearchIcon,
+} from '@hugeicons/core-free-icons'
 import { PatientSearchModal } from './PatientSearchModal'
-import { FormattingToolbar } from './FormattingToolbar'
+import { Dropdown, DropdownItem } from '@/components/ui/Dropdown'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
 
 interface ChatInputProps {
-  onSend: (message: string, files?: File[]) => void
+  onSend: (
+    message: string,
+    files?: File[],
+    options?: { webSearch?: boolean; deepDive?: boolean }
+  ) => void
   onStop?: () => void
-  onVoiceStart?: () => void
-  onVoiceEnd?: () => void
+  onMoveToBackground?: () => void
   isLoading?: boolean
   isListening?: boolean
+  isVoiceSupported?: boolean
+  transcript?: string
+  interimTranscript?: string
+  onStartListening?: () => void
+  onStopListening?: () => void
   placeholder?: string
   disabled?: boolean
 }
+
+const INPUT_ICON_STROKE_WIDTH = 2.2
 
 // Helper function to convert TipTap HTML to markdown
 function htmlToMarkdown(html: string): string {
@@ -33,8 +48,6 @@ function htmlToMarkdown(html: string): string {
     // Convert em/i tags to markdown italic
     .replace(/<em>(.*?)<\/em>/gi, '*$1*')
     .replace(/<i>(.*?)<\/i>/gi, '*$1*')
-    // Convert u tags to markdown (using underscores for underline, though not standard)
-    .replace(/<u>(.*?)<\/u>/gi, '__$1__')
     // Convert links
     .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
     // Convert unordered lists (using [\s\S] instead of . with s flag for compatibility)
@@ -64,19 +77,23 @@ function htmlToMarkdown(html: string): string {
 export function ChatInput({
   onSend,
   onStop,
-  onVoiceStart,
-  onVoiceEnd,
+  onMoveToBackground,
   isLoading = false,
   isListening = false,
+  isVoiceSupported = false,
+  transcript = '',
+  interimTranscript = '',
+  onStartListening,
+  onStopListening,
   placeholder = 'Ask Copilot',
   disabled = false,
 }: ChatInputProps) {
   const [files, setFiles] = useState<File[]>([])
   const [showPatientModal, setShowPatientModal] = useState(false)
-  const [isFocused, setIsFocused] = useState(false)
   const [isEditorEmpty, setIsEditorEmpty] = useState(true)
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
+  const [deepDiveEnabled, setDeepDiveEnabled] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
     immediatelyRender: false, // Disable SSR to avoid hydration mismatches
@@ -95,13 +112,6 @@ export function ChatInput({
         placeholder,
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-brand-blue underline',
-        },
-      }),
     ],
     editorProps: {
       attributes: {
@@ -116,27 +126,38 @@ export function ChatInput({
         return false
       },
     },
-    onFocus: () => setIsFocused(true),
     onUpdate: ({ editor }) => {
       setIsEditorEmpty(editor.isEmpty)
     },
-    onCreate: ({ editor }) => {
-      // Ensure no marks are active on initial load
-      editor.commands.unsetAllMarks()
-    },
   })
 
-  // Handle clicks outside to blur
+  // Sync voice transcript into the editor while listening
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsFocused(false)
-      }
-    }
+    if (!editor || !isListening) return
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    const fullText = transcript + (interimTranscript ? interimTranscript : '')
+    if (fullText) {
+      // Build content with interim text styled differently
+      if (interimTranscript) {
+        editor.commands.setContent(
+          `<p>${transcript}<span style="color: #a3a3a3">${interimTranscript}</span></p>`
+        )
+      } else {
+        editor.commands.setContent(`<p>${transcript}</p>`)
+      }
+      setIsEditorEmpty(false)
+    }
+  }, [editor, isListening, transcript, interimTranscript])
+
+  // When listening stops, set final transcript as plain text for editing
+  useEffect(() => {
+    if (!editor || isListening) return
+    if (transcript) {
+      editor.commands.setContent(`<p>${transcript}</p>`)
+      editor.commands.focus('end')
+      setIsEditorEmpty(false)
+    }
+  }, [editor, isListening, transcript])
 
   const handleSubmit = useCallback(() => {
     if (!editor) return
@@ -149,11 +170,21 @@ export function ChatInput({
     // Convert HTML to markdown for sending
     const markdown = htmlToMarkdown(html)
 
-    onSend(markdown, files.length > 0 ? files : undefined)
-    editor.chain().clearContent().unsetAllMarks().run()
+    const chatOptions =
+      webSearchEnabled || deepDiveEnabled
+        ? {
+            ...(webSearchEnabled ? { webSearch: true } : {}),
+            ...(deepDiveEnabled ? { deepDive: true } : {}),
+          }
+        : undefined
+
+    onSend(markdown, files.length > 0 ? files : undefined, chatOptions)
+    editor.chain().clearContent().run()
     setIsEditorEmpty(true)
     setFiles([])
-  }, [editor, files, isLoading, disabled, onSend, isEditorEmpty])
+    setWebSearchEnabled(false)
+    setDeepDiveEnabled(false)
+  }, [editor, files, isLoading, disabled, onSend, isEditorEmpty, webSearchEnabled, deepDiveEnabled])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -167,9 +198,9 @@ export function ChatInput({
 
   const handleVoiceClick = () => {
     if (isListening) {
-      onVoiceEnd?.()
+      onStopListening?.()
     } else {
-      onVoiceStart?.()
+      onStartListening?.()
     }
   }
 
@@ -180,7 +211,54 @@ export function ChatInput({
   }
 
   return (
-    <div className="w-full" ref={containerRef}>
+    <div className="w-full">
+      {/* Search mode badges */}
+      {(webSearchEnabled || deepDiveEnabled) && (
+        <div className="flex items-center gap-2 mb-2">
+          {webSearchEnabled && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+              <HugeiconsIcon
+                icon={InternetIcon}
+                size={14}
+                color="currentColor"
+                strokeWidth={INPUT_ICON_STROKE_WIDTH}
+              />
+              Web Search ON
+              <button
+                type="button"
+                onClick={() => setWebSearchEnabled(false)}
+                className="ml-1 text-blue-400 hover:text-blue-600"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          )}
+
+          {deepDiveEnabled && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-sm font-medium">
+              <HugeiconsIcon
+                icon={AiSearchIcon}
+                size={14}
+                color="currentColor"
+                strokeWidth={INPUT_ICON_STROKE_WIDTH}
+              />
+              Deep Dive ON (One message)
+              <button
+                type="button"
+                onClick={() => setDeepDiveEnabled(false)}
+                className="ml-1 text-amber-400 hover:text-amber-600"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* File previews */}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
@@ -216,44 +294,94 @@ export function ChatInput({
         </div>
       )}
 
-      {/* Unified wrapper - maintains consistent border during animation */}
-      <div className={cn(
-        'input-wrapper-unified',
-        isFocused && 'expanded'
-      )}>
-        {/* Animated formatting toolbar - slides down inside wrapper */}
-        <div className={cn(
-          'toolbar-inner',
-          isFocused && 'expanded'
-        )}>
-          <div>
-            <FormattingToolbar editor={editor} />
-          </div>
-        </div>
-
-        {/* Divider - fades in when toolbar is visible */}
-        <div className={cn(
-          'toolbar-divider',
-          isFocused && 'visible'
-        )} />
-
-        {/* Input container - ChatGPT style */}
+      {/* Input wrapper */}
+      <div className="input-wrapper-unified">
+        {/* Input container */}
         <div className="input-container-chatgpt flex items-center gap-2 p-3">
-          {/* File upload button - morphs from circle to square */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isLoading}
-            className={cn(
-              'btn-morph flex items-center justify-center w-10 h-10',
-              'bg-neutral-100 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
-              isFocused ? 'squared' : 'circular'
-            )}
-            aria-label="Upload file"
+          {/* Plus (+) dropdown menu */}
+          <Dropdown
+            position="below"
+            align="left"
+            trigger={
+              <button
+                type="button"
+                disabled={disabled || isLoading}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-xl',
+                  'bg-neutral-100 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'transition-colors duration-150'
+                )}
+                aria-label="More options"
+              >
+                <HugeiconsIcon
+                  icon={PlusSignIcon}
+                  size={20}
+                  color="currentColor"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+              </button>
+            }
           >
-            <HugeiconsIcon icon={Attachment02Icon} size={20} color="currentColor" />
-          </button>
+            <DropdownItem
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <span className="flex items-center gap-3">
+                <HugeiconsIcon
+                  icon={Image01Icon}
+                  size={18}
+                  className="text-neutral-500"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+                Photos & Files
+              </span>
+            </DropdownItem>
+            <DropdownItem
+              onClick={() => setWebSearchEnabled((prev) => !prev)}
+            >
+              <span className="flex items-center gap-3">
+                <HugeiconsIcon
+                  icon={InternetIcon}
+                  size={18}
+                  className="text-neutral-500"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+                Web Search
+                {webSearchEnabled && (
+                  <span className="ml-auto text-xs font-semibold text-blue-600">ON</span>
+                )}
+              </span>
+            </DropdownItem>
+            <DropdownItem
+              onClick={() => setDeepDiveEnabled((prev) => !prev)}
+            >
+              <span className="flex items-center gap-3">
+                <HugeiconsIcon
+                  icon={AiSearchIcon}
+                  size={18}
+                  className="text-amber-600"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+                Deep Dive
+                {deepDiveEnabled && (
+                  <span className="ml-auto text-xs font-semibold text-amber-600">ON</span>
+                )}
+              </span>
+            </DropdownItem>
+            <DropdownItem
+              onClick={() => setShowPatientModal(true)}
+            >
+              <span className="flex items-center gap-3">
+                <HugeiconsIcon
+                  icon={UserIcon}
+                  size={18}
+                  className="text-neutral-500"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+                Patient Lookup
+              </span>
+            </DropdownItem>
+          </Dropdown>
           <input
             ref={fileInputRef}
             type="file"
@@ -272,14 +400,69 @@ export function ChatInput({
             )}
           />
 
-          {/* Send/Stop button - morphs from circle to square */}
+          {/* Voice input button */}
+          {!isLoading && isVoiceSupported && (
+            <button
+              type="button"
+              onClick={handleVoiceClick}
+              disabled={disabled}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-xl transition-colors duration-150',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                isListening
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-neutral-100 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200'
+              )}
+              aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+            >
+              {isListening ? (
+                <span className="relative flex items-center justify-center">
+                  <HugeiconsIcon
+                    icon={Mic01Icon}
+                    size={20}
+                    color="currentColor"
+                    strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                  />
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                </span>
+              ) : (
+                <HugeiconsIcon
+                  icon={Mic01Icon}
+                  size={20}
+                  color="currentColor"
+                  strokeWidth={INPUT_ICON_STROKE_WIDTH}
+                />
+              )}
+            </button>
+          )}
+
+          {/* Move to Background button - only shown while loading */}
+          {isLoading && onMoveToBackground && (
+            <button
+              type="button"
+              onClick={onMoveToBackground}
+              className={cn(
+                'flex items-center gap-1.5 px-3 h-10 rounded-xl',
+                'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-800',
+                'text-sm font-medium whitespace-nowrap transition-colors duration-150'
+              )}
+              aria-label="Move to background"
+              title="Continue in background"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              <span className="hidden sm:inline">Background</span>
+            </button>
+          )}
+
+          {/* Send/Stop button */}
           <button
             type="button"
             onClick={isLoading ? onStop : handleSubmit}
             disabled={disabled || (!isLoading && isEditorEmpty && files.length === 0)}
             className={cn(
-              'btn-send btn-morph',
-              isFocused ? 'squared' : 'circular',
+              'btn-send rounded-xl',
               isLoading && 'btn-stop'
             )}
             aria-label={isLoading ? 'Stop generation' : 'Send message'}

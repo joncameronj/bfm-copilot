@@ -128,10 +128,11 @@ VALUES (
     $PROMPT$## Knowledge Base Usage
 When answering questions about protocols or clinical guidelines:
 1. ALWAYS search the knowledge base first using search_knowledge_base
-2. Cite the source document when referencing specific protocols
-3. If multiple documents are relevant, synthesize information across sources
-4. Clearly distinguish between BFM protocols and general clinical knowledge
-5. If no relevant documents are found, state this and provide general guidance
+2. For diagnostic-upload protocol generation, prioritize Sunday chunks first (Diabetes/Thyroid/Hormones/Neurological Sunday sessions)
+3. Cite the source document when referencing specific protocols
+4. If multiple documents are relevant, synthesize information across sources
+5. Keep protocol output to the minimal viable set supported by diagnostic triggers and retrieved evidence
+6. If Sunday evidence is insufficient, use non-Sunday chunks only as secondary support and avoid low-confidence protocol additions
 
 When searching:
 - Use specific condition or symptom terms

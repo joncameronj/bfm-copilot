@@ -110,14 +110,21 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate analysis')
+        let message = 'Failed to generate analysis'
+        try {
+          const errorPayload = await response.json()
+          message = errorPayload?.error || message
+        } catch {
+          // Ignore parse failures and use fallback message.
+        }
+        throw new Error(message)
       }
 
       toast.success('Analysis generated successfully')
       fetchData() // Refresh the data
     } catch (error) {
       console.error('Analysis generation failed:', error)
-      toast.error('Failed to generate analysis')
+      toast.error(error instanceof Error ? error.message : 'Failed to generate analysis')
     } finally {
       setGeneratingId(null)
     }

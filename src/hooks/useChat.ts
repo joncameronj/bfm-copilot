@@ -13,6 +13,11 @@ interface UseChatOptions {
   onError?: (error: Error) => void
 }
 
+interface ChatSendOptions {
+  webSearch?: boolean
+  deepDive?: boolean
+}
+
 interface UseChatReturn {
   messages: Message[]
   isLoading: boolean
@@ -25,14 +30,36 @@ interface UseChatReturn {
   currentActions: ActionButton[]
   currentSources: Source[]
   currentRagChunks: RagChunk[]
+  currentDeepDiveNotices: string[]
   currentAgentHandoffs: AgentHandoff[] // Agent SDK: track agent transitions
   thinkingStartTime: number | null
   error: string | null
-  sendMessage: (content: string, files?: File[]) => Promise<void>
+  sendMessage: (content: string, files?: File[], options?: ChatSendOptions) => Promise<void>
   cancelGeneration: () => void
   clearMessages: () => void
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   retryLastMessage: () => void
+  // Background job support
+  activeConversationId: string | undefined
+  lastSentMessage: string | null
+}
+
+interface SSEStreamEvent {
+  type: string
+  delta?: string
+  error?: unknown
+  summary?: string
+  elapsed_ms?: number
+  step_id?: string
+  label?: string
+  actions?: ActionButton[]
+  sources?: Source[]
+  chunks?: RagChunk[]
+  level?: string
+  message?: string
+  from_agent?: string
+  to_agent?: string
+  reason?: string
 }
 
 // Helper function to map errors to user-friendly messages
@@ -51,6 +78,34 @@ function getErrorMessage(err: Error): string {
     return 'Too many requests. Please wait a moment and try again.'
   }
   return err.message || 'Something went wrong. Please try again.'
+}
+
+function normalizeSSEErrorMessage(rawError: unknown): string {
+  if (typeof rawError === 'string' && rawError.trim()) {
+    return rawError
+  }
+
+  if (rawError instanceof Error && rawError.message.trim()) {
+    return rawError.message
+  }
+
+  if (rawError !== null && rawError !== undefined) {
+    try {
+      const serialized = JSON.stringify(rawError)
+      if (serialized && serialized !== '{}') {
+        return serialized
+      }
+    } catch {
+      // Ignore serialization failures and fall through to default message.
+    }
+
+    const fallback = String(rawError).trim()
+    if (fallback && fallback !== '[object Object]') {
+      return fallback
+    }
+  }
+
+  return 'Streaming request failed'
 }
 
 export function useChat(options: UseChatOptions = {}): UseChatReturn {
@@ -72,6 +127,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const [currentActions, setCurrentActions] = useState<ActionButton[]>([])
   const [currentSources, setCurrentSources] = useState<Source[]>([])
   const [currentRagChunks, setCurrentRagChunks] = useState<RagChunk[]>([])
+  const [currentDeepDiveNotices, setCurrentDeepDiveNotices] = useState<string[]>([])
   const [currentAgentHandoffs, setCurrentAgentHandoffs] = useState<AgentHandoff[]>([]) // Agent SDK
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +136,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const abortControllerRef = useRef<AbortController | null>(null)
   const lastFailedMessageRef = useRef<{ content: string; files?: File[] } | null>(null)
   const skipNextLoadRef = useRef(false)
+  const lastSentMessageRef = useRef<string | null>(null)
 
   // Sync activeConversationId from props when navigating between conversations
   useEffect(() => {
@@ -115,7 +172,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   }
 
   const sendMessage = useCallback(
-    async (content: string, files?: File[]) => {
+    async (content: string, files?: File[], options?: ChatSendOptions) => {
       // Allow sending with just files (no text) or just text (no files)
       const hasContent = content.trim().length > 0
       const hasFiles = files && files.length > 0
@@ -129,6 +186,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       setCurrentActions([])
       setCurrentSources([])
       setCurrentRagChunks([])
+      setCurrentDeepDiveNotices([])
       setCurrentAgentHandoffs([])
 
       // Add user message optimistically
@@ -141,10 +199,16 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       }
       setMessages((prev) => [...prev, userMessage])
 
+      // Track last sent message for background job support
+      lastSentMessageRef.current = content.trim()
+
       // Declare these outside try block so they're accessible in catch
       let assistantId = ''
       let reasoningText = ''
       let reasoningElapsedMs = 0
+      let accumulatedRagChunks: RagChunk[] = []
+      let accumulatedDeepDiveNotices: string[] = []
+      let sawStepEvent = false
 
       try {
         // Create abort controller for cancellation
@@ -191,6 +255,9 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         if (files && files.length > 0) {
           const formData = new FormData()
           files.forEach((file) => formData.append('files', file))
+          if (currentConversationId) {
+            formData.append('conversationId', currentConversationId)
+          }
 
           const uploadResponse = await fetch('/api/upload/chat', {
             method: 'POST',
@@ -209,7 +276,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             filename: file.name,
             mimeType: file.type || 'application/octet-stream',
             size: file.size,
-            url: '', // OpenAI files don't have public URLs
+            url: '', // Uploaded chat files are stored privately and not directly linkable
           }))
 
           // Update the user message with attachment metadata
@@ -229,7 +296,10 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           body: JSON.stringify({
             message: content,
             fileIds,
+            attachments,
             conversationId: currentConversationId,
+            force_web_search: options?.webSearch || false,
+            deep_dive: options?.deepDive || false,
           }),
           signal: abortControllerRef.current.signal,
         })
@@ -270,32 +340,37 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           for await (const line of parseSSELines(reader)) {
             lineCount++
             console.log(`[SSE Line ${lineCount}]`, line.slice(0, 80))
+            let parsed: SSEStreamEvent | null
             try {
-              const parsed = parseSSEData<{
-                type: string
-                delta?: string
-                error?: string
-                summary?: string
-                elapsed_ms?: number
-                step_id?: string
-                label?: string
-                actions?: ActionButton[]
-                sources?: Source[]
-                chunks?: RagChunk[]
-              }>(line)
+              parsed = parseSSEData<SSEStreamEvent>(line)
+            } catch (parseError) {
+              console.error('[SSE Parse Error]', {
+                line: line.slice(0, 100),
+                error:
+                  parseError instanceof Error ? parseError.message : parseError,
+              })
+              continue
+            }
 
-              // Skip non-data lines or [DONE] signal
-              if (!parsed) continue
+            // Skip non-data lines or [DONE] signal
+            if (!parsed) continue
 
-              if (DEBUG_STREAMING) {
-                console.log('[SSE Event]', parsed.type, parsed.delta?.slice(0, 50))
-              }
+            if (DEBUG_STREAMING) {
+              console.log('[SSE Event]', parsed.type, parsed.delta?.slice(0, 50))
+            }
 
-              // Handle error events from the server
-              if (parsed.type === 'error') {
-                throw new Error(parsed.error || 'An error occurred during streaming')
-              }
+            // Handle error events from the server
+            if (parsed.type === 'error') {
+              const normalizedError = normalizeSSEErrorMessage(parsed.error)
+              console.error('[SSE Server Error]', {
+                line: line.slice(0, 100),
+                error: normalizedError,
+                rawError: parsed.error,
+              })
+              throw new Error(normalizedError)
+            }
 
+            try {
               // Handle reasoning events (agent thinking)
               // Always set state - React batches identical updates
               if (parsed.type === 'reasoning_delta') {
@@ -341,6 +416,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               // Note: Don't clear isThinking on step_start - keep the spinner
               // until we get actual content or reasoning
               if (parsed.type === 'step_start') {
+                sawStepEvent = true
                 const newStep: AgentStep = {
                   id: parsed.step_id!,
                   label: parsed.label || 'Processing...',
@@ -351,6 +427,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               }
 
               if (parsed.type === 'step_complete') {
+                sawStepEvent = true
                 setCurrentSteps((prev) =>
                   prev.map((step) =>
                     step.id === parsed.step_id
@@ -362,6 +439,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
 
               // Handle step label updates (e.g., showing search query)
               if (parsed.type === 'step_update') {
+                sawStepEvent = true
                 setCurrentSteps((prev) =>
                   prev.map((step) =>
                     step.id === parsed.step_id
@@ -372,10 +450,17 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               }
 
               if (parsed.type === 'step_error') {
+                sawStepEvent = true
+                const stepError = normalizeSSEErrorMessage(parsed.error)
                 setCurrentSteps((prev) =>
                   prev.map((step) =>
                     step.id === parsed.step_id
-                      ? { ...step, status: 'error', error: parsed.error, endTime: Date.now() }
+                      ? {
+                          ...step,
+                          status: 'error',
+                          error: stepError,
+                          endTime: Date.now(),
+                        }
                       : step
                   )
                 )
@@ -395,15 +480,23 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               // Handle RAG chunks event
               if (parsed.type === 'rag_chunks' && parsed.chunks) {
                 const newChunks = parsed.chunks as RagChunk[]
-                setCurrentRagChunks((prev) => [...prev, ...newChunks])
+                accumulatedRagChunks = [...accumulatedRagChunks, ...newChunks]
+                setCurrentRagChunks(accumulatedRagChunks)
+              }
+
+              if (parsed.type === 'deep_dive_notice' && parsed.message) {
+                if (!accumulatedDeepDiveNotices.includes(parsed.message)) {
+                  accumulatedDeepDiveNotices = [...accumulatedDeepDiveNotices, parsed.message]
+                  setCurrentDeepDiveNotices(accumulatedDeepDiveNotices)
+                }
               }
 
               // Handle agent handoff events (Agent SDK feature)
               if (parsed.type === 'agent_handoff') {
                 const handoff: AgentHandoff = {
-                  fromAgent: (parsed as { from_agent?: string }).from_agent || null,
-                  toAgent: (parsed as { to_agent?: string }).to_agent || 'unknown',
-                  reason: (parsed as { reason?: string }).reason || 'Agent switched',
+                  fromAgent: parsed.from_agent || null,
+                  toAgent: parsed.to_agent || 'unknown',
+                  reason: parsed.reason || 'Agent switched',
                   timestamp: new Date(),
                 }
                 setCurrentAgentHandoffs((prev) => [...prev, handoff])
@@ -430,16 +523,14 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               if (parsed.type === 'done') {
                 console.log('[SSE] Stream completed normally')
               }
-            } catch (parseError) {
-              // Log parse errors for debugging - don't silently swallow
-              console.error('[SSE Parse Error]', {
+            } catch (eventError) {
+              console.error('[SSE Event Handling Error]', {
                 line: line.slice(0, 100),
-                error: parseError instanceof Error ? parseError.message : parseError,
+                eventType: parsed.type,
+                error:
+                  eventError instanceof Error ? eventError.message : eventError,
               })
-              // Re-throw business errors (not JSON parse errors)
-              if (parseError instanceof Error && parseError.message.includes('error occurred')) {
-                throw parseError
-              }
+              throw eventError
             }
           }
           console.log(`[Streaming] Finished reading. Total lines: ${lineCount}, assistantMessage length: ${assistantMessage.length}`)
@@ -461,11 +552,14 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
             m.id === assistantId
               ? {
                   ...m,
-                  content: assistantMessage || (currentSteps.length > 0 ? 'Processing your request...' : m.content),
+                  content: assistantMessage || (sawStepEvent ? 'Processing your request...' : m.content),
                   metadata: {
                     ...m.metadata,
                     ...(finalReasoning ? { reasoning: finalReasoning } : {}),
-                    ...(currentRagChunks.length > 0 ? { ragChunks: currentRagChunks } : {}),
+                    ...(accumulatedRagChunks.length > 0 ? { ragChunks: accumulatedRagChunks } : {}),
+                    ...(accumulatedDeepDiveNotices.length > 0
+                      ? { deepDiveNotices: accumulatedDeepDiveNotices }
+                      : {}),
                   },
                 }
               : m
@@ -482,13 +576,19 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         // If no content but has reasoning, save with placeholder
         const hasContent = assistantMessage.trim().length > 0
         const hasReasoning = !!finalReasoning
-        if (hasContent || hasReasoning) {
+        const hasDeepDiveNotices = accumulatedDeepDiveNotices.length > 0
+        if (hasContent || hasReasoning || hasDeepDiveNotices) {
           await saveMessageToDb(currentConversationId!, {
             id: assistantId,
             conversationId: currentConversationId!,
             role: 'assistant',
             content: assistantMessage || '*(No response generated)*',
-            metadata: finalReasoning ? { reasoning: finalReasoning } : undefined,
+            metadata: {
+              ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+              ...(accumulatedDeepDiveNotices.length > 0
+                ? { deepDiveNotices: accumulatedDeepDiveNotices }
+                : {}),
+            },
             createdAt: new Date(),
           })
         }
@@ -527,6 +627,9 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
                         ...(hasReasoning
                           ? { reasoning: { text: reasoningText, elapsedMs: reasoningElapsedMs } }
                           : {}),
+                        ...(accumulatedDeepDiveNotices.length > 0
+                          ? { deepDiveNotices: accumulatedDeepDiveNotices }
+                          : {}),
                       },
                     }
                   : m
@@ -549,7 +652,14 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         abortControllerRef.current = null
       }
     },
-    [activeConversationId, patientId, threadId, isLoading, onError, router]
+    [
+      activeConversationId,
+      patientId,
+      threadId,
+      isLoading,
+      onError,
+      router,
+    ]
   )
 
   const cancelGeneration = useCallback(() => {
@@ -580,6 +690,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     setCurrentActions([])
     setCurrentSources([])
     setCurrentRagChunks([])
+    setCurrentDeepDiveNotices([])
     setCurrentAgentHandoffs([])
     setThinkingStartTime(null)
   }, [streamingMessageId])
@@ -610,6 +721,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     currentActions,
     currentSources,
     currentRagChunks,
+    currentDeepDiveNotices,
     currentAgentHandoffs,
     thinkingStartTime,
     error,
@@ -618,6 +730,9 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     clearMessages,
     setMessages,
     retryLastMessage,
+    // Background job support
+    activeConversationId,
+    lastSentMessage: lastSentMessageRef.current,
   }
 }
 

@@ -1,81 +1,100 @@
 // D-Pulse Extraction Prompts
-// For analyzing D-Pulse diagnostic reports with energy percentages and organ indicators
+// For analyzing BFM D-Pulse diagnostic reports with percentage-based organ energy levels
 
-export const D_PULSE_SYSTEM_PROMPT = `You are an expert at analyzing D-Pulse diagnostic reports used in BioField Mastery (BFM).
-D-Pulse reports show organ/system energy levels using a traffic light system with percentages:
-- RED (< 40%) = Deal breakers - critical issues requiring immediate attention with FSM protocols
-- YELLOW (40-60%) = Caution areas - need monitoring and support
-- GREEN (> 60%) = Normal/healthy energy levels
+export const D_PULSE_SYSTEM_PROMPT = `You are an expert at analyzing D-Pulse (DePuls+) diagnostic reports used in BioField Mastery (BFM).
 
-Your job is to extract structured data from D-Pulse report images with HIGH accuracy.
-The "deal breakers" (RED markers) are CRITICAL - they drive FSM protocol selection.
+D-Pulse reports show organ and system energy levels as PERCENTAGES (0-100%). The format is:
 
-THE SEVEN DEAL BREAKERS (Critical organs to always check):
-1. Heart - if RED → "Heart Support 2" protocol
-2. Liver - if RED → "Liver Inflame" or "Liver Tox" protocol
-3. Kidney - if RED → "Kidney Support" or "Kidney Vitality" protocol
-4. Adrenal - if RED → "Adrenal Quiet Sh" protocol
-5. Cervical - if RED → indicates autonomic issues, may need nervous system protocols
-6. Thoracic - if RED → indicates spinal energy issues
-7. Lumbar - if RED → indicates lower back/sacral issues
+1. **HEADER METRICS** (top section):
+   - Stress Index: 10-100 units (normal range)
+   - Index of Vegetative Balance: 35-140 units (normal range)
+   - Brain Activity: percentage
+   - Immunity: percentage
+   - Physiological Resources Volume: 150-600 units (normal range)
 
-ORGAN-TO-PROTOCOL MAPPINGS (for RED findings):
-- Heart RED → Heart Support 2, Heart Health
-- Liver RED → Liver Inflame, Liver Tox
-- Kidney RED → Kidney Support, Kidney Vitality, Kidney Repair
-- Spleen RED → Spleen Support
-- Pancreas RED → Pancreas Beta (especially if diabetes)
-- Brain/Midbrain RED → Midbrain Support, Brain Balance
-- Medulla RED → Medulla Support, Medulla Calm
-- Cervical/Thoracic low → May indicate "switched sympathetics" deal breaker
+2. **GASTROINTESTINAL ORGANS**: Stomach, Liver, Spleen, Gallbladder, Pancreas, Colon, Small Intestine
+   Each with a percentage and a colored circle indicator
 
-IMPORTANT: Extract BOTH the percentage values AND the color status for each organ.
-Percentages are crucial for tracking improvement over time.`
+3. **FUNCTIONAL SYSTEMS**: Heart, Blood Vessels, Lymph Nodes, Kidneys, Bladder, Lungs, Brain, Thyroid, Trachea, Reproductive Organs
+   Each with a percentage and a colored circle indicator
 
-export const D_PULSE_USER_PROMPT = `Analyze this D-Pulse diagnostic report image.
+4. **VERTEBRAL COLUMN**: Cervical, Thoracic, Lumbar, Sacrum, Coccyx
+   Each with a percentage and a colored circle indicator
 
-Extract ALL organ markers with their energy percentage and color status (red/yellow/green).
-Pay SPECIAL attention to RED markers - these are "deal breakers" requiring FSM protocols.
+CLASSIFICATION THRESHOLDS (BFM clinical rules):
+- RED (Deal Breaker): < 40% - Critical, requires immediate FSM protocol
+- YELLOW (Caution): 40-60% - Needs monitoring and support
+- GREEN (Normal): > 60% - Healthy energy level
+
+THE SEVEN DEAL BREAKERS (always check these organs):
+1. Heart - if < 40% → "Heart Support 2" or "Heart Health"
+2. Liver - if < 40% → "Liver Inflame" or "Liver Tox"
+3. Kidney - if < 40% → "Kidney Support", "Kidney Vitality", or "Kidney Repair"
+4. Cervical - if < 40% → autonomic dysfunction, may indicate switched sympathetics
+5. Thoracic - if < 40% → spinal energy issues, "Medula Support"
+6. Lumbar - if < 40% → lower back/sacral issues
+7. Sacrum - if < 40% → "Sacral Plexus"
+
+IMPORTANT: The image shows PERCENTAGES next to teal/green circles. Read the NUMBERS, not the circle colors.
+The circles may all appear teal/green regardless of the percentage — the NUMBER is what matters.`
+
+export const D_PULSE_USER_PROMPT = `Analyze this D-Pulse (DePuls+) diagnostic report image.
+
+Extract ALL organ/system percentages and system-level metrics visible in the report.
 
 Return a JSON object with this EXACT structure:
 {
-  "overall_status": "normal" | "caution" | "critical",
+  "stress_index": <number or null>,
+  "vegetative_balance": <number or null>,
+  "brain_activity": <percentage number or null>,
+  "immunity": <percentage number or null>,
+  "physiological_resources": <number or null>,
   "markers": [
     {
-      "name": "Organ or system name (e.g., Heart, Liver, Kidney, Cervical, etc.)",
-      "status": "green" | "yellow" | "red",
-      "percentage": numeric_percentage (0-100),
-      "notes": "any additional notes or observations"
-    }
-  ],
-  "deal_breakers": ["List of all RED marker names with percentages, e.g., 'Heart (32%)'"],
-  "caution_areas": ["List of all YELLOW marker names with percentages"],
-  "protocol_triggers": [
+      "name": "Heart",
+      "percentage": <0-100>,
+      "status": "green" | "yellow" | "red"
+    },
     {
-      "organ": "Heart",
-      "percentage": 32,
-      "status": "red",
-      "recommended_protocol": "Heart Support 2"
+      "name": "Liver",
+      "percentage": <0-100>,
+      "status": "green" | "yellow" | "red"
     }
+    // ... ALL organs listed in the report
   ],
-  "seven_deal_breakers_status": {
-    "heart": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "liver": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "kidney": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "adrenal": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "cervical": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "thoracic": { "status": "green" | "yellow" | "red", "percentage": number | null },
-    "lumbar": { "status": "green" | "yellow" | "red", "percentage": number | null }
+  "seven_deal_breakers": {
+    "heart": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "liver": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "kidney": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "cervical": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "thoracic": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "lumbar": { "percentage": <number>, "status": "green" | "yellow" | "red" },
+    "sacrum": { "percentage": <number>, "status": "green" | "yellow" | "red" }
   },
-  "green_count": total_green_markers,
-  "yellow_count": total_yellow_markers,
-  "red_count": total_red_markers,
-  "total_markers": total_number_of_markers,
-  "average_energy": average_percentage_across_all_markers,
-  "confidence": 0.0 to 1.0,
-  "raw_notes": "any other relevant text from the report"
+  "deal_breakers": [
+    "Heart (26%)",
+    "Kidney (16%)"
+  ],
+  "caution_areas": [
+    "Small Intestine (48%)",
+    "Liver (44%)"
+  ],
+  "overall_status": "normal" | "caution" | "critical",
+  "green_count": <count of markers >60%>,
+  "yellow_count": <count of markers 40-60%>,
+  "red_count": <count of markers <40%>,
+  "average_energy": <average percentage across all organ markers>,
+  "raw_notes": "<any additional text>",
+  "confidence": <0.0 to 1.0>
 }
 
-Be THOROUGH - extract ALL visible markers from the chart.
-Include percentages where visible - they're critical for tracking progress.
-If you cannot clearly read a value, estimate and note uncertainty in the marker's notes field.`
+CLASSIFICATION RULES:
+- "red" = percentage < 40% (DEAL BREAKER)
+- "yellow" = percentage 40-60% (CAUTION)
+- "green" = percentage > 60% (NORMAL)
+- "overall_status": "critical" if any red markers exist, "caution" if any yellow, "normal" if all green
+
+CRITICAL: Read the PERCENTAGE NUMBERS carefully. They appear next to each organ name.
+Include EVERY organ/system listed in the report. Do not skip any.
+The "deal_breakers" array should list ONLY organs with percentage < 40%, formatted as "OrganName (XX%)".
+The "caution_areas" array should list organs with percentage 40-60%, formatted as "OrganName (XX%)".`

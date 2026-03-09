@@ -17,6 +17,7 @@ import {
   HealthIcon,
   ChartHistogramIcon,
 } from '@hugeicons/core-free-icons'
+import { UnreadBadge } from './UnreadBadge'
 
 interface NavItem {
   label: string
@@ -49,6 +50,7 @@ const ADMIN_NAV_ITEM: NavItem = { label: 'Admin', href: '/admin', icon: 'Admin' 
 
 interface NavigationProps {
   isCollapsed?: boolean
+  unreadChatsCount?: number
 }
 
 const TRANSITION_TIMING = 'cubic-bezier(0.4, 0, 0.2, 1)'
@@ -73,7 +75,7 @@ function NavIcon({ iconKey }: { iconKey: string }) {
   return <HugeiconsIcon icon={icon} size={20} strokeWidth={2} className="flex-shrink-0" />
 }
 
-export function Navigation({ isCollapsed = false }: NavigationProps) {
+export function Navigation({ isCollapsed = false, unreadChatsCount = 0 }: NavigationProps) {
   const pathname = usePathname()
   const { effectiveRole, isAdmin } = useRoleView()
 
@@ -87,6 +89,9 @@ export function Navigation({ isCollapsed = false }: NavigationProps) {
         const isActive = item.href === '/'
           ? pathname === '/'
           : pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+        // Show unread badge on Chats nav item
+        const showBadge = item.icon === 'Chats' && unreadChatsCount > 0 && !isCollapsed
 
         return (
           <Link
@@ -108,11 +113,21 @@ export function Navigation({ isCollapsed = false }: NavigationProps) {
             {isCollapsed && (
               <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {item.label}
+                {item.icon === 'Chats' && unreadChatsCount > 0 && ` (${unreadChatsCount})`}
               </span>
             )}
-            <NavIcon iconKey={item.icon} />
+            {/* Icon with potential badge overlay when collapsed */}
+            <div className="relative flex-shrink-0">
+              <NavIcon iconKey={item.icon} />
+              {/* Badge on icon when collapsed */}
+              {item.icon === 'Chats' && unreadChatsCount > 0 && isCollapsed && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[14px] h-[14px] text-[9px] font-bold text-white bg-red-500 rounded-full">
+                  {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
+                </span>
+              )}
+            </div>
             <span
-              className="whitespace-nowrap"
+              className="whitespace-nowrap flex-1"
               style={{
                 opacity: isCollapsed ? 0 : 1,
                 transition: `opacity ${TRANSITION_DURATION} ${TRANSITION_TIMING}`,
@@ -120,6 +135,8 @@ export function Navigation({ isCollapsed = false }: NavigationProps) {
             >
               {item.label}
             </span>
+            {/* Badge after label when expanded */}
+            {showBadge && <UnreadBadge count={unreadChatsCount} />}
           </Link>
         )
       })}

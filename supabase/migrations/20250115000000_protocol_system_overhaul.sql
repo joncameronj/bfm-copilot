@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS public.diagnostic_extracted_values (
     extraction_method TEXT NOT NULL DEFAULT 'vision_api' CHECK (
         extraction_method IN ('vision_api', 'pdf_parser', 'manual')
     ),
-    extraction_model TEXT,  -- e.g., 'gpt-4o'
+    extraction_model TEXT,  -- e.g., 'grok-vision-beta'
     extraction_confidence NUMERIC(3,2),  -- 0.00 to 1.00
 
     -- Structured extracted data (schema varies by file_type)

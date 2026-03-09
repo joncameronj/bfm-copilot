@@ -3,27 +3,57 @@
 
 // ============================================
 // HRV (Heart Rate Variability) Extraction
+// BFM-specific format: 2D grid (SNS x PNS) with dot positions,
+// System Energy, Stress Response, and Brainwave Percentages
 // ============================================
 
+export interface HRVDotPosition {
+  pns: number                       // PNS axis value (-4 to +4)
+  sns: number                       // SNS axis value (-4 to +4)
+}
+
 export interface HRVExtractedData {
-  // Core metrics
-  rmssd?: number                    // Root mean square of successive differences
-  sdnn?: number                     // Standard deviation of NN intervals
-  lf_hf_ratio?: number              // Low frequency / High frequency ratio
-  hrv_score?: number                // Overall HRV score (0-100)
-  heart_rate?: number               // Average heart rate
+  // BFM-specific metrics
+  system_energy?: number            // 1-13 scale (1-4 athlete, 5-9 healthy, 10-13 energetic debt)
+  stress_response?: number          // 1-7 scale (1=best, 7=worst)
+
+  // Dot positions on SNS/PNS grid
+  calm_position?: HRVDotPosition    // Blue dot (laying down)
+  stressed_position?: HRVDotPosition // Red dot (standing up)
+  recovery_position?: HRVDotPosition // Green dot (seated/breathing)
+
+  // Legacy metrics (from NervExpress Ortho/Valsalva reports)
+  rmssd?: number
+  sdnn?: number
+  lf_hf_ratio?: number
+  hrv_score?: number
+  heart_rate?: number
 
   // Pattern analysis
   patterns: {
-    sympathetic_dominance: boolean  // Fight/flight overactive
-    parasympathetic_dominance: boolean  // Rest/digest dominant
-    balanced: boolean               // Normal autonomic balance
+    sympathetic_dominance: boolean
+    parasympathetic_dominance: boolean
+    balanced: boolean
+    switched_sympathetics: boolean   // SNS/PNS reversed (Deal Breaker #1)
+    pns_negative: boolean            // PNS in negative zone
+    vagus_dysfunction: boolean       // Abnormal vagal response
   }
 
-  // Clinical findings - what's "off"
-  findings: string[]                // e.g., ["Low parasympathetic tone", "Elevated stress response"]
+  // Brainwave percentages (often on BFM HRV images)
+  brainwave?: {
+    alpha: number                    // % (normal ~15-20%, low <10% = pain indicator)
+    beta: number                     // % (normal ~15-20%, high >25% = midbrain set point high)
+    delta: number                    // % (normal ~5-10% waking, high >20% = low direct current)
+    gamma: number                    // % (normal ~5-10%, high >30% = racing brain)
+    theta: number                    // % (normal ~5-10%, if theta > alpha = deal breaker)
+  }
 
-  // Raw text for verification
+  // Deal breakers detected from HRV/Brainwave
+  deal_breakers: string[]
+
+  // Clinical findings
+  findings: string[]
+
   raw_notes?: string
 }
 
@@ -33,30 +63,50 @@ export interface HRVExtractedData {
 
 export interface DPulseMarker {
   name: string                      // Organ/system name
-  status: 'green' | 'yellow' | 'red'
-  value?: number
+  percentage: number                // 0-100% energy level
+  status: 'green' | 'yellow' | 'red' // green >60%, yellow 40-60%, red <40%
   notes?: string
+  // Keep legacy 'value' as alias for percentage
+  value?: number
 }
 
 export interface DPulseExtractedData {
   // Overall assessment
-  overall_status: 'normal' | 'caution' | 'concern'
+  overall_status: 'normal' | 'caution' | 'critical'
 
-  // Individual markers with traffic light status
+  // System-level metrics
+  stress_index?: number              // 10-100 units (normal range)
+  vegetative_balance?: number        // 35-140 units (normal range)
+  brain_activity?: number            // Percentage
+  immunity?: number                  // Percentage
+  physiological_resources?: number   // 150-600 units (normal range)
+
+  // Individual markers with percentages
   markers: DPulseMarker[]
 
-  // Deal breakers (red markers) - CRITICAL for protocol generation
-  deal_breakers: string[]           // e.g., ["Heart", "Kidney", "Liver"]
+  // Deal breakers (percentage < 40%) - CRITICAL for protocol generation
+  deal_breakers: string[]           // e.g., ["Heart (26%)", "Kidney (16%)"]
 
-  // Caution areas (yellow markers)
+  // Caution areas (percentage 40-60%)
   caution_areas: string[]
+
+  // Seven Deal Breaker organs status
+  seven_deal_breakers?: {
+    heart?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    liver?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    kidney?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    cervical?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    thoracic?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    lumbar?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+    sacrum?: { percentage: number; status: 'green' | 'yellow' | 'red' }
+  }
 
   // Summary counts
   green_count: number
   yellow_count: number
   red_count: number
+  average_energy?: number
 
-  // Additional notes
   raw_notes?: string
 }
 
@@ -73,7 +123,7 @@ export interface UAExtractedData {
   // Core values
   ph: {
     value: number                   // e.g., 6.5
-    status: 'low' | 'optimal' | 'high'  // low < 6.0, optimal 6.0-7.5, high > 7.5
+    status: 'low' | 'optimal' | 'high'  // low < 6.5 (BFM threshold), optimal 6.5-7.5, high > 7.5
   }
 
   specific_gravity: {
@@ -107,12 +157,22 @@ export interface UAExtractedData {
   bilirubin?: UAValueWithStatus<string>
   urobilinogen?: UAValueWithStatus<string>
 
+  // Heavy metals (sometimes shown on UA report)
+  heavy_metals?: string[]           // e.g., ["Cadmium", "Copper"]
+
+  // VCS (Visual Contrast Scale) - often on same page as UA
+  vcs_score?: {
+    correct: number                 // Number correct out of 32
+    total: number                   // Always 32
+    passed: boolean                 // 24+ = passing
+  }
+
   // Clinical interpretation
   findings: string[]
 
   // Protocol triggers based on BFM rules
   recommended_protocols: {
-    // pH low → Cell Synergy or Trisalts
+    // pH low (<6.5) → Cell Synergy or Trisalts
     ph_low_protocol?: 'cell_synergy' | 'trisalts'
     // Protein off → X39 patches
     protein_protocol?: 'x39_patches'

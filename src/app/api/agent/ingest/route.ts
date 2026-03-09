@@ -1,9 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getPythonAgentUrl } from '@/lib/agent/url'
 
 export const dynamic = 'force-dynamic'
-
-const PYTHON_AGENT_URL = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +25,7 @@ export async function POST(request: Request) {
     formData.append('user_id', user.id)
 
     // Forward to Python agent
-    const response = await fetch(`${PYTHON_AGENT_URL}/agent/ingest`, {
+    const response = await fetch(`${getPythonAgentUrl()}/agent/ingest`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,

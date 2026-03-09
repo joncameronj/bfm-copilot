@@ -73,15 +73,26 @@ export const ROUTE_RULES: Record<string, UserRole[]> = {
   '/admin/rag': ['admin'],
   '/admin/rag/logs': ['admin'],
   '/admin/rag/telemetry': ['admin'],
+  '/chats': ['admin', 'practitioner'],
   '/patients': ['admin', 'practitioner'],
   '/diagnostics': ['admin', 'practitioner'],
   '/dashboard': ['admin', 'practitioner'],
   '/protocols': ['admin', 'practitioner'], // Clinical protocols for practitioners
   '/my-health': ['member'],
   '/my-labs': ['member'],
+  '/my-progress': ['member'],
   '/suggestions': ['member'], // Softer language for member wellness suggestions
   '/': ['admin', 'practitioner', 'member'],
   '/labs': ['admin', 'practitioner', 'member'],
+}
+
+export function canAccessRouteForRole(pathname: string, role: UserRole): boolean {
+  for (const [route, allowedRoles] of Object.entries(ROUTE_RULES)) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      return allowedRoles.includes(role)
+    }
+  }
+  return true
 }
 
 export function canAccess(role: UserRole, feature: keyof RolePermissions): boolean {

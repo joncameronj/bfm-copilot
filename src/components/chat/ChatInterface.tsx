@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { ChatInput } from './ChatInput'
 import { MessageList } from './MessageList'
@@ -10,6 +10,7 @@ import { QuickActionsBar } from './QuickActionsBar'
 import { useChat } from '@/hooks/useChat'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { useRole } from '@/hooks/useRole'
+import { useBackgroundJobsOptional } from '@/providers/BackgroundJobsProvider'
 import type { PatientChatContext, QuickAction } from '@/types/patient-context'
 
 interface ChatInterfaceProps {
@@ -18,7 +19,8 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps) {
-  const { user } = useRole()
+  const { user, role } = useRole()
+  const backgroundJobs = useBackgroundJobsOptional()
 
   // Patient context state for conversations started from patient profile
   const [patientContext, setPatientContext] = useState<PatientChatContext | null>(null)
@@ -39,24 +41,82 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
     currentActions,
     currentSources,
     currentRagChunks,
+    currentDeepDiveNotices,
     thinkingStartTime,
     error,
     sendMessage,
     cancelGeneration,
     retryLastMessage,
+    activeConversationId,
+    lastSentMessage,
   } = useChat({ conversationId, patientId })
 
-  const { isListening, isSupported, startListening, stopListening } = useVoiceInput({
-    onResult: (transcript) => {
-      if (transcript.trim()) {
-        sendMessage(transcript)
+  // Handle moving current generation to background
+  const handleMoveToBackground = useCallback(async () => {
+    if (!backgroundJobs || !activeConversationId || !lastSentMessage) {
+      toast.error('Unable to move to background')
+      return
+    }
+
+    if (!backgroundJobs.canStartNewJob) {
+      toast.error('Maximum background jobs reached (3). Please wait for one to complete.')
+      return
+    }
+
+    try {
+      // Create background job with the current message
+      const jobId = await backgroundJobs.startBackgroundJob(
+        activeConversationId,
+        lastSentMessage,
+        { user_role: role || 'member' }
+      )
+
+      if (jobId) {
+        // Cancel current generation (this removes the partial response)
+        cancelGeneration()
+
+        // Remove the user message and partial assistant message from UI
+        // since the background job will handle it fresh
+        // Note: We keep messages to avoid jarring UX - the job will save new ones
+
+        toast.success('Moved to background. Check the overlay to track progress.')
+      } else {
+        toast.error('Failed to create background job')
       }
-    },
+    } catch (err) {
+      console.error('Failed to move to background:', err)
+      toast.error('Failed to move to background')
+    }
+  }, [backgroundJobs, activeConversationId, lastSentMessage, cancelGeneration, role])
+
+  const {
+    isListening,
+    isSupported,
+    transcript,
+    interimTranscript,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useVoiceInput({
+    continuous: true,
   })
 
-  // Extract first name from full name
+  // Extract first name from full name, handling titles like "Dr."
   const firstName = useMemo(() => {
-    return user?.fullName?.split(' ')[0] || null
+    if (!user?.fullName) return null
+    const parts = user.fullName.split(' ')
+    if (parts.length === 0) return null
+
+    // Common titles to check for
+    const titles = ['Dr.', 'Dr', 'Mr.', 'Mr', 'Mrs.', 'Mrs', 'Ms.', 'Ms', 'Prof.', 'Prof']
+    const firstWord = parts[0]
+
+    // If first word is a title and there's a name after it, include both
+    if (titles.includes(firstWord) && parts.length > 1) {
+      return `${firstWord} ${parts[1]}`
+    }
+
+    return firstWord || null
   }, [user?.fullName])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -103,12 +163,21 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
     }
   }, [sendMessage])
 
-  const handleSend = (content: string, files?: File[]) => {
+  const handleSend = (
+    content: string,
+    files?: File[],
+    options?: { webSearch?: boolean; deepDive?: boolean }
+  ) => {
     // Track when user sends their first real message (not the auto-opening)
     if (patientContext && !isInitializing) {
       setHasUserSentMessage(true)
     }
-    sendMessage(content, files)
+    // Stop listening and reset transcript if voice was active
+    if (isListening) {
+      stopListening()
+    }
+    resetTranscript()
+    sendMessage(content, files, options)
   }
 
   const handleQuickAction = (prompt: string) => {
@@ -118,6 +187,16 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
 
   const hasMessages = messages.length > 0
 
+  // Common voice props for ChatInput
+  const voiceProps = {
+    isListening,
+    isVoiceSupported: isSupported,
+    transcript,
+    interimTranscript,
+    onStartListening: isSupported ? startListening : undefined,
+    onStopListening: isSupported ? stopListening : undefined,
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages area with blur overlay */}
@@ -126,11 +205,9 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
           <EmptyState
             onSend={handleSend}
             onStop={cancelGeneration}
-            onVoiceStart={isSupported ? startListening : undefined}
-            onVoiceEnd={isSupported ? stopListening : undefined}
             isLoading={isLoading}
-            isListening={isListening}
             firstName={firstName}
+            {...voiceProps}
           />
         ) : (
           <div className="max-w-3xl mx-auto px-4">
@@ -152,6 +229,7 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
               currentActions={currentActions}
               currentSources={currentSources}
               currentRagChunks={currentRagChunks}
+              currentDeepDiveNotices={currentDeepDiveNotices}
               thinkingStartTime={thinkingStartTime}
             />
 
@@ -208,11 +286,13 @@ export function ChatInterface({ conversationId, patientId }: ChatInterfaceProps)
             <ChatInput
               onSend={handleSend}
               onStop={cancelGeneration}
-              onVoiceStart={isSupported ? startListening : undefined}
-              onVoiceEnd={isSupported ? stopListening : undefined}
+              onMoveToBackground={backgroundJobs ? handleMoveToBackground : undefined}
               isLoading={isLoading}
-              isListening={isListening}
+              {...voiceProps}
             />
+            <p className="text-xs text-neutral-400 text-center mt-2">
+              Copilot can make mistakes. Always verify information before taking action on protocols.
+            </p>
           </div>
         </div>
       )}

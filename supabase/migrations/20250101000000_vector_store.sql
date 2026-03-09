@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
     document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1536),  -- OpenAI text-embedding-3-small dimension
+    embedding vector(1536),  -- xAI grok-embedding-small dimension
     token_count INTEGER,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()

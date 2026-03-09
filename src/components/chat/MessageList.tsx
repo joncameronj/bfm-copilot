@@ -17,6 +17,7 @@ interface MessageListProps {
   currentActions?: ActionButton[]
   currentSources?: Source[]
   currentRagChunks?: RagChunk[]
+  currentDeepDiveNotices?: string[]
   thinkingStartTime?: number | null
 }
 
@@ -31,6 +32,7 @@ export function MessageList({
   currentActions = [],
   currentSources = [],
   currentRagChunks = [],
+  currentDeepDiveNotices = [],
   thinkingStartTime,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -47,11 +49,11 @@ export function MessageList({
       className="px-4 py-6"
     >
       <div className="max-w-3xl mx-auto space-y-4">
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isActiveMessage = message.id === streamingMessageId
           return (
             <ChatMessage
-              key={message.id}
+              key={message.id || `msg-${index}`}
               message={message}
               isStreaming={isStreaming && isActiveMessage}
               isReasoning={isReasoning && isActiveMessage}
@@ -61,6 +63,9 @@ export function MessageList({
               currentActions={isActiveMessage ? currentActions : message.metadata?.actions}
               currentSources={isActiveMessage ? currentSources : message.metadata?.sources}
               currentRagChunks={isActiveMessage ? currentRagChunks : message.metadata?.ragChunks}
+              currentDeepDiveNotices={
+                isActiveMessage ? currentDeepDiveNotices : message.metadata?.deepDiveNotices
+              }
               thinkingStartTime={isActiveMessage ? thinkingStartTime : undefined}
             />
           )

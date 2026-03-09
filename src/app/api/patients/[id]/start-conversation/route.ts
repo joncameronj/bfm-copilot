@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createThread } from '@/lib/openai'
 import { buildPatientChatContext, generateQuickActions, formatContextForAI } from '@/lib/patient-context'
 import { NextResponse } from 'next/server'
 
@@ -40,9 +39,6 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Generate contextual quick actions
     const quickActions = generateQuickActions(context)
 
-    // Create OpenAI thread
-    const thread = await createThread()
-
     // Create conversation with patient context
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
@@ -50,7 +46,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         user_id: user.id,
         patient_id: patientId,
         title: `${context.patient.name} - Consult`,
-        thread_id: thread.id,
+        thread_id: null,
         conversation_type: 'patient_consult',
         message_count: 0,
       })
@@ -86,7 +82,6 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({
       conversationId: conversation.id,
-      threadId: thread.id,
       context,
       quickActions,
     })

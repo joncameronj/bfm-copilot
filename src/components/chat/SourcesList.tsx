@@ -82,7 +82,7 @@ export function SourcesList({ sources, isActive, className }: SourcesListProps) 
             <div className="px-4 pb-3 pt-1 space-y-1.5 border-t border-neutral-100 dark:border-neutral-800">
               <AnimatePresence mode="popLayout">
                 {sources.map((source, index) => (
-                  <SourceItem key={source.id} source={source} index={index} />
+                  <SourceItem key={source.id || `source-${index}`} source={source} index={index} />
                 ))}
               </AnimatePresence>
             </div>

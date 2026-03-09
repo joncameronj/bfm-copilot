@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "patient": "Gregory Geiger",
+    "initials": "GG",
+    "age_sex": "69M",
+    "test_dates": ["2025-08-12"],
+    "reviewed_by": "Dr. Rob",
+    "review_date": "2026-03-08",
+    "overall_grade": "4.5/5",
+    "review_notes": "SNS Balance not triggered (SNS not switched). Vagus Support must go FIRST, then Vagus Trauma after that if insufficient. HRV baroreceptor sensitivity high → triggers CSF Support. X-39 on Day 1 (protein in urine). 5 Levers grouped together in Phase 2."
+  },
+  "urgency_min": 4.9,
+  "expected_deal_breakers": [
+    "Alpha/Theta Imbalance",
+    "PNS Negative Zone",
+    "Vagus Nerve Dysfunction",
+    "Low Heart",
+    "Low pH",
+    "VCS Failed"
+  ],
+  "not_expected_deal_breakers": [
+    "SNS Switched"
+  ],
+  "expected_protocols": [
+    "Alpha Theta",
+    "PNS Support",
+    "Vagus Support",
+    "Vagus Trauma",
+    "CSF Support",
+    "Heart Health",
+    "Biotoxin",
+    "Kidney Repair",
+    "Leptin Resist",
+    "Pineal Support",
+    "Pit A Support",
+    "Pars Intermedia"
+  ],
+  "protocol_order_rules": {
+    "vagus": "Vagus Support FIRST, then Vagus Trauma only if Support insufficient",
+    "phase2_five_levers_together": "Pineal Support, Leptin Resist, Pit A Support, Pars Intermedia — all grouped in Phase 2"
+  },
+  "expected_supplements_day1": [
+    "Cell Synergy",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39",
+    "Innovita Vagus Nerve"
+  ],
+  "expected_supplements": [
+    "Cell Synergy",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39",
+    "Innovita Vagus Nerve",
+    "D-Ribose",
+    "Kidney Clear"
+  ],
+  "corrections": {
+    "sns_balance": "Do NOT trigger SNS Balance — SNS is not switched for this patient",
+    "vagus_order": "Vagus Support BEFORE Vagus Trauma. Never Vagus Trauma first.",
+    "csf_support": "High baroreceptor sensitivity on HRV → CSF Support frequency required",
+    "x39_timing": "X-39 on Day 1 (protein in urine is a reason to start immediately)",
+    "phase_grouping": "Keep 5 Levers together in Phase 2 (Pineal, Leptin Resist, Pit A, Pars Intermedia), rest to Phase 3",
+    "no_snb_balance": "SNS Balance only if SNS is clearly switched; it is not here"
+  },
+  "expected_five_levers": 5,
+  "cyto_lower_gated": true,
+  "cytolower_gate_reason": "VCS 8/32; must address Leptin before MSH",
+  "urgent_labs_needed": ["CMP with GFR (MOST URGENT — proteinuria)", "MSH", "25-OH Vitamin D"],
+  "week4_retest": "Retest deep breathing PNS response — if now improves, transition from Vagus Trauma to Vagus Support",
+  "grading": {
+    "urgency_assessment": 5,
+    "diagnostic_interpretation": 3,
+    "deal_breaker_identification": 4,
+    "frequency_protocol_appropriateness": 4,
+    "frequency_sequencing": 4,
+    "supplement_accuracy": 5,
+    "supplement_dosing_timing": 5,
+    "five_levers": 5,
+    "clinical_concerns": 5,
+    "monitoring_plan": 5,
+    "safety_contraindications": 5,
+    "overall": 5
+  }
+}

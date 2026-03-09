@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "patient": "Geraldine DeMartino",
+    "initials": "GD",
+    "age_sex": "72F",
+    "test_dates": ["2024-05-02"],
+    "reviewed_by": "Dr. Rob",
+    "review_date": "2026-03-08",
+    "overall_grade": "4.5/5",
+    "review_notes": "Overall very solid interpretations and protocol suggestions. SNS Switch is not clearly implicated — more of a vagus nerve pattern. Cell Synergy always 1 scoop. Day 1 = in-office testing only. Don't recommend Vitamin D or Integra Cell until labs confirm."
+  },
+  "urgency_min": 4.9,
+  "expected_deal_breakers": [
+    "Beta > Alpha",
+    "PNS Negative Zone",
+    "Vagus Nerve Dysfunction",
+    "Low Heart",
+    "Low pH",
+    "VCS Failed"
+  ],
+  "not_expected_deal_breakers": [
+    "SNS Switched"
+  ],
+  "expected_protocols": [
+    "CPP",
+    "PNS Support",
+    "Vagus Support",
+    "Vagus Balance",
+    "Vagus Trauma",
+    "Medulla Support",
+    "Heart Health",
+    "Terrain",
+    "Biotoxin",
+    "Pineal Support",
+    "Leptin Resist",
+    "Pit A Support",
+    "Pars Intermedia"
+  ],
+  "expected_supplements_day1": [
+    "Cell Synergy",
+    "Tri-Salts",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39"
+  ],
+  "expected_supplements": [
+    "Cell Synergy",
+    "Tri-Salts",
+    "Pectasol-C",
+    "Serculate",
+    "CoQ10",
+    "X-39",
+    "Innovita Vagus Nerve"
+  ],
+  "do_not_recommend": [
+    "Vitamin D (labs not yet obtained)",
+    "Integra Cell (CRP not yet confirmed)"
+  ],
+  "corrections": {
+    "sns_switch": "Not clearly implicated — more vagus nerve pattern. Do not trigger SNS Balance unless SNS is clearly switched.",
+    "cell_synergy_dose": "1 scoop (never more without specific trigger)",
+    "supplement_phasing": "Day 1 = in-office testing only. Do not recommend lab-dependent supplements without labs.",
+    "vagus_protocol_order": "Vagus Support first, then Vagus Trauma if insufficient",
+    "cyto_lower_gate": "Must address Leptin first (Biotoxin + Leptin Resist + Adipothin + diet), THEN MSH"
+  },
+  "expected_five_levers": 5,
+  "cyto_lower_gated": true,
+  "cytolower_gate_reason": "VCS 3/32; must address Leptin before MSH",
+  "arrhythmia_safety": true,
+  "urgent_labs_needed": ["MSH", "25-OH Vitamin D", "CMP", "RBC Magnesium", "CBC", "CRP", "RBC CoQ10"],
+  "grading": {
+    "urgency_assessment": 5,
+    "diagnostic_interpretation": 5,
+    "deal_breaker_identification": 4,
+    "frequency_protocol_appropriateness": 4,
+    "frequency_sequencing": 4,
+    "supplement_accuracy": 4,
+    "supplement_dosing_timing": 5,
+    "five_levers": 5,
+    "clinical_concerns": 5,
+    "monitoring_plan": 5,
+    "safety_contraindications": 5
+  }
+}

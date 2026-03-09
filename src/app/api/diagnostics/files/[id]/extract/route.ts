@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { extractDiagnosticValues } from '@/lib/vision'
 import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
+import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { DiagnosticType } from '@/types/shared'
 import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
@@ -19,6 +20,7 @@ interface RouteParams {
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { id: fileId } = await params
+    const visionModel = getDefaultVisionModel()
     const supabase = await createClient()
     const {
       data: { user },
@@ -93,7 +95,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
           diagnostic_file_id: fileId,
           status: 'processing',
           extraction_method: 'vision_api',
-          extraction_model: 'gpt-4o',
+          extraction_model: visionModel,
         })
         .select('id')
         .single()
@@ -109,26 +111,26 @@ export async function POST(_request: Request, { params }: RouteParams) {
         .eq('id', extractionId)
     }
 
-    // Get file URL from Supabase Storage
-    const { data: urlData } = supabase.storage
+    // Generate short-lived signed URL (diagnostics bucket is private).
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('diagnostics')
-      .getPublicUrl(file.storage_path)
+      .createSignedUrl(file.storage_path, 60 * 10)
 
-    if (!urlData?.publicUrl) {
+    if (signedUrlError || !signedUrlData?.signedUrl) {
       await supabase
         .from('diagnostic_extracted_values')
         .update({
           status: 'error',
-          error_message: 'Failed to get file URL from storage',
+          error_message: 'Failed to generate signed URL from storage',
         })
         .eq('id', extractionId)
 
-      return NextResponse.json({ error: 'Failed to get file URL' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create signed URL' }, { status: 500 })
     }
 
     // Perform extraction based on file type
     const result = await extractDiagnosticValues(
-      urlData.publicUrl,
+      signedUrlData.signedUrl,
       file.file_type as DiagnosticType,
       file.mime_type
     )

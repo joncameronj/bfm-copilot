@@ -29,7 +29,7 @@ This is the primary value proposition for practitioners:
 | Step | What Happens | Endpoint |
 |------|--------------|----------|
 | 1. **Upload** | Diagnostic files stored in Supabase Storage | `POST /api/diagnostics/upload` |
-| 2. **Extract** | Vision API (GPT-4o) extracts structured data from images/PDFs | `POST /api/diagnostics/files/[id]/extract` |
+| 2. **Extract** | Vision API (grok-vision-beta) extracts structured data from images/PDFs | `POST /api/diagnostics/files/[id]/extract` |
 | 3. **Analyze** | Python agent performs RAG search + generates AI analysis | `POST /api/diagnostics/[id]/generate-analysis` |
 | 4. **Recommend** | AI suggests protocols with frequencies based on knowledge base | (part of analysis response) |
 | 5. **Validate** | Frequencies validated against approved list (prevents hallucination) | (post-processing) |
@@ -56,7 +56,7 @@ The RAG (Retrieval-Augmented Generation) system is the core intelligence layer:
 
 **Architecture:**
 ```
-Query → Python Agent → Query Analysis (GPT-4o-mini) → Embedding Generation
+Query → Python Agent → Query Analysis (grok-4-1-fast-non-reasoning) → Embedding Generation
     → Vector Search (pgvector) → Role Filtering → Results with Similarity Scores
 ```
 
@@ -93,7 +93,7 @@ The platform serves three distinct user roles:
 | **Database** | Supabase (PostgreSQL), pgvector for embeddings |
 | **Auth** | Supabase Auth with JWT, OAuth support |
 | **Storage** | Supabase Storage |
-| **AI/LLM** | OpenAI GPT-4/GPT-5, OpenAI Assistants API, Embeddings API |
+| **AI/LLM** | xAI Grok chat, vision, and embedding APIs |
 | **Containerization** | Docker & Docker Compose |
 
 ---
@@ -247,7 +247,7 @@ type UserRole = 'admin' | 'practitioner' | 'member'
 
 #### Chat Flow
 ```
-User Message → API Route → OpenAI Assistant → Stream Response
+User Message → API Route → xAI-backed agent → Stream Response
                      ↓
               RAG Search (if relevant)
                      ↓
@@ -721,7 +721,7 @@ Legal restrictions are enforced via:
 ## Notes
 
 - All features use Supabase RLS for row-level security
-- OpenAI Assistants API powers the chat system
+- xAI powers the chat system
 - RAG uses pgvector for semantic search
 - File uploads go to Supabase Storage
 - Real-time features use Supabase subscriptions where needed
