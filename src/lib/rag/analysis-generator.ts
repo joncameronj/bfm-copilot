@@ -3,8 +3,9 @@
 // Uses Sunday-first RAG search and frequency name validation
 
 import { createClient } from '@/lib/supabase/server'
-import { getOpenAIClient } from '@/lib/openai'
-import { generateEmbedding } from './embeddings'
+import { getAnthropicClient, extractJSON, JSON_SYSTEM_SUFFIX } from '@/lib/anthropic'
+import { getPythonAgentUrl } from '@/lib/agent/url'
+import { getDefaultChatModel } from '@/lib/ai/provider'
 import {
   filterAndValidateProtocol,
   deduplicateFrequenciesAcrossProtocols,
@@ -61,7 +62,9 @@ Structure your response as JSON with the following format:
           "diagnostic_trigger": "Which specific diagnostic finding triggered this (e.g., 'ALT elevated', 'Heart RED on D-Pulse')"
         }
       ],
-      "priority": 1
+      "priority": 1,
+      "layer": 1,
+      "layer_label": "High Priorities"
     }
   ],
   "supplementation": [
@@ -69,7 +72,8 @@ Structure your response as JSON with the following format:
       "name": "Supplement name",
       "dosage": "Recommended dosage",
       "timing": "When to take",
-      "rationale": "Why this is recommended based on the data"
+      "rationale": "Why this is recommended based on the data",
+      "layer": 1
     }
   ],
   "reasoning_chain": [
@@ -79,13 +83,18 @@ Structure your response as JSON with the following format:
   ]
 }
 
+LAYERED PROTOCOL SYSTEM — assign every protocol and supplement to a layer:
+- Layer 1 ("High Priorities"): Deal breakers + primary in-office protocols + Day 1 supplements (Cell Synergy, Tri-Salts, Pectasol-C, X-39, Serculate, CoQ10, Vagus Nerve). Set priority=1, layer=1, layer_label="High Priorities".
+- Layer 2 ("Next If No Response"): Condition-specific protocols (Thyroid, Hormone, Gut, Liver) + lab-triggered supplements (Vitamin D, IP6 Gold, Homocysteine Factor, Adipothin, Livergy, Pancreos). Set priority=2, layer=2, layer_label="Next If No Response".
+- Layer 3 ("If They Are Still Stuck"): Experimental protocols (Deuterium, EMF Cord) + advanced detox + advanced supplements (Epi Pineal, Hypothala, Rejuvenation H2, Fatty 15). Set priority=3, layer=3, layer_label="If They Are Still Stuck".
+
 Guidelines for protocols:
-- Recommend 4-6 protocols typically, based on the diagnostic findings
+- Recommend the MINIMAL VIABLE protocol set based on highest-signal diagnostic findings (typically 2-4; only add more when clearly justified by extracted diagnostics)
 - Each protocol should have 1-3 relevant FSM frequencies (NAMES ONLY from approved list)
 - Prioritize protocols based on deal breakers and critical findings (1 = most important)
 - Include supplementation based on ALL diagnostic findings (HRV, D-Pulse, UA, VCS)
 - When labs are available, add additional supplement recommendations based on blood markers
-- Base all recommendations on the BFM Sunday documentation (primary source) and RAG context
+- Base all recommendations on BFM Sunday documentation first; use non-Sunday chunks only as secondary support when Sunday evidence is insufficient
 - ALWAYS cite which document section supports each recommendation`
 
 const DR_ROB_MEMBER_PROMPT = `You are speaking as Dr. Rob, an expert in integrative wellness. You are providing EDUCATIONAL information to a program member.
@@ -147,6 +156,140 @@ interface RagChunk {
   priority_rank?: number
 }
 
+const FALLBACK_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'this', 'that', 'from', 'your', 'their',
+  'have', 'has', 'are', 'was', 'were', 'been', 'into', 'over', 'under',
+  'diagnostic', 'diagnostics', 'patient', 'patients', 'analysis', 'findings',
+  'recommendation', 'recommendations', 'protocol', 'protocols', 'file', 'files',
+  'data', 'report', 'reports', 'result', 'results',
+])
+
+function extractFallbackKeywords(query: string, maxKeywords: number = 8): string[] {
+  const rawWords = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !FALLBACK_STOP_WORDS.has(word))
+
+  const uniqueWords: string[] = []
+  for (const word of rawWords) {
+    if (!uniqueWords.includes(word)) {
+      uniqueWords.push(word)
+    }
+    if (uniqueWords.length >= maxKeywords) {
+      break
+    }
+  }
+
+  return uniqueWords
+}
+
+async function keywordFallbackSearch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  queryText: string,
+  userRole: 'practitioner' | 'member',
+  limit: number
+): Promise<RagChunk[]> {
+  const keywords = extractFallbackKeywords(queryText)
+  if (!keywords.length) {
+    return []
+  }
+
+  const orClause = keywords.map((keyword) => `content.ilike.%${keyword}%`).join(',')
+
+  const { data, error } = await supabase
+    .from('document_chunks')
+    .select(`
+      id,
+      document_id,
+      content,
+      documents!inner(
+        title,
+        filename,
+        care_category,
+        document_category,
+        role_scope,
+        seminar_day,
+        status
+      )
+    `)
+    .or(orClause)
+    .limit(limit * 4)
+
+  if (error || !data) {
+    console.error('[RAG] Keyword fallback query failed:', error)
+    return []
+  }
+
+  const allowedRoleScopes =
+    userRole === 'practitioner'
+      ? new Set(['clinical', 'both'])
+      : new Set(['educational', 'both'])
+
+  const scoredRows = (data as Array<Record<string, unknown>>)
+    .map((row) => {
+      const documentData = row.documents as
+        | Record<string, unknown>
+        | Array<Record<string, unknown>>
+        | null
+      const document = Array.isArray(documentData)
+        ? documentData[0] || null
+        : documentData
+      const content = String(row.content || '')
+      const normalizedContent = content.toLowerCase()
+      const keywordHits = keywords.reduce(
+        (count, keyword) => (normalizedContent.includes(keyword) ? count + 1 : count),
+        0
+      )
+      const sundayBoost = document?.seminar_day === 'sunday' ? 0.2 : 0
+      const score = keywordHits + sundayBoost
+
+      return { row, document, score }
+    })
+    .filter(({ document, score }) => {
+      if (!document || score <= 0) return false
+      const status = String(document.status || '')
+      if (status !== 'indexed' && status !== 'completed') return false
+      const roleScope = String(document.role_scope || 'educational')
+      return allowedRoleScopes.has(roleScope)
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+
+  return scoredRows.map(({ row, document, score }) => ({
+    chunk_id: String(row.id),
+    document_id: String(row.document_id),
+    content: String(row.content || ''),
+    title: (document?.title as string | null) || null,
+    filename: String(document?.filename || 'unknown'),
+    similarity: Math.min(0.95, 0.25 + score * 0.08),
+    care_category: (document?.care_category as string | undefined) || undefined,
+    document_category: (document?.document_category as string | undefined) || undefined,
+    seminar_day: (document?.seminar_day as string | undefined) || undefined,
+    search_phase: 'keyword_fallback',
+    priority_rank: undefined,
+  }))
+}
+
+interface ProtocolEngineResult {
+  protocols: Array<{
+    name: string
+    priority: number
+    trigger: string
+    category: string
+    notes: string
+  }>
+  supplements: Array<{
+    name: string
+    trigger: string
+    dosage: string
+    timing: string
+    notes: string
+  }>
+  deal_breakers: string[]
+  cross_correlations: string[]
+}
+
 interface GeneratedAnalysis {
   summary: string
   protocols: Array<{
@@ -160,6 +303,10 @@ interface GeneratedAnalysis {
   ragContext: RagChunk[]
   reasoningChain: string[]
   extractedData: DiagnosticDataSummary | null
+}
+
+function getAnalysisModel(): string {
+  return getDefaultChatModel()
 }
 
 // ============================================
@@ -239,7 +386,32 @@ export async function generateDiagnosticAnalysis(
   // 4. Fetch extracted diagnostic values (from Vision API)
   const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
 
-  // 5. Determine if we have lab data for supplementation recommendations
+  // 5. Run deterministic protocol engine on extracted data
+  // This is the PRIMARY source of protocol decisions — the AI only explains/sequences
+  let engineResult: ProtocolEngineResult | null = null
+  if (extractedData) {
+    try {
+      const engineResponse = await fetch(`${getPythonAgentUrl()}/agent/protocols/engine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extracted_data: extractedData }),
+      })
+      if (engineResponse.ok) {
+        engineResult = await engineResponse.json() as ProtocolEngineResult
+        console.log(
+          `[Protocol Engine] Found ${engineResult.protocols.length} protocols, ` +
+          `${engineResult.supplements.length} supplements, ` +
+          `${engineResult.deal_breakers.length} deal breakers`
+        )
+      } else {
+        console.warn(`[Protocol Engine] Failed: ${engineResponse.status} ${engineResponse.statusText}`)
+      }
+    } catch (engineError) {
+      console.warn('[Protocol Engine] Unavailable, falling back to AI-only:', engineError)
+    }
+  }
+
+  // 6. Determine if we have lab data for supplementation recommendations
   // Include labs if either:
   // - Patient has existing lab_results records, OR
   // - This diagnostic upload includes extracted blood panel data
@@ -251,7 +423,7 @@ export async function generateDiagnosticAnalysis(
 
   // 8. Perform RAG search via Python agent (single source of truth)
   // This ensures consistent search behavior across chat and diagnostic analysis
-  const pythonAgentUrl = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
+  const pythonAgentUrl = getPythonAgentUrl()
 
   let ragChunks: RagChunk[] = []
 
@@ -268,6 +440,7 @@ export async function generateDiagnosticAnalysis(
         limit: 15,
         threshold: 0.40, // Lowered to improve recall
         include_related: true,
+        enforce_sunday_first: true,
       }),
     })
 
@@ -279,16 +452,21 @@ export async function generateDiagnosticAnalysis(
 
     // Convert Python agent response to RagChunk format
     ragChunks = (ragData.results || []).map((r: Record<string, unknown>) => ({
-      chunk_id: '', // Not provided by Python agent
-      document_id: '', // Not provided by Python agent
+      chunk_id: (r.chunk_id as string | undefined) || '',
+      document_id: (r.document_id as string | undefined) || '',
       content: r.content as string,
       title: r.title as string | null,
       filename: r.filename as string,
       similarity: r.similarity as number,
       care_category: undefined,
       document_category: r.document_category as string | undefined,
-      seminar_day: undefined,
-      search_phase: r.match_type as string | undefined, // Use match_type as search_phase
+      seminar_day: r.seminar_day as string | undefined,
+      search_phase: (r.search_phase as string | undefined)
+        || ((r.seminar_day as string | undefined) === 'sunday'
+          ? 'sunday_primary'
+          : (r.seminar_day as string | undefined)
+            ? 'seminar_secondary'
+            : undefined),
       priority_rank: undefined,
     }))
 
@@ -296,37 +474,38 @@ export async function generateDiagnosticAnalysis(
   } catch (ragError) {
     console.error('Python agent RAG search error:', ragError)
 
-    // Fallback to Supabase RPC if Python agent fails
-    console.warn('Falling back to Supabase RPC for RAG search')
-    const queryEmbedding = await generateEmbedding(queryText)
-
-    const { data: fallbackResults } = await supabase.rpc(
-      'smart_search_documents_v2',
-      {
-        p_query_embedding: queryEmbedding,
-        p_user_id: practitionerId,
-        p_user_role: userRole,
-        p_match_threshold: 0.40,
-        p_match_count: 15,
-      }
-    )
-
-    if (fallbackResults) {
-      ragChunks = (fallbackResults || []).map((r: Record<string, unknown>) => ({
-        chunk_id: r.chunk_id as string,
-        document_id: r.document_id as string,
-        content: r.content as string,
-        title: r.title as string | null,
-        filename: r.filename as string,
-        similarity: r.similarity as number,
-        care_category: r.care_category as string | undefined,
-        document_category: r.document_category as string | undefined,
-        seminar_day: r.seminar_day as string | undefined,
-        search_phase: undefined,
-        priority_rank: undefined,
-      }))
-      console.log(`[RAG] Fallback returned ${ragChunks.length} results`)
+    // Fallback to Supabase keyword search if Python agent fails.
+    // This avoids reliance on external embedding generation.
+    console.warn('Falling back to Supabase keyword search for RAG')
+    try {
+      ragChunks = await keywordFallbackSearch(
+        supabase,
+        queryText,
+        userRole,
+        15
+      )
+      console.log(`[RAG] Keyword fallback returned ${ragChunks.length} results`)
+    } catch (fallbackError) {
+      console.error(
+        '[RAG] Keyword fallback search failed; continuing without RAG context:',
+        fallbackError
+      )
+      ragChunks = []
     }
+  }
+
+  const sundayChunkCount = ragChunks.filter(
+    (chunk) => chunk.seminar_day === 'sunday' || chunk.search_phase === 'sunday_primary'
+  ).length
+  if (ragChunks.length > 0 && sundayChunkCount === 0) {
+    console.warn(
+      `[RAG] Sunday-first fallback engaged for diagnostic upload ${diagnosticUploadId}. ` +
+      `Using secondary seminar chunks due to insufficient Sunday evidence. Query: ${queryText}`
+    )
+  } else if (ragChunks.length === 0) {
+    console.warn(
+      `[RAG] No RAG chunks returned for diagnostic upload ${diagnosticUploadId}. Query: ${queryText}`
+    )
   }
 
   // 9. Fetch APPROVED frequency names (for validation)
@@ -346,7 +525,7 @@ export async function generateDiagnosticAnalysis(
     .select('id, name, frequency_a, frequency_b, category, condition, description')
     .eq('is_active', true)
 
-  // 11. Generate analysis with AI
+  // 11. Generate analysis with AI (protocol engine results used as primary source)
   const analysis = await callAIForAnalysis(
     patientContext,
     diagnosticFiles,
@@ -356,7 +535,8 @@ export async function generateDiagnosticAnalysis(
     userRole,
     extractedData,
     approvedFrequencyNames,
-    diagnosticUploadId
+    diagnosticUploadId,
+    engineResult
   )
 
   return {
@@ -491,6 +671,34 @@ async function getExtractedDiagnosticData(
           if (data.findings && Array.isArray(data.findings)) {
             summary.findings.push(...(data.findings as string[]))
           }
+          // Extract deal breakers from HRV (new BFM format)
+          if (data.deal_breakers && Array.isArray(data.deal_breakers)) {
+            summary.dealBreakers.push(...(data.deal_breakers as string[]))
+          }
+          // Extract brainwave data into separate brainwave slot
+          if (data.brainwave && !summary.brainwave) {
+            const bw = data.brainwave as Record<string, number>
+            summary.brainwave = {
+              alpha: { value: bw.alpha, status: bw.alpha < 10 ? 'low' : bw.alpha > 25 ? 'high' : 'normal' },
+              beta: { value: bw.beta, status: bw.beta > 25 ? 'high' : 'normal' },
+              delta: { value: bw.delta, status: bw.delta > 20 ? 'high' : 'normal' },
+              gamma: { value: bw.gamma, status: bw.gamma > 30 ? 'high' : 'normal' },
+              theta: { value: bw.theta, status: bw.theta > bw.alpha ? 'high' : 'normal' },
+              patterns: {
+                dominant_wave: (['delta', 'theta', 'alpha', 'beta', 'gamma'] as const)
+                  .reduce((max, wave) => (bw[wave] ?? 0) > (bw[max] ?? 0) ? wave : max, 'alpha' as const),
+                imbalances: [
+                  ...(bw.alpha < 10 ? ['Low alpha'] : []),
+                  ...(bw.beta > 25 ? ['High beta'] : []),
+                  ...(bw.gamma > 30 ? ['High gamma'] : []),
+                  ...(bw.delta > 20 ? ['High waking delta'] : []),
+                  ...(bw.theta > bw.alpha ? ['Theta > Alpha (reversed field)'] : []),
+                ],
+              },
+              findings: [],
+              fsm_indicators: [],
+            } as unknown as DiagnosticDataSummary['brainwave']
+          }
           break
 
         case 'd_pulse':
@@ -507,12 +715,28 @@ async function getExtractedDiagnosticData(
           }
           // Check protocol triggers
           const ph = data.ph as { value?: number; status?: string } | undefined
-          if (ph?.status === 'low' || (ph?.value && ph.value < 6.0)) {
+          if (ph?.status === 'low' || (ph?.value && ph.value < 6.5)) {
             summary.protocolTriggers.phLow = true
           }
           const protein = data.protein as { status?: string } | undefined
           if (protein?.status === 'trace' || protein?.status === 'positive') {
             summary.protocolTriggers.proteinPositive = true
+          }
+          // Check VCS score from UA page (BFM format puts VCS on same page)
+          const vcsFromUA = data.vcs_score as { correct?: number; total?: number; passed?: boolean } | undefined
+          if (vcsFromUA && !summary.vcs) {
+            if (vcsFromUA.passed === false) {
+              summary.protocolTriggers.vcsLow = true
+            }
+            // Create a synthetic VCS entry from the UA VCS data
+            summary.vcs = {
+              passed: vcsFromUA.passed ?? true,
+              biotoxin_likely: vcsFromUA.passed === false,
+              severity: vcsFromUA.passed === false ? 'moderate' : 'none',
+              findings: vcsFromUA.passed === false
+                ? [`VCS ${vcsFromUA.correct}/${vcsFromUA.total} - FAILED (below 24/32 threshold)`]
+                : [`VCS ${vcsFromUA.correct}/${vcsFromUA.total} - passing`],
+            } as unknown as DiagnosticDataSummary['vcs']
           }
           break
 
@@ -569,13 +793,32 @@ These MUST be addressed first in protocol recommendations.`)
 
   // HRV
   if (extractedData.hrv) {
-    const hrv = extractedData.hrv
-    sections.push(`### HRV Analysis
-- HRV Score: ${hrv.hrv_score ?? 'N/A'}
-- RMSSD: ${hrv.rmssd ?? 'N/A'}
-- LF/HF Ratio: ${hrv.lf_hf_ratio ?? 'N/A'}
-- Pattern: ${hrv.patterns?.balanced ? 'Balanced' : hrv.patterns?.sympathetic_dominance ? 'Sympathetic Dominant (stress)' : hrv.patterns?.parasympathetic_dominance ? 'Parasympathetic Dominant' : 'Unknown'}
-- Findings: ${hrv.findings?.join(', ') || 'None noted'}`)
+    const hrv = extractedData.hrv as unknown as Record<string, unknown>
+    const patterns = hrv.patterns as Record<string, boolean> | undefined
+    const brainwave = hrv.brainwave as Record<string, number> | undefined
+    const calm = hrv.calm_position as { pns?: number; sns?: number } | undefined
+    const stressed = hrv.stressed_position as { pns?: number; sns?: number } | undefined
+    const recovery = hrv.recovery_position as { pns?: number; sns?: number } | undefined
+
+    const hrvLines = [`### HRV Analysis`]
+    if (hrv.system_energy) hrvLines.push(`- **System Energy Available:** ${hrv.system_energy}/13${(hrv.system_energy as number) >= 10 ? ' (**ENERGETIC DEBT**)' : ''}`)
+    if (hrv.stress_response) hrvLines.push(`- **Stress Response:** ${hrv.stress_response}/7${(hrv.stress_response as number) >= 5 ? ' (**POOR**)' : ''}`)
+    if (calm) hrvLines.push(`- Calm (Blue) Position: PNS=${calm.pns}, SNS=${calm.sns}`)
+    if (stressed) hrvLines.push(`- Stressed (Red) Position: PNS=${stressed.pns}, SNS=${stressed.sns}`)
+    if (recovery) hrvLines.push(`- Recovery (Green) Position: PNS=${recovery.pns}, SNS=${recovery.sns}`)
+    if (patterns?.switched_sympathetics) hrvLines.push(`- **DEAL BREAKER: SNS SWITCHED** - sympathetics reversed`)
+    if (patterns?.pns_negative) hrvLines.push(`- **DEAL BREAKER: PNS NEGATIVE** - parasympathetic system failing`)
+    if (brainwave) {
+      hrvLines.push(`- Brainwave: Alpha=${brainwave.alpha}%, Beta=${brainwave.beta}%, Delta=${brainwave.delta}%, Gamma=${brainwave.gamma}%, Theta=${brainwave.theta}%`)
+      if (brainwave.theta > brainwave.alpha) hrvLines.push(`- **DEAL BREAKER: Theta (${brainwave.theta}%) > Alpha (${brainwave.alpha}%) - reversed field**`)
+      if (brainwave.alpha < 10) hrvLines.push(`- **DEAL BREAKER: Alpha ${brainwave.alpha}% (under 10%) - pain indicator**`)
+      if (brainwave.beta > 25 || brainwave.gamma > 30) hrvLines.push(`- **Midbrain set point too high** - Beta ${brainwave.beta}%, Gamma ${brainwave.gamma}%`)
+    }
+    // Legacy fields
+    if (hrv.hrv_score) hrvLines.push(`- HRV Score: ${hrv.hrv_score}`)
+    if (hrv.rmssd) hrvLines.push(`- RMSSD: ${hrv.rmssd}`)
+    hrvLines.push(`- Findings: ${(hrv.findings as string[])?.join(', ') || 'None noted'}`)
+    sections.push(hrvLines.join('\n'))
   }
 
   // Brainwave
@@ -589,26 +832,70 @@ These MUST be addressed first in protocol recommendations.`)
 
   // D-Pulse
   if (extractedData.dPulse) {
-    const dp = extractedData.dPulse
-    sections.push(`### D-Pulse Results
-- Overall: ${dp.overall_status}
-- RED (Deal Breakers): ${dp.deal_breakers?.join(', ') || 'None'}
-- YELLOW (Caution): ${dp.caution_areas?.join(', ') || 'None'}
-- GREEN: ${dp.green_count ?? 0} markers`)
+    const dp = extractedData.dPulse as unknown as Record<string, unknown>
+    const markers = (dp.markers as Array<{ name: string; percentage?: number; status?: string }>) || []
+    const sevenDB = dp.seven_deal_breakers as Record<string, { percentage: number; status: string }> | undefined
+
+    const dpLines = [`### D-Pulse Results`]
+    if (dp.stress_index) dpLines.push(`- Stress Index: ${dp.stress_index}`)
+    if (dp.vegetative_balance) dpLines.push(`- Vegetative Balance: ${dp.vegetative_balance}`)
+    if (dp.brain_activity) dpLines.push(`- Brain Activity: ${dp.brain_activity}%`)
+    if (dp.immunity) dpLines.push(`- Immunity: ${dp.immunity}%`)
+    if (dp.physiological_resources) dpLines.push(`- Physiological Resources: ${dp.physiological_resources}${(dp.physiological_resources as number) < 150 ? ' (**BELOW NORMAL**)' : ''}`)
+    dpLines.push(`- Overall: ${dp.overall_status}`)
+    dpLines.push(`- **RED (Deal Breakers <40%):** ${(dp.deal_breakers as string[])?.join(', ') || 'None'}`)
+    dpLines.push(`- **YELLOW (Caution 40-60%):** ${(dp.caution_areas as string[])?.join(', ') || 'None'}`)
+    dpLines.push(`- GREEN (>60%): ${dp.green_count ?? 0} markers`)
+    if (dp.average_energy) dpLines.push(`- Average Energy: ${dp.average_energy}%`)
+
+    // Seven Deal Breakers detail
+    if (sevenDB) {
+      const dbEntries = Object.entries(sevenDB)
+        .filter(([, v]) => v.status === 'red')
+        .map(([k, v]) => `${k}: ${v.percentage}%`)
+      if (dbEntries.length > 0) {
+        dpLines.push(`- **Seven Deal Breaker organs in RED:** ${dbEntries.join(', ')}`)
+      }
+    }
+
+    // List all markers for completeness
+    if (markers.length > 0) {
+      const lowMarkers = markers
+        .filter(m => (m.percentage ?? 0) < 60)
+        .sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0))
+        .map(m => `${m.name}: ${m.percentage}%`)
+      if (lowMarkers.length > 0) {
+        dpLines.push(`- Low-energy organs: ${lowMarkers.join(', ')}`)
+      }
+    }
+    sections.push(dpLines.join('\n'))
   }
 
   // Urinalysis
   if (extractedData.ua) {
-    const ua = extractedData.ua
-    const phValue = typeof ua.ph === 'object' && ua.ph ? ua.ph.value : ua.ph
-    const phStatus = typeof ua.ph === 'object' && ua.ph ? ua.ph.status : ''
-    const proteinValue = typeof ua.protein === 'object' && ua.protein ? ua.protein.value : ua.protein
-    const proteinStatus = typeof ua.protein === 'object' && ua.protein ? ua.protein.status : ''
+    const ua = extractedData.ua as unknown as Record<string, unknown>
+    const phObj = ua.ph as { value?: number; status?: string } | undefined
+    const proteinObj = ua.protein as { value?: string; status?: string } | undefined
+    const sgObj = ua.specific_gravity as { value?: number; status?: string } | undefined
+    const vcsObj = ua.vcs_score as { correct?: number; total?: number; passed?: boolean } | undefined
+    const heavyMetals = ua.heavy_metals as string[] | undefined
 
-    sections.push(`### Urinalysis (UA)
-- pH: ${phValue ?? 'N/A'} (${phStatus || ''})${phStatus === 'low' ? ' → **Recommend: Cell Synergy or Trisalts**' : ''}
-- Protein: ${proteinValue ?? 'N/A'}${proteinStatus === 'trace' || proteinStatus === 'positive' ? ' → **Recommend: X39 patches**' : ''}
-- Specific Gravity: ${typeof ua.specific_gravity === 'object' && ua.specific_gravity ? ua.specific_gravity.value : 'N/A'}`)
+    const uaLines = [`### Urinalysis (UA)`]
+    const phVal = phObj?.value
+    const phStat = phObj?.status
+    uaLines.push(`- **pH:** ${phVal ?? 'N/A'}${phStat === 'low' ? ` (**LOW - under 6.5, DEAL BREAKER**) → Recommend: Cell Synergy or Tri-Salts` : ` (${phStat || ''})`}`)
+    uaLines.push(`- **Protein:** ${proteinObj?.value ?? 'N/A'}${proteinObj?.status === 'trace' || proteinObj?.status === 'positive' ? ' (**POSITIVE - DEAL BREAKER**) → Recommend: X-39 patches' : ''}`)
+    uaLines.push(`- Specific Gravity: ${sgObj?.value ?? 'N/A'}${sgObj?.status === 'high' ? ' (HIGH - possible dehydration)' : ''}`)
+
+    if (vcsObj) {
+      uaLines.push(`- **VCS Score:** ${vcsObj.correct}/${vcsObj.total}${vcsObj.passed === false ? ' (**FAILED - DEAL BREAKER**) → Recommend: Pectasol-C, Biotoxin, Leptin Resist' : ' (passing)'}`)
+    }
+
+    if (heavyMetals && heavyMetals.length > 0) {
+      uaLines.push(`- **Heavy Metals Detected:** ${heavyMetals.join(', ')}`)
+    }
+
+    sections.push(uaLines.join('\n'))
   }
 
   // VCS
@@ -633,6 +920,60 @@ These MUST be addressed first in protocol recommendations.`)
   return sections.join('\n\n')
 }
 
+/**
+ * Build the prompt section for protocol engine results (deterministic output).
+ * When present, these are MANDATORY recommendations the AI must include.
+ */
+function buildProtocolEngineSection(engineResult: ProtocolEngineResult | null): string {
+  if (!engineResult) {
+    return ''
+  }
+
+  const sections: string[] = []
+
+  sections.push(`## PROTOCOL ENGINE OUTPUT (MANDATORY - from Master Protocol Key rules)
+The following protocols and supplements were determined by the deterministic rules engine.
+These are GROUND TRUTH — you MUST include all of them in your output.`)
+
+  if (engineResult.deal_breakers.length > 0) {
+    sections.push(`### Deal Breakers Found (address FIRST)
+${engineResult.deal_breakers.map(d => `- **${d}**`).join('\n')}`)
+  }
+
+  if (engineResult.protocols.length > 0) {
+    const p1 = engineResult.protocols.filter(p => p.priority === 1)
+    const p2 = engineResult.protocols.filter(p => p.priority === 2)
+    const p3 = engineResult.protocols.filter(p => p.priority >= 3)
+
+    if (p1.length > 0) {
+      sections.push(`### Priority 1 — Deal Breaker Protocols (MUST include)
+${p1.map(p => `- **${p.name}** — ${p.trigger}${p.notes ? ` (${p.notes})` : ''}`).join('\n')}`)
+    }
+    if (p2.length > 0) {
+      sections.push(`### Priority 2 — High Priority Protocols
+${p2.map(p => `- **${p.name}** — ${p.trigger}${p.notes ? ` (${p.notes})` : ''}`).join('\n')}`)
+    }
+    if (p3.length > 0) {
+      sections.push(`### Priority 3 — Standard Protocols
+${p3.map(p => `- **${p.name}** — ${p.trigger}${p.notes ? ` (${p.notes})` : ''}`).join('\n')}`)
+    }
+  }
+
+  if (engineResult.supplements.length > 0) {
+    sections.push(`### Required Supplements
+${engineResult.supplements.map(s =>
+  `- **${s.name}** — ${s.trigger}${s.dosage ? ` | Dose: ${s.dosage}` : ''}${s.timing ? ` | Timing: ${s.timing}` : ''}${s.notes ? ` | ${s.notes}` : ''}`
+).join('\n')}`)
+  }
+
+  if (engineResult.cross_correlations.length > 0) {
+    sections.push(`### Cross-Diagnostic Correlations
+${engineResult.cross_correlations.map(c => `- ${c}`).join('\n')}`)
+  }
+
+  return sections.join('\n\n')
+}
+
 async function callAIForAnalysis(
   patient: PatientContext,
   files: DiagnosticFile[],
@@ -642,9 +983,10 @@ async function callAIForAnalysis(
   userRole: 'practitioner' | 'member',
   extractedData: DiagnosticDataSummary | null,
   approvedFrequencyNames: string[],
-  diagnosticUploadId: string
+  diagnosticUploadId: string,
+  engineResult: ProtocolEngineResult | null = null
 ): Promise<Omit<GeneratedAnalysis, 'ragContext' | 'extractedData'>> {
-  const openai = getOpenAIClient()
+  const client = getAnthropicClient()
 
   // Build context from RAG results, PRIORITIZING Sunday docs
   const sundayChunks = ragChunks.filter(c => c.seminar_day === 'sunday' || c.search_phase === 'sunday_primary')
@@ -673,6 +1015,9 @@ async function callAIForAnalysis(
     ? fsmFrequencies.map(f => `- ${f.name} (for ${f.condition})`).join('\n')
     : ''
 
+  // Build protocol engine section (deterministic rules output)
+  const engineSection = buildProtocolEngineSection(engineResult)
+
   // Build user message with all context
   const userMessage = `
 ## Patient Information
@@ -688,19 +1033,10 @@ ${files.map(f => `- ${f.filename} (${f.fileType})`).join('\n')}
 
 ${extractedDataSection}
 
+${engineSection}
+
 ## Lab Data Available
 ${hasLabs ? 'Yes - blood panel data is available for detailed supplementation' : 'No blood panel - base supplementation on HRV, D-Pulse, UA, and VCS findings'}
-Include supplementation recommendations based on ALL diagnostic findings.
-
-SUPPLEMENTATION TRIGGERS (always recommend when these findings are present):
-- pH low on UA → Cell Synergy or Trisalts
-- Protein positive on UA → X39 patches
-- VCS failed → Pectasol-C or Leptin protocols
-- D-Pulse RED markers → specific supplements from Sunday sessions
-- HRV autonomic dysfunction → relevant support supplements
-- Blood panel abnormalities → targeted supplementation (when labs available)
-
-Base ALL supplement recommendations on Dr. Rob's Sunday session content.
 
 ${frequencyList}
 
@@ -711,39 +1047,58 @@ ${fsmReference ? `## FSM Frequency Reference (context only)\n${fsmReference}` : 
 
 ---
 
-Based on the above patient information, extracted diagnostic values, and BFM Sunday documentation, please provide your analysis and recommendations.
+${engineResult
+  ? `YOUR TASK: The Protocol Engine has already determined the correct protocols and supplements above.
+Your job is to:
+1. Write a clear, Dr. Rob-style summary explaining WHY these protocols were selected based on the diagnostic data
+2. Organize the engine's protocols into your JSON output — use the engine protocol names as frequency names
+3. Include ALL supplements from the engine output in your supplementation array
+4. Add a reasoning_chain explaining the diagnostic-to-protocol logic
+5. You MAY add additional protocols ONLY if the RAG context clearly supports them AND they are on the approved list
+6. Do NOT remove or contradict any protocol the engine selected — those are ground truth from the Master Protocol Key`
+  : `Based on the above patient information, extracted diagnostic values, and BFM Sunday documentation, please provide your analysis and recommendations.
+
+SUPPLEMENTATION TRIGGERS (always recommend when these findings are present):
+- pH low on UA → Cell Synergy or Trisalts
+- Protein positive on UA → X39 patches
+- VCS failed → Pectasol-C or Leptin protocols
+- D-Pulse RED markers → specific supplements from Sunday sessions
+- HRV autonomic dysfunction → relevant support supplements
+- Blood panel abnormalities → targeted supplementation (when labs available)
+
+Base ALL supplement recommendations on Dr. Rob's Sunday session content.`}
 
 REMEMBER (CRITICAL):
 1. Use ONLY frequency NAMES from the approved list - NO Hz values like "40/116" EVER
 2. Valid examples: "Liver Inflame", "PNS Support", "Thyroid 1" - NOT "40/116" or "40 Hz"
 3. Cite which document section supports each recommendation
-4. Prioritize protocols based on deal breakers and "seven deal breakers"
-5. Follow the diagnostic analysis order: HRV → Brainwave → D-Pulse → UA → VCS → Labs
-6. If unsure about a frequency name, DO NOT include it - only use exact matches from approved list
+4. Follow the diagnostic analysis order: HRV → Brainwave → D-Pulse → UA → VCS → Labs
+5. If unsure about a frequency name, DO NOT include it - only use exact matches from approved list
 `
 
   const systemPrompt = userRole === 'practitioner'
     ? DR_ROB_PRACTITIONER_PROMPT
     : DR_ROB_MEMBER_PROMPT
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+  const response = await client.messages.create({
+    model: getAnalysisModel(),
+    max_tokens: 4000,
+    temperature: 0.7,
+    system: systemPrompt + JSON_SYSTEM_SUFFIX,
     messages: [
-      { role: 'system', content: systemPrompt },
       { role: 'user', content: userMessage },
     ],
-    response_format: { type: 'json_object' },
-    temperature: 0.7,
-    max_tokens: 4000,
   })
 
-  const content = response.choices[0]?.message?.content
+  const textBlock = response.content.find((b) => b.type === 'text')
+  const content = textBlock && 'text' in textBlock ? textBlock.text : null
   if (!content) {
     throw new Error('No response from AI')
   }
 
   try {
-    const parsed = JSON.parse(content)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = extractJSON<any>(content)
 
     // Handle member response format (insights instead of protocols)
     if (userRole === 'member') {
@@ -863,10 +1218,25 @@ REMEMBER (CRITICAL):
       )
     }
 
+    // Post-processing: ensure layer fields exist on supplementation (fallback for older models)
+    const rawSupplementation = (parsed.supplementation || []) as Supplementation[]
+    const supplementation: Supplementation[] = rawSupplementation.map(s => {
+      if (s.layer && typeof s.layer === 'number') return s
+      // Derive layer from supplement name heuristics
+      const name = (s.name || '').toLowerCase()
+      const day1Names = ['cell synergy', 'tri-salts', 'trisalts', 'pectasol', 'x-39', 'x39', 'serculate', 'coq10', 'vagus nerve']
+      const layer2Names = ['vitamin d', 'ip6 gold', 'ip6gold', 'homocysteine', 'adipothin', 'livergy', 'pancreos']
+      const layer3Names = ['epi pineal', 'hypothala', 'rejuvenation', 'fatty 15', 'deuterium']
+      if (day1Names.some(n => name.includes(n))) return { ...s, layer: 1 }
+      if (layer2Names.some(n => name.includes(n))) return { ...s, layer: 2 }
+      if (layer3Names.some(n => name.includes(n))) return { ...s, layer: 3 }
+      return { ...s, layer: 0 }
+    })
+
     return {
       summary: parsed.summary as string,
       protocols,
-      supplementation: parsed.supplementation || [],
+      supplementation,
       reasoningChain: (parsed.reasoning_chain as string[]) || [],
     }
   } catch (parseError) {
@@ -907,7 +1277,10 @@ export async function saveAnalysisToDatabase(
           chunk_id: c.chunk_id,
           document_id: c.document_id,
           title: c.title,
+          filename: c.filename,
           similarity: c.similarity,
+          seminar_day: c.seminar_day,
+          search_phase: c.search_phase,
         })),
       },
     })

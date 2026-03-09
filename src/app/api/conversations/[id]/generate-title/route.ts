@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { getOpenAIClient } from '@/lib/openai'
+import { getAnthropicClient } from '@/lib/anthropic'
 import { NextResponse } from 'next/server'
+import { getDefaultFastModel } from '@/lib/ai/provider'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,27 +57,24 @@ export async function POST(request: Request, { params }: RouteParams) {
       .map((m) => `${m.role}: ${m.content.slice(0, 500)}`)
       .join('\n')
 
-    // Generate title using OpenAI
-    const openai = getOpenAIClient()
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    // Generate title using the configured Anthropic model
+    const client = getAnthropicClient()
+    const completion = await client.messages.create({
+      model: getDefaultFastModel(),
+      max_tokens: 30,
+      temperature: 0.7,
+      system: 'You are a title generator. Generate a concise, descriptive title (3-6 words) for the following conversation. The title should capture the main topic or intent. Return only the title text, nothing else.',
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are a title generator. Generate a concise, descriptive title (3-6 words) for the following conversation. The title should capture the main topic or intent. Return only the title text, nothing else.',
-        },
         {
           role: 'user',
           content: conversationText,
         },
       ],
-      max_tokens: 30,
-      temperature: 0.7,
     })
 
+    const textBlock = completion.content.find((b) => b.type === 'text')
     const generatedTitle =
-      completion.choices[0]?.message?.content?.trim() || 'New Conversation'
+      (textBlock && 'text' in textBlock ? textBlock.text.trim() : null) || 'New Conversation'
 
     // Update the conversation title
     const { error: updateError } = await supabase

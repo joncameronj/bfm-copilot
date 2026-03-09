@@ -1,5 +1,5 @@
 // Lab Panel Vision Extractor
-// Extracts lab values from images using GPT-4o Vision API
+// Extracts lab values from images using Anthropic Vision API
 
 import { extractFromImage } from '../vision-client'
 import { LAB_PANEL_SYSTEM_PROMPT, LAB_PANEL_USER_PROMPT } from '../prompts/lab-panel-prompt'

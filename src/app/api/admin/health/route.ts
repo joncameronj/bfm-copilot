@@ -4,9 +4,7 @@ import {
   checkSupabaseDatabase,
   checkSupabaseAuth,
   checkPythonAgent,
-  checkOpenAI,
-  checkInternalEndpoint,
-  INTERNAL_ENDPOINTS
+  checkAnthropic
 } from '@/lib/health/checkers'
 import {
   HealthCheckResponse,
@@ -56,22 +54,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Get session for internal endpoint checks
-  const { data: { session } } = await supabase.auth.getSession()
-  const authToken = session?.access_token || ''
-
-  // Determine base URL for internal checks
-  const baseUrl = new URL(request.url).origin
-
   // Run all health checks in parallel
   const checkPromises = [
     checkSupabaseDatabase(),
     checkSupabaseAuth(),
     checkPythonAgent(),
-    checkOpenAI(),
-    ...INTERNAL_ENDPOINTS.map(ep =>
-      checkInternalEndpoint(ep.name, ep.path, baseUrl, authToken)
-    ),
+    checkAnthropic(),
   ]
 
   const results = await Promise.allSettled(checkPromises)

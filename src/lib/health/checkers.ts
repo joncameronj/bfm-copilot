@@ -5,8 +5,9 @@ import {
   ServiceCategory,
   RESPONSE_TIME_THRESHOLDS
 } from '@/types/health'
+import { getPythonAgentUrl } from '@/lib/agent/url'
 
-const PYTHON_AGENT_URL = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
+const PYTHON_AGENT_URL = getPythonAgentUrl()
 const CHECK_TIMEOUT_MS = 5000
 
 // Helper to determine status from response time
@@ -175,17 +176,33 @@ export async function checkPythonAgent(): Promise<ServiceHealth> {
   }
 }
 
-// Check OpenAI API connectivity
-export async function checkOpenAI(): Promise<ServiceHealth> {
+// Check Anthropic API connectivity
+export async function checkAnthropic(): Promise<ServiceHealth> {
+  const serviceName = 'Anthropic API'
+  const apiKey = process.env.ANTHROPIC_API_KEY
+
+  if (!apiKey) {
+    return {
+      name: serviceName,
+      category: 'external',
+      status: 'unhealthy',
+      responseTimeMs: 0,
+      lastChecked: new Date().toISOString(),
+      error: 'ANTHROPIC_API_KEY is not configured',
+    }
+  }
+
   const start = performance.now()
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS)
 
-    const response = await fetch('https://api.openai.com/v1/models', {
+    // Lightweight probe — list models endpoint
+    const response = await fetch('https://api.anthropic.com/v1/models', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       signal: controller.signal,
     })
@@ -194,7 +211,7 @@ export async function checkOpenAI(): Promise<ServiceHealth> {
     const responseTimeMs = Math.round(performance.now() - start)
 
     return {
-      name: 'OpenAI API',
+      name: serviceName,
       category: 'external',
       status: response.ok
         ? getStatusFromResponseTime(responseTimeMs, 'external')
@@ -206,7 +223,7 @@ export async function checkOpenAI(): Promise<ServiceHealth> {
     }
   } catch (error) {
     return {
-      name: 'OpenAI API',
+      name: serviceName,
       category: 'external',
       status: 'unhealthy',
       responseTimeMs: Math.round(performance.now() - start),
@@ -217,68 +234,3 @@ export async function checkOpenAI(): Promise<ServiceHealth> {
     }
   }
 }
-
-// Internal endpoint checker - checks if an endpoint returns 2xx
-export async function checkInternalEndpoint(
-  name: string,
-  path: string,
-  baseUrl: string,
-  authToken: string
-): Promise<ServiceHealth> {
-  const start = performance.now()
-  try {
-    const result = await timedFetch(`${baseUrl}${path}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    // Handle auth errors as degraded (endpoint exists but auth token may be invalid/missing)
-    const isAuthError = result.status === 401 || result.status === 403
-    const status = result.ok
-      ? getStatusFromResponseTime(result.responseTimeMs, 'internal')
-      : isAuthError
-        ? 'degraded'
-        : 'unhealthy'
-
-    return {
-      name,
-      category: 'internal',
-      status,
-      responseTimeMs: result.responseTimeMs,
-      lastChecked: new Date().toISOString(),
-      message: result.ok
-        ? 'Endpoint responding'
-        : isAuthError
-          ? 'Endpoint reachable but requires auth'
-          : undefined,
-      error: result.ok
-        ? undefined
-        : `HTTP ${result.status}${isAuthError ? ' (auth required)' : ''}`,
-    }
-  } catch (error) {
-    return {
-      name,
-      category: 'internal',
-      status: 'unhealthy',
-      responseTimeMs: Math.round(performance.now() - start),
-      lastChecked: new Date().toISOString(),
-      error: error instanceof Error
-        ? (error.name === 'AbortError' ? 'Request timeout' : error.message)
-        : 'Connection failed',
-    }
-  }
-}
-
-// List of internal endpoints to check
-export const INTERNAL_ENDPOINTS = [
-  { name: 'Conversations API', path: '/api/conversations' },
-  { name: 'Patients API', path: '/api/patients' },
-  { name: 'Labs Results API', path: '/api/labs/results' },
-  { name: 'Dashboard Stats API', path: '/api/dashboard/stats' },
-  { name: 'Settings Profile API', path: '/api/settings/profile' },
-  { name: 'Admin Users API', path: '/api/admin/users' },
-  { name: 'Diagnostics API', path: '/api/diagnostics' },
-]

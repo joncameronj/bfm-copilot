@@ -1,16 +1,12 @@
 // Vision API Client for Diagnostic File Extraction
-// Uses GPT-4o Vision to extract structured data from diagnostic images
+// Uses Anthropic Vision to extract structured data from diagnostic images
 
-import { getOpenAIClient } from '@/lib/openai'
+import { getAnthropicClient, extractJSON, JSON_SYSTEM_SUFFIX } from '@/lib/anthropic'
+import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { ExtractionResult } from '@/types/diagnostic-extraction'
 
-interface VisionMessage {
-  role: 'system' | 'user'
-  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string; detail: 'high' | 'low' | 'auto' } }>
-}
-
 /**
- * Extract structured data from an image using GPT-4o Vision
+ * Extract structured data from an image using Anthropic Vision
  */
 export async function extractFromImage<T>(
   imageUrl: string,
@@ -18,35 +14,34 @@ export async function extractFromImage<T>(
   userPrompt: string,
   maxTokens: number = 4000
 ): Promise<ExtractionResult<T>> {
-  const openai = getOpenAIClient()
+  const client = getAnthropicClient()
+  const model = getDefaultVisionModel()
 
   try {
-    const messages: VisionMessage[] = [
-      { role: 'system', content: systemPrompt },
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: userPrompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: imageUrl,
-              detail: 'high', // High detail for diagnostic images
-            },
-          },
-        ],
-      },
-    ]
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: messages as Parameters<typeof openai.chat.completions.create>[0]['messages'],
-      response_format: { type: 'json_object' },
+    const response = await client.messages.create({
+      model,
       max_tokens: maxTokens,
-      temperature: 0.1, // Low temperature for accuracy
+      temperature: 0.1,
+      system: systemPrompt + JSON_SYSTEM_SUFFIX,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: userPrompt },
+            {
+              type: 'image',
+              source: {
+                type: 'url',
+                url: imageUrl,
+              },
+            },
+          ],
+        },
+      ],
     })
 
-    const content = response.choices[0]?.message?.content
+    const textBlock = response.content.find((b) => b.type === 'text')
+    const content = textBlock && 'text' in textBlock ? textBlock.text : null
     if (!content) {
       return {
         success: false,
@@ -57,7 +52,7 @@ export async function extractFromImage<T>(
       }
     }
 
-    const parsed = JSON.parse(content) as T & { confidence?: number }
+    const parsed = extractJSON<T & { confidence?: number }>(content)
     return {
       success: true,
       data: parsed,
@@ -85,31 +80,33 @@ export async function extractFromMultipleImages<T>(
   userPrompt: string,
   maxTokens: number = 4000
 ): Promise<ExtractionResult<T>> {
-  const openai = getOpenAIClient()
+  const client = getAnthropicClient()
+  const model = getDefaultVisionModel()
 
   try {
     const imageContent = imageUrls.map((url) => ({
-      type: 'image_url' as const,
-      image_url: { url, detail: 'high' as const },
+      type: 'image' as const,
+      source: {
+        type: 'url' as const,
+        url,
+      },
     }))
 
-    const messages: VisionMessage[] = [
-      { role: 'system', content: systemPrompt },
-      {
-        role: 'user',
-        content: [{ type: 'text', text: userPrompt }, ...imageContent],
-      },
-    ]
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: messages as Parameters<typeof openai.chat.completions.create>[0]['messages'],
-      response_format: { type: 'json_object' },
+    const response = await client.messages.create({
+      model,
       max_tokens: maxTokens,
       temperature: 0.1,
+      system: systemPrompt + JSON_SYSTEM_SUFFIX,
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text' as const, text: userPrompt }, ...imageContent],
+        },
+      ],
     })
 
-    const content = response.choices[0]?.message?.content
+    const textBlock = response.content.find((b) => b.type === 'text')
+    const content = textBlock && 'text' in textBlock ? textBlock.text : null
     if (!content) {
       return {
         success: false,
@@ -120,7 +117,7 @@ export async function extractFromMultipleImages<T>(
       }
     }
 
-    const parsed = JSON.parse(content) as T & { confidence?: number }
+    const parsed = extractJSON<T & { confidence?: number }>(content)
     return {
       success: true,
       data: parsed,
