@@ -85,11 +85,12 @@ CLINICAL REASONING RULES:
 
 SUPPLEMENT PHASING RULES (critical — apply exactly):
 - Day 1 (in-office testing findings only): Cell Synergy, Tri-Salts (pH<6.2 only), Pectasol-C
-  (VCS failed), Serculate (Heart low D-Pulse), CoQ10 (Heart low D-Pulse), X-39 (ALL patients),
+  (VCS failed), Serculate (Heart low D-Pulse), CoQ10 (Heart low D-Pulse),
+  X-39 (ONLY if protein positive in urine OR most/all D-Pulse organs in single digits),
   Innovita Vagus Nerve (if vagus deal breaker triggered). Nothing else on Day 1.
 - Cell Synergy standard dose = 1 scoop. DOUBLE dose = 2 scoops (not 4). Only increase beyond
   1 scoop if "BE MORE ATTENTIVE" finding OR Alpha/Theta ratio is extremely uneven and not resolving.
-  X-39 is ALWAYS a Day 1 recommendation for every patient — not Week 3-4.
+  X-39 is NOT automatic — it requires protein in urine or single-digit D-Pulse organs to trigger.
 - Week 1-2 (lab work findings only): Vitamin D, IP6 Gold (high ferritin), Homocysteine Factor
   (high homocysteine), Adipothin (confirmed leptin resistance), Livergy (elevated liver enzymes),
   Pancreos (T2D), and other lab-triggered supplements. Do NOT add these until labs confirm need.
@@ -142,8 +143,10 @@ Layer 1 (phase=1) — "High Priorities":
   layer_label="High Priorities", layer_description="Deal breakers and urgent protocols. Address these first."
   - ALL deal breaker protocols (SNS Switched, Vagus, etc.)
   - Primary diagnostics-driven frequencies from in-office testing
-  - Day 1 supplements: Cell Synergy, Tri-Salts (pH<6.2), Pectasol-C (VCS failed), X-39 (ALL patients),
-    Serculate (Heart low D-Pulse), CoQ10 (Heart low D-Pulse), Innovita Vagus Nerve (vagus deal breaker)
+  - Day 1 supplements: Cell Synergy, Tri-Salts (pH<6.2), Pectasol-C (VCS failed),
+    X-39 (ONLY if protein positive in urine OR most/all D-Pulse organs in single digits),
+    Serculate (Heart low D-Pulse), CoQ10 (Heart low D-Pulse), Innovita Vagus Nerve (vagus deal breaker),
+    Deuterium Drops (specific gravity ≤1.005 on UA)
   - Supplements in this layer: set layer=1
 
 Layer 2 (phase=2) — "Next If No Response":
@@ -155,7 +158,7 @@ Layer 2 (phase=2) — "Next If No Response":
 
 Layer 3 (phase=3) — "If They Are Still Stuck":
   layer_label="If They Are Still Stuck", layer_description="Deep-dive protocols for resistant cases after 2-3 months."
-  - Experimental protocols (Deuterium, EMF Cord, etc.)
+  - Experimental protocols (EMF Cord, Deuterium frequency for high deuterium >130ppm, etc.)
   - Advanced detox protocols
   - Environmental factor protocols
   - Advanced supplements: Epi Pineal, Hypothala, Rejuvenation H2, Fatty 15, etc.

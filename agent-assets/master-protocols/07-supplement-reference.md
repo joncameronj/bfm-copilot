@@ -174,6 +174,22 @@ in the BFM protocol system.
 
 ---
 
+## Supplement: Deuterium Drops
+
+**What It Does:** Supports cellular deuterium management when metabolic water production is impaired
+
+**Dosage:** Per BFM dosing protocol
+
+**Timing / Instructions:** Daily
+
+**When to Use (Indications):** Low specific gravity on urinalysis (1.005 or below); redox findings on labs
+
+**Brand / Source:** BFM
+
+**Module(s):** General, Metabolic
+
+---
+
 ## Supplement: Deuterium Homeopathic
 
 **What It Does:** Mito deuterium removal
@@ -382,8 +398,8 @@ in the BFM protocol system.
 
 **Timing / Instructions:** Nightly; C7 or below belly button or injury site
 
-**When to Use (Indications):** UB rates; protein spilling; injuries; energy
-Thyroid: over thyroid 2 wks, alternate with Glutathione
+**When to Use (Indications):** ONLY when triggered by: (1) protein positive in urine (protein spilling), or (2) most/all D-Pulse organs in single digits (severe systemic depletion). NOT automatic for every patient.
+Also used for: injuries; thyroid (over thyroid 2 wks, alternate with Glutathione)
 
 **Brand / Source:** Life Wave ($99/mo wholesale)
 
