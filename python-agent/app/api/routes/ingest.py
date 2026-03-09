@@ -5,6 +5,9 @@ from pptx import Presentation
 
 from app.config import get_settings, Settings
 from app.embeddings.indexer import index_document
+from app.utils.logger import get_logger
+
+logger = get_logger("ingest")
 
 router = APIRouter()
 
@@ -202,4 +205,4 @@ async def process_document_task(
             text_content=text_content,
         )
     except Exception as e:
-        print(f"Error indexing document {filename}: {e}")
+        logger.error(f"Error indexing document {filename}: {e}")

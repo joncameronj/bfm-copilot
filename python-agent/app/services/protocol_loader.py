@@ -101,15 +101,31 @@ def get_known_supplements() -> set[str]:
     """
     Get the set of known supplement names for protocol detection.
 
-    Currently hardcoded as supplements are not in a separate DB table.
-    Can be extended to fetch from database if a table is added.
+    Based on the BFM Master Protocol Key supplement reference.
 
     Returns:
         Set of lowercase supplement names
     """
     return {
-        "serculate", "cell synergy", "tri salts", "x39", "x-39",
-        "deuterium drops", "deuterium", "pectasol-c", "pectasol", "apex",
+        # Core supplements from Deal Breakers
+        "cell synergy", "tri salts", "tri-salts", "d-ribose",
+        "pectasol-c", "pectasol", "apex",
+        "serculate", "serculate (innovita)",
+        # Innovita product line
+        "innovita", "livergy", "thyroiden", "mitokond", "kidney clear",
+        "hypothala", "adipothin", "epi pineal",
+        "vagus nerve form code", "innovita vagus nerve form code",
+        # Patches and devices
+        "x39", "x-39", "lifewave", "glutathione patch",
+        # Cellular / mitochondrial support
+        "coq10", "integra cell", "ip6 gold", "mito synergy",
+        "fatty 15", "homocysteine factor",
+        # DrinkHRW
+        "rejuvenation", "rejuvenation (drinkhrw)", "drinkhrw",
+        # Detox / pH
+        "deuterium drops", "deuterium",
+        # Other named supplements from master key
+        "ion gut health",
     }
 
 
@@ -215,20 +231,47 @@ def get_supplement_patterns() -> list[str]:
     """
     Get regex patterns for supplement detection.
 
-    Currently hardcoded as supplements are not in a separate DB table.
+    Based on the BFM Master Protocol Key supplement reference.
 
     Returns:
         List of regex patterns for supplement detection
     """
     return [
+        # Core supplements
         r"\b(Serculate)\b",
         r"\b(Cell\s*Synergy)\b",
-        r"\b(Tri\s*Salts)\b",
-        r"\b(X[-\s]?39)\b",
-        r"\b(Deuterium\s*Drops?|Deuterium)\b",
+        r"\b(Tri[-\s]?Salts)\b",
+        r"\b(D[-\s]?Ribose)\b",
         r"\b(Pectasol[-\s]?C|Pectasol)\b",
         r"\b(Apex)\b",
+        # Innovita product line
+        r"\b(Innovita)\b",
+        r"\b(Livergy)\b",
+        r"\b(Thyroiden)\b",
+        r"\b(MitoKond)\b",
+        r"\b(Kidney\s*Clear)\b",
+        r"\b(Hypothala)\b",
+        r"\b(Adipothin)\b",
+        r"\b(Epi\s*Pineal)\b",
+        r"\b(Vagus\s*Nerve\s*form\s*code)\b",
+        # Patches and devices
+        r"\b(X[-\s]?39)\b",
         r"\b(LifeWave)\b",
+        r"\b(Glutathione\s*Patch)\b",
+        # Cellular / mitochondrial
+        r"\b(CoQ10)\b",
+        r"\b(Integra\s*Cell)\b",
+        r"\b(IP6\s*Gold)\b",
+        r"\b(Mito\s*Synergy)\b",
+        r"\b(Fatty\s*15)\b",
+        r"\b(Homocysteine\s*Factor)\b",
+        # DrinkHRW
+        r"\b(Rejuvenation)\b",
+        r"\b(DrinkHRW)\b",
+        # Detox
+        r"\b(Deuterium\s*Drops?|Deuterium)\b",
+        # Other
+        r"\b(Ion\s*Gut\s*Health)\b",
     ]
 
 

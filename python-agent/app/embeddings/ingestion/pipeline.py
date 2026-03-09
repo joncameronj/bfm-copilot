@@ -14,6 +14,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from app.utils.logger import get_logger
+
+logger = get_logger("pipeline")
+
 from app.embeddings.preprocessing import (
     clean_transcript,
     CleaningConfig,
@@ -117,17 +121,17 @@ class IngestionPipeline:
         results = []
         categories = ["diabetes", "thyroid", "hormones", "neurological"]
 
-        print(f"\n{'='*60}")
-        print(f"BFM Asset Ingestion Pipeline")
-        print(f"Assets directory: {self.assets_dir}")
-        print(f"Dry run: {self.dry_run}")
-        print(f"Skip images: {self.skip_images}")
-        print(f"{'='*60}\n")
+        logger.info(f"{'='*60}")
+        logger.info(f"BFM Asset Ingestion Pipeline")
+        logger.info(f"Assets directory: {self.assets_dir}")
+        logger.info(f"Dry run: {self.dry_run}")
+        logger.info(f"Skip images: {self.skip_images}")
+        logger.info(f"{'='*60}")
 
         for category in categories:
             category_path = self.assets_dir / category
             if category_path.exists():
-                print(f"\nProcessing category: {category.upper()}")
+                logger.info(f"Processing category: {category.upper()}")
                 category_results = await self._process_category(category_path, category)
                 results.extend(category_results)
 
@@ -154,7 +158,7 @@ class IngestionPipeline:
         # 1. Process raw transcripts
         raw_data_path = category_path / "raw-data"
         if raw_data_path.exists():
-            print(f"  Processing raw transcripts...")
+            logger.info(f"  Processing raw transcripts...")
             for md_file in raw_data_path.glob("*.md"):
                 result = await self._process_markdown(md_file, category)
                 results.append(result)
@@ -162,7 +166,7 @@ class IngestionPipeline:
 
         # 2. Process frequency PDFs at category level
         for pdf_file in category_path.glob("*frequencies*.pdf"):
-            print(f"  Processing frequency PDF: {pdf_file.name}")
+            logger.info(f"  Processing frequency PDF: {pdf_file.name}")
             result = await self._process_pdf(pdf_file, category, "frequency_reference")
             results.append(result)
             self._update_stats(result)
@@ -170,7 +174,7 @@ class IngestionPipeline:
         # 3. Process case studies
         case_studies_path = category_path / f"{category}-casestudies"
         if case_studies_path.exists():
-            print(f"  Processing case studies...")
+            logger.info(f"  Processing case studies...")
             for case_dir in sorted(case_studies_path.iterdir()):
                 if case_dir.is_dir() and not case_dir.name.startswith("."):
                     case_results = await self._process_case_study(case_dir, category)
@@ -187,7 +191,7 @@ class IngestionPipeline:
         results = []
         case_id = case_dir.name
 
-        print(f"    Case study: {case_id}")
+        logger.info(f"    Case study: {case_id}")
 
         # Process images
         if not self.skip_images:
@@ -554,7 +558,7 @@ class IngestionPipeline:
         results = []
 
         for md_file in self.assets_dir.glob("*.md"):
-            print(f"Processing root file: {md_file.name}")
+            logger.info(f"Processing root file: {md_file.name}")
             result = await self._process_markdown(md_file, "general")
             results.append(result)
             self._update_stats(result)
@@ -664,30 +668,30 @@ class IngestionPipeline:
         self.stats.by_type[type_name] = self.stats.by_type.get(type_name, 0) + 1
 
     def _print_summary(self, results: list[ProcessingResult]) -> None:
-        """Print a summary of the ingestion run."""
-        print(f"\n{'='*60}")
-        print("INGESTION SUMMARY")
-        print(f"{'='*60}")
-        print(f"Total files:     {self.stats.total_files}")
-        print(f"Processed:       {self.stats.processed}")
-        print(f"Failed:          {self.stats.failed}")
-        print(f"Chunks created:  {self.stats.chunks_created}")
-        print(f"Tokens used:     {self.stats.tokens_used}")
-        print(f"\nBy Category:")
+        """Log a summary of the ingestion run."""
+        logger.info(f"{'='*60}")
+        logger.info("INGESTION SUMMARY")
+        logger.info(f"{'='*60}")
+        logger.info(f"Total files:     {self.stats.total_files}")
+        logger.info(f"Processed:       {self.stats.processed}")
+        logger.info(f"Failed:          {self.stats.failed}")
+        logger.info(f"Chunks created:  {self.stats.chunks_created}")
+        logger.info(f"Tokens used:     {self.stats.tokens_used}")
+        logger.info(f"By Category:")
         for cat, count in self.stats.by_category.items():
-            print(f"  {cat}: {count}")
-        print(f"\nBy Type:")
+            logger.info(f"  {cat}: {count}")
+        logger.info(f"By Type:")
         for type_name, count in self.stats.by_type.items():
-            print(f"  {type_name}: {count}")
+            logger.info(f"  {type_name}: {count}")
 
         if self.stats.errors:
-            print(f"\nErrors ({len(self.stats.errors)}):")
+            logger.error(f"Errors ({len(self.stats.errors)}):")
             for err in self.stats.errors[:5]:
-                print(f"  - {err['file']}: {err['error'][:50]}...")
+                logger.error(f"  - {err['file']}: {err['error'][:50]}...")
             if len(self.stats.errors) > 5:
-                print(f"  ... and {len(self.stats.errors) - 5} more")
+                logger.error(f"  ... and {len(self.stats.errors) - 5} more")
 
-        print(f"{'='*60}\n")
+        logger.info(f"{'='*60}")
 
 
 def _map_category_to_body_system(category: str) -> str:

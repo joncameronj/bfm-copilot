@@ -22,6 +22,10 @@ CLINICAL_PATTERNS = [
     r"\b(administer|prescribe|prescribed|prescription)\b",
     # Protocol terminology (when combined with specific instructions)
     r"\b(loading dose|maintenance dose|therapeutic dose)\b",
+    # Frequency/protocol specifics
+    r"\b\d+(?:\.\d+)?\s*hz\b",
+    r"\b(fsm|frequency protocol|protocol code)\b",
+    r"\b[A-Za-z][A-Za-z0-9\/\-\s]{2,40}\s\(\d{3,4}\)",
     # Specific treatment instructions
     r"\b(take|inject|infuse)\s+\d+",
 ]
@@ -105,7 +109,7 @@ class OutputValidator:
         """
         # Replace dosage mentions with general guidance
         filtered = CLINICAL_REGEX.sub(
-            "[specific dosing - consult your healthcare provider]",
+            "[clinical protocol detail - consult your healthcare provider]",
             response
         )
         return filtered + FILTERED_CONTENT_WARNING

@@ -84,7 +84,6 @@ def extract_protocols_from_text(text: str) -> dict[str, list[str]]:
 
 def normalize_protocol_name(name: str) -> str:
     """Normalize protocol names for consistent matching."""
-    # Common normalizations
     name = name.strip()
     # Handle X-39 / X39 variations
     name = re.sub(r"X[-\s]?39", "X-39", name, flags=re.IGNORECASE)
@@ -92,6 +91,12 @@ def normalize_protocol_name(name: str) -> str:
     name = re.sub(r"CP[-\s]?P", "CP-P", name, flags=re.IGNORECASE)
     # Handle Pectasol-C variations
     name = re.sub(r"Pectasol[-\s]?C?", "Pectasol-C", name, flags=re.IGNORECASE)
+    # Handle Vagus/Vagas/Vegas variations
+    name = re.sub(r"V[ae]g[au]s", "Vagus", name, flags=re.IGNORECASE)
+    # Handle Tri-Salts / Tri Salts
+    name = re.sub(r"Tri[-\s]?Salts", "Tri-Salts", name, flags=re.IGNORECASE)
+    # Handle D-Ribose / DRibose
+    name = re.sub(r"D[-\s]?Ribose", "D-Ribose", name, flags=re.IGNORECASE)
     return name
 
 

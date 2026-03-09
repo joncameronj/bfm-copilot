@@ -10,6 +10,8 @@ Provides intelligent knowledge base search that:
 6. Boosts results containing matching protocols (from diagnostic mappings)
 """
 
+import asyncio
+import hashlib
 import re
 import time
 import httpx
@@ -39,6 +41,12 @@ ROLE_SCOPE_MAP: dict[str, list[str]] = {
     "practitioner": ["clinical", "both"],
     "member": ["educational", "both"],
 }
+
+# Deep-dive retrieval controls for chat tool usage.
+DEEP_DIVE_NOTICE_PREFIX = "[DEEP_DIVE_NOTICE]"
+STANDARD_TOOL_MAX_LIMIT = 8
+DEEP_DIVE_TOOL_MAX_LIMIT = 20
+DEEP_DIVE_TOOL_MIN_LIMIT = 10
 
 
 @dataclass
@@ -251,16 +259,24 @@ def _boost_by_protocols(
             match_ratio = len(matched) / max(len(target_normalized), 1)
             protocol_boost = boost_factor * match_ratio
 
+            # Extra boost for master reference content (authoritative source)
+            if result.document_category == "master_reference":
+                protocol_boost *= 2.0
             # Extra boost for Sunday content (tactical/case study)
-            if result.seminar_day == "sunday":
+            elif result.seminar_day == "sunday":
                 protocol_boost *= 1.5
 
             result.matched_protocols = list(matched)
             result.protocol_boost = protocol_boost
             result.similarity = min(1.0, result.similarity + protocol_boost)
         else:
+            # Still boost master_reference docs even without protocol match
+            if result.document_category == "master_reference":
+                result.protocol_boost = boost_factor * 0.5
+                result.similarity = min(1.0, result.similarity + result.protocol_boost)
+            else:
+                result.protocol_boost = 0.0
             result.matched_protocols = []
-            result.protocol_boost = 0.0
 
         boosted_results.append(result)
 
@@ -308,13 +324,13 @@ async def sunday_first_search(
     min_sunday_results: int = 3,
 ) -> list[SearchResult]:
     """
-    Cascading search: Sunday first, then Saturday, then Friday.
+    Parallel search across all seminar days with Sunday prioritization.
 
     Strategy:
-    1. Search only Sunday docs first (tactical case studies, protocols)
-    2. If insufficient high-quality results, add Saturday docs
-    3. If still insufficient, add Friday docs
-    4. Always include case studies regardless of day
+    1. Run all three day searches in parallel (Sunday, Saturday, Friday)
+    2. Prioritize Sunday results (tactical case studies, protocols)
+    3. Include Saturday/Friday only if insufficient Sunday results
+    4. Deduplicate and boost by protocol matches
 
     Args:
         query: The search query
@@ -327,7 +343,7 @@ async def sunday_first_search(
         include_related: Whether to expand to related conditions
         limit: Maximum results to return
         threshold: Minimum similarity threshold
-        min_sunday_results: Minimum high-quality Sunday results before expanding
+        min_sunday_results: Minimum high-quality Sunday results before including other days
 
     Returns:
         List of SearchResult objects, prioritizing Sunday content
@@ -350,17 +366,25 @@ async def sunday_first_search(
         tag_names = analysis.all_tags() if analysis else None
         should_expand = include_related and (analysis.should_expand if analysis else True)
 
-        all_results: list[SearchResult] = []
+        # Run searches in parallel: master_reference + Sunday/Saturday/Friday
+        # Master reference docs are the authoritative protocol key and always searched
+        get_logger().info("[RAG] Running parallel search: master_reference + all seminar days")
+        parallel_start = time.time()
 
-        # Phase 1: Sunday only (tactical case studies and protocols)
-        log_search_params(
-            threshold=threshold,
-            limit=limit,
+        # Master reference search — always included, lower threshold
+        master_ref_task = _search_with_day_filter(
+            query_embedding=query_embedding,
+            user_id=user_id,
+            user_role=user_role,
+            seminar_day=None,  # No day filter
             body_systems=body_systems,
-            document_categories=document_categories,
-            seminar_day="sunday",
+            document_categories=["master_reference"],
+            tag_names=tag_names,
+            include_related=should_expand,
+            threshold=max(threshold - 0.10, 0.30),  # Lower threshold for master ref
+            limit=5,
         )
-        sunday_results = await _search_with_day_filter(
+        sunday_task = _search_with_day_filter(
             query_embedding=query_embedding,
             user_id=user_id,
             user_role=user_role,
@@ -372,60 +396,55 @@ async def sunday_first_search(
             threshold=threshold,
             limit=limit,
         )
-        all_results.extend(sunday_results)
+        saturday_task = _search_with_day_filter(
+            query_embedding=query_embedding,
+            user_id=user_id,
+            user_role=user_role,
+            seminar_day="saturday",
+            body_systems=body_systems,
+            document_categories=document_categories,
+            tag_names=tag_names,
+            include_related=should_expand,
+            threshold=threshold,
+            limit=limit // 2,
+        )
+        friday_task = _search_with_day_filter(
+            query_embedding=query_embedding,
+            user_id=user_id,
+            user_role=user_role,
+            seminar_day="friday",
+            body_systems=body_systems,
+            document_categories=document_categories,
+            tag_names=tag_names,
+            include_related=should_expand,
+            threshold=threshold,
+            limit=limit // 3,
+        )
 
-        # Count high-quality Sunday results
-        high_quality_count = len([r for r in sunday_results if r.similarity >= threshold])
-        get_logger().info(f"[RAG] Sunday search: {len(sunday_results)} results, {high_quality_count} high-quality")
+        master_results, sunday_results, saturday_results, friday_results = await asyncio.gather(
+            master_ref_task, sunday_task, saturday_task, friday_task
+        )
 
-        # Phase 2: Add Saturday if insufficient Sunday results
-        if high_quality_count < min_sunday_results:
-            log_search_params(
-                threshold=threshold,
-                limit=limit // 2,
-                body_systems=body_systems,
-                document_categories=document_categories,
-                seminar_day="saturday",
-            )
-            saturday_results = await _search_with_day_filter(
-                query_embedding=query_embedding,
-                user_id=user_id,
-                user_role=user_role,
-                seminar_day="saturday",
-                body_systems=body_systems,
-                document_categories=document_categories,
-                tag_names=tag_names,
-                include_related=should_expand,
-                threshold=threshold,
-                limit=limit // 2,
-            )
+        parallel_elapsed = time.time() - parallel_start
+        get_logger().info(f"[PERF] Parallel search took {parallel_elapsed:.2f}s")
+
+        # Count high-quality results
+        high_quality_sunday = len([r for r in sunday_results if r.similarity >= threshold])
+        get_logger().info(
+            f"[RAG] Search results: Master={len(master_results)}, "
+            f"Sunday={len(sunday_results)} ({high_quality_sunday} HQ), "
+            f"Saturday={len(saturday_results)}, Friday={len(friday_results)}"
+        )
+
+        # Build final result list: master_reference first, then Sunday
+        all_results: list[SearchResult] = list(master_results) + list(sunday_results)
+
+        # Only include Saturday/Friday if insufficient Sunday results
+        if high_quality_sunday < min_sunday_results:
             all_results.extend(saturday_results)
-            get_logger().info(f"[RAG] Saturday search: {len(saturday_results)} additional results")
-
-            # Phase 3: Add Friday if still insufficient (last resort)
             total_high_quality = len([r for r in all_results if r.similarity >= threshold])
             if total_high_quality < min_sunday_results + 2:
-                log_search_params(
-                    threshold=threshold,
-                    limit=limit // 3,
-                    body_systems=body_systems,
-                    document_categories=document_categories,
-                    seminar_day="friday",
-                )
-                friday_results = await _search_with_day_filter(
-                    query_embedding=query_embedding,
-                    user_id=user_id,
-                    user_role=user_role,
-                    seminar_day="friday",
-                    body_systems=body_systems,
-                    document_categories=document_categories,
-                    tag_names=tag_names,
-                    include_related=should_expand,
-                    threshold=threshold,
-                    limit=limit // 3,
-                )
                 all_results.extend(friday_results)
-                get_logger().info(f"[RAG] Friday search: {len(friday_results)} additional results")
 
         # Deduplicate results
         deduped = _deduplicate_results(all_results)
@@ -617,18 +636,27 @@ async def search_knowledge_base(
         should_expand=analysis.should_expand,
     )
 
-    # Map file_types to document_categories if provided
-    category_map = {
-        "medical_protocol": "protocol",
-        "lab_interpretation": "lab_guide",
-        "diagnostic_report": "care_guide",
-        "ip_material": "reference",
+    # Map file_types to document_categories if provided.
+    # IMPORTANT: include seminar_transcript so Sunday session chunks are not
+    # accidentally excluded when callers pass file_type filters.
+    # IMPORTANT: always include master_reference — these are the authoritative
+    # source of truth for all protocol decisions.
+    category_map: dict[str, list[str]] = {
+        "medical_protocol": ["protocol", "seminar_transcript", "master_reference"],
+        "lab_interpretation": ["lab_guide", "seminar_transcript", "master_reference"],
+        "diagnostic_report": ["care_guide", "seminar_transcript", "master_reference"],
+        "ip_material": ["seminar_transcript", "reference", "master_reference"],
     }
     document_categories = None
     if file_types:
-        document_categories = [
-            category_map.get(ft, ft) for ft in file_types if ft in category_map
-        ]
+        mapped_categories: list[str] = []
+        for ft in file_types:
+            mapped_categories.extend(category_map.get(ft, [ft]))
+        # Always include master_reference
+        if "master_reference" not in mapped_categories:
+            mapped_categories.append("master_reference")
+        # De-duplicate while preserving order.
+        document_categories = list(dict.fromkeys(mapped_categories))
 
     # Perform Sunday-first cascading search with role filtering
     # This prioritizes Sunday docs (tactical case studies) over Saturday/Friday
@@ -749,143 +777,89 @@ async def get_documents_by_tags(
     return result.data or []
 
 
-# Tool definition for the OpenAI Agents SDK
-RAG_SEARCH_TOOL_DEFINITION = {
-    "type": "function",
-    "function": {
-        "name": "search_knowledge_base",
-        "description": """Search the health knowledge base for protocols, lab interpretation guides,
-        and clinical documentation. This tool intelligently expands searches to include related
-        conditions. For example, when searching for thyroid issues, it will also find adrenal
-        and iron deficiency protocols that commonly co-occur.
-
-        Use this tool to find evidence-based guidelines and reference materials relevant to
-        the current patient case or clinical question.""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query describing what information you need to find",
-                },
-                "file_types": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Optional filter for document types: medical_protocol, lab_interpretation, diagnostic_report, ip_material",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum number of results to return (default: 5)",
-                    "default": 5,
-                },
-            },
-            "required": ["query"],
-        },
-    },
-}
-
-# Smart search tool (alternative with more options)
-SMART_SEARCH_TOOL_DEFINITION = {
-    "type": "function",
-    "function": {
-        "name": "smart_search",
-        "description": """Advanced knowledge base search with body system and category filtering.
-        Use this for more targeted searches when you know the specific body system or document type.""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query",
-                },
-                "body_systems": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Filter by body systems: endocrine, cardiovascular, digestive, immune, nervous, etc.",
-                },
-                "document_categories": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Filter by category: protocol, lab_guide, care_guide, reference",
-                },
-                "include_related": {
-                    "type": "boolean",
-                    "description": "Whether to expand search to related conditions (default: true)",
-                    "default": True,
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum results (default: 10)",
-                    "default": 10,
-                },
-            },
-            "required": ["query"],
-        },
-    },
-}
-
-
 # =============================================================================
-# OpenAI Agents SDK Integration
+# Tool Schema + Handler for custom AgentRunner
 # =============================================================================
 
-def create_search_knowledge_base_tool(
+RAG_SEARCH_TOOL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "The search query describing what information you need to find",
+        },
+        "file_types": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional filter for document types: medical_protocol, lab_interpretation, diagnostic_report, ip_material",
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Maximum number of results to return (default: 5)",
+            "default": 5,
+        },
+    },
+    "required": ["query"],
+}
+
+RAG_SEARCH_TOOL_DESCRIPTION = """Search the BFM health knowledge base for protocols, lab interpretation guides,
+seminar presentations, and clinical documentation. This tool intelligently expands
+searches to include related conditions. For example, when searching for thyroid issues,
+it will also find adrenal and iron deficiency protocols that commonly co-occur.
+
+Content includes:
+- BFM Master Protocol Key (authoritative reference for all protocols, deal breakers,
+  lab mappings, condition protocols, supplements, contraindications, and the Five Levers)
+- BFM seminar slides (Friday/Saturday/Sunday sessions) with case studies and walkthroughs
+- Supplement reference with dosages, timing, indications, and brands
+- Frequency protocol details and mitochondrial frequency settings
+
+ALWAYS search this knowledge base before recommending any protocol, supplement, or
+frequency. The Master Protocol Key is the definitive source of truth."""
+
+
+def create_search_handler(
     user_id: str,
     user_role: Literal["admin", "practitioner", "member"],
     conversation_id: str | None = None,
+    deep_dive: bool = False,
 ):
-    """
-    Create a FunctionTool for the OpenAI Agents SDK with user context injected via closure.
+    """Create an async handler for the search tool with user context injected via closure."""
 
-    This wraps the existing search_knowledge_base function, preserving all its
-    functionality including role-based filtering, while making it compatible
-    with the Agents SDK.
+    def normalize_limit(requested_limit: int) -> tuple[int, str | None]:
+        normalized = max(1, requested_limit)
 
-    Args:
-        user_id: User ID for access control and logging
-        user_role: User role for content filtering
-        conversation_id: Optional conversation ID for logging
+        if deep_dive:
+            capped = min(max(normalized, DEEP_DIVE_TOOL_MIN_LIMIT), DEEP_DIVE_TOOL_MAX_LIMIT)
+            if capped != normalized:
+                return (
+                    capped,
+                    (
+                        f"{DEEP_DIVE_NOTICE_PREFIX} Retrieval capped at {capped} chunks "
+                        "(Deep Dive guardrail)."
+                    ),
+                )
+            return capped, None
 
-    Returns:
-        FunctionTool instance for the search_knowledge_base function
-    """
-    # Import here to avoid circular imports and only when SDK is used
-    from agents import function_tool
+        capped = min(normalized, STANDARD_TOOL_MAX_LIMIT)
+        return capped, None
 
-    @function_tool
-    async def search_knowledge_base_tool(
+    async def handler(
         query: str,
         file_types: list[str] | None = None,
         limit: int = 5,
     ) -> str:
-        """
-        Search the BFM health knowledge base for protocols, lab interpretation guides,
-        and clinical documentation.
-
-        This tool intelligently expands searches to include related conditions.
-        For example, when searching for thyroid issues, it will also find adrenal
-        and iron deficiency protocols that commonly co-occur.
-
-        Use this tool to find evidence-based guidelines and reference materials
-        relevant to the current patient case or clinical question.
-
-        Args:
-            query: The search query describing what information you need to find
-            file_types: Optional filter for document types (medical_protocol,
-                       lab_interpretation, diagnostic_report, ip_material)
-            limit: Maximum number of results to return (default: 5)
-
-        Returns:
-            Formatted search results with relevance scores and match types
-        """
-        # Call the existing search_knowledge_base function with injected context
-        return await search_knowledge_base(
+        normalized_limit, notice = normalize_limit(limit)
+        result = await search_knowledge_base(
             query=query,
-            user_id=user_id,  # Injected via closure
-            user_role=user_role,  # Injected via closure
-            conversation_id=conversation_id,  # Injected via closure
+            user_id=user_id,
+            user_role=user_role,
+            conversation_id=conversation_id,
             file_types=file_types,
-            limit=limit,
+            limit=normalized_limit,
         )
+        if notice:
+            return f"{notice}\n{result}"
+        return result
 
-    return search_knowledge_base_tool
+    return handler

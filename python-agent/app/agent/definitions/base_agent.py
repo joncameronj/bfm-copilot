@@ -1,19 +1,38 @@
 """
-Base Agent Definition - BFM Copilot agent using OpenAI Agents SDK.
+Base Agent Definition - BFM Copilot agent using the Anthropic SDK.
 
-Creates the main agent with role-based configuration, RAG tools,
+Creates the main agent configuration with role-based settings, RAG tools,
 and dynamic reasoning capabilities.
 """
 
+from dataclasses import dataclass
 from typing import Literal
 
-from agents import Agent, ModelSettings
-from openai.types.shared import Reasoning
-
 from app.agent.system_prompts import get_system_prompt
+from app.agent.tool_registry import ToolRegistry
 from app.models.messages import PatientContext
-from app.tools.rag_search import create_search_knowledge_base_tool
-from app.tools.web_search import create_web_search_tool
+from app.tools.rag_search import (
+    RAG_SEARCH_TOOL_SCHEMA,
+    RAG_SEARCH_TOOL_DESCRIPTION,
+    create_search_handler,
+)
+from app.tools.web_search import (
+    WEB_SEARCH_TOOL_SCHEMA,
+    WEB_SEARCH_TOOL_DESCRIPTION,
+    create_web_search_handler,
+)
+from app.services.ai_client import get_chat_model
+
+
+@dataclass
+class AgentConfig:
+    """Configuration for the BFM Copilot agent."""
+
+    name: str
+    model: str
+    instructions: str
+    tool_registry: ToolRegistry
+    reasoning_effort: str
 
 
 def create_base_agent(
@@ -23,10 +42,11 @@ def create_base_agent(
     reasoning_effort: str = "high",
     user_id: str = "system",
     conversation_id: str | None = None,
-    model: str = "gpt-5.2",
-) -> Agent:
+    model: str | None = None,
+    deep_dive: bool = False,
+) -> AgentConfig:
     """
-    Create the BFM Copilot agent with role-based configuration.
+    Create the BFM Copilot agent config with role-based configuration.
 
     This preserves all current functionality:
     - Role-based content filtering (system prompt)
@@ -41,11 +61,16 @@ def create_base_agent(
         reasoning_effort: Reasoning effort level (low, medium, high)
         user_id: User ID for RAG access control
         conversation_id: Optional conversation ID for logging
-        model: Model to use (default: gpt-5.2)
+        model: Model to use (default: from AI provider settings)
+        deep_dive: Whether to enable deep-dive retrieval guardrails for tool calls
 
     Returns:
-        Configured Agent instance
+        Configured AgentConfig instance
     """
+    # Get model from provider if not explicitly specified
+    if model is None:
+        model = get_chat_model()
+
     # Build system prompt with role-specific instructions
     instructions = get_system_prompt(
         conversation_type=conversation_type,
@@ -54,37 +79,37 @@ def create_base_agent(
         include_rag_instructions=True,
     )
 
-    # Create search tool with user context injected via closure
-    # This preserves the existing search_knowledge_base functionality
-    search_tool = create_search_knowledge_base_tool(
-        user_id=user_id,
-        user_role=user_role,
-        conversation_id=conversation_id,
-    )
+    # Build tool registry
+    tool_registry = ToolRegistry()
 
-    # Build tools list - all roles get RAG search
-    tools = [search_tool]
-
-    # Add web search tool for educational content lookup
-    # Available to all roles for research purposes
-    web_search_tool = create_web_search_tool()
-    tools.append(web_search_tool)
-
-    # Create agent with all current features preserved
-    agent = Agent(
-        name="bfm_copilot",
-        model=model,
-        instructions=instructions,
-        tools=tools,
-        model_settings=ModelSettings(
-            reasoning=Reasoning(
-                effort=reasoning_effort,  # Dynamic: low/medium/high
-                summary="detailed",
-            )
+    # Register RAG search tool with user context injected via closure
+    tool_registry.register(
+        name="search_knowledge_base",
+        description=RAG_SEARCH_TOOL_DESCRIPTION,
+        parameters=RAG_SEARCH_TOOL_SCHEMA,
+        handler=create_search_handler(
+            user_id=user_id,
+            user_role=user_role,
+            conversation_id=conversation_id,
+            deep_dive=deep_dive,
         ),
     )
 
-    return agent
+    # Register web search tool
+    tool_registry.register(
+        name="search_medical_sources",
+        description=WEB_SEARCH_TOOL_DESCRIPTION,
+        parameters=WEB_SEARCH_TOOL_SCHEMA,
+        handler=create_web_search_handler(),
+    )
+
+    return AgentConfig(
+        name="bfm_copilot",
+        model=model,
+        instructions=instructions,
+        tool_registry=tool_registry,
+        reasoning_effort=reasoning_effort,
+    )
 
 
 def determine_reasoning_effort(

@@ -9,6 +9,10 @@ import time
 import httpx
 from dataclasses import dataclass
 from typing import Optional
+from app.services.ai_client import get_chat_model
+from app.utils.logger import get_logger
+
+logger = get_logger("model_settings")
 
 
 @dataclass
@@ -27,20 +31,31 @@ class ModelSettingsService:
         self,
         api_url: str,
         cache_ttl_seconds: int = 60,
-        default_model: str = "gpt-5.2",
+        default_model: str | None = None,
         default_reasoning_effort: str = "high",
         default_reasoning_summary: str = "detailed",
         default_temperature: float = 0.8,
     ):
         self.api_url = api_url
         self.cache_ttl_seconds = cache_ttl_seconds
-        self.default_model = default_model
+        self.default_model = default_model or get_chat_model()
         self.default_reasoning_effort = default_reasoning_effort
         self.default_reasoning_summary = default_reasoning_summary
         self.default_temperature = default_temperature
 
         self._cached_settings: Optional[ModelSettings] = None
         self._cache_timestamp: float = 0
+
+    def _normalize_chat_model(self, chat_model: str) -> str:
+        """
+        Ensure model name matches Anthropic provider to avoid silent mismatches.
+        """
+        if chat_model.startswith(("gpt-", "o1", "o3", "grok-")):
+            fallback = get_chat_model()
+            logger.warning(f"Model '{chat_model}' does not match Anthropic provider. Using '{fallback}' instead.")
+            return fallback
+
+        return chat_model
 
     def _is_cache_valid(self) -> bool:
         """Check if the cached settings are still valid."""
@@ -76,7 +91,7 @@ class ModelSettingsService:
                 if response.status_code == 200:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
-                        chat_model=data.get("chat_model", self.default_model),
+                        chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),
@@ -89,7 +104,7 @@ class ModelSettingsService:
 
         except Exception as e:
             # API unavailable, use defaults
-            print(f"Failed to fetch model settings from API: {e}")
+            logger.warning(f"Failed to fetch model settings from API: {e}")
             return self._get_defaults()
 
     def get_settings_sync(self) -> ModelSettings:
@@ -110,7 +125,7 @@ class ModelSettingsService:
                 if response.status_code == 200:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
-                        chat_model=data.get("chat_model", self.default_model),
+                        chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),
@@ -121,7 +136,7 @@ class ModelSettingsService:
                     return self._get_defaults()
 
         except Exception as e:
-            print(f"Failed to fetch model settings from API: {e}")
+            logger.warning(f"Failed to fetch model settings from API: {e}")
             return self._get_defaults()
 
     def invalidate_cache(self) -> None:
@@ -144,7 +159,7 @@ def get_model_settings_service() -> ModelSettingsService:
 
 def init_model_settings_service(
     api_url: str,
-    default_model: str = "gpt-5.2",
+    default_model: str | None = None,
     default_reasoning_effort: str = "high",
     default_reasoning_summary: str = "detailed",
     default_temperature: float = 0.8,

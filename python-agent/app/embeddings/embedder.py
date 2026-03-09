@@ -1,22 +1,20 @@
-from openai import OpenAI
+import hashlib
 
-from app.config import get_settings
+from app.services.embeddings_client import create_embedding, create_embedding_batch_sync
 
-# Embedding model configuration
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIMENSIONS = 1536
-BATCH_SIZE = 100  # OpenAI recommends batches of up to 2048, we use 100 for safety
+# Batch size for embedding operations
+BATCH_SIZE = 100
 
-
-def get_openai_client() -> OpenAI:
-    """Get OpenAI client instance."""
-    settings = get_settings()
-    return OpenAI(api_key=settings.openai_api_key)
+# Embedding cache (in-memory, keyed by MD5 hash of query text)
+_embedding_cache: dict[str, list[float]] = {}
 
 
 async def get_embedding(text: str) -> list[float]:
     """
-    Generate embedding for a single text.
+    Generate embedding for a single text using async client with caching.
+
+    Uses MD5 hash of the text as cache key to avoid recomputing embeddings
+    for repeated queries. This saves 1-2s on repeated queries.
 
     Args:
         text: The text to embed
@@ -24,20 +22,25 @@ async def get_embedding(text: str) -> list[float]:
     Returns:
         List of floats representing the embedding vector
     """
-    client = get_openai_client()
+    # Check cache first
+    cache_key = hashlib.md5(text.encode()).hexdigest()
+    if cache_key in _embedding_cache:
+        return _embedding_cache[cache_key]
 
-    response = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=text,
-        dimensions=EMBEDDING_DIMENSIONS,
-    )
+    embedding = await create_embedding(text=text)
 
-    return response.data[0].embedding
+    # Cache the result
+    _embedding_cache[cache_key] = embedding
+
+    return embedding
 
 
 async def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
     """
     Generate embeddings for multiple texts in batches.
+
+    Uses synchronous client for batch operations (typically used in
+    ingestion scripts where async isn't critical).
 
     Args:
         texts: List of texts to embed
@@ -45,24 +48,10 @@ async def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
     Returns:
         List of embedding vectors in the same order as input
     """
-    client = get_openai_client()
-    all_embeddings = []
-
-    # Process in batches
-    for i in range(0, len(texts), BATCH_SIZE):
-        batch = texts[i : i + BATCH_SIZE]
-
-        response = client.embeddings.create(
-            model=EMBEDDING_MODEL,
-            input=batch,
-            dimensions=EMBEDDING_DIMENSIONS,
-        )
-
-        # Extract embeddings in order
-        batch_embeddings = [item.embedding for item in response.data]
-        all_embeddings.extend(batch_embeddings)
-
-    return all_embeddings
+    return create_embedding_batch_sync(
+        texts=texts,
+        batch_size=BATCH_SIZE,
+    )
 
 
 async def embed_query(query: str) -> list[float]:
@@ -72,3 +61,9 @@ async def embed_query(query: str) -> list[float]:
     This is an alias for get_embedding but named semantically for search use cases.
     """
     return await get_embedding(query)
+
+
+def clear_embedding_cache() -> None:
+    """Clear the embedding cache. Useful for testing or memory management."""
+    global _embedding_cache
+    _embedding_cache = {}

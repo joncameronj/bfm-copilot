@@ -104,23 +104,3 @@ def analyze_query_complexity(
         return "low"
     else:
         return "medium"
-
-
-# Test examples
-if __name__ == "__main__":
-    test_cases = [
-        ("What is HRV?", "low"),
-        ("Define insulin resistance", "low"),
-        ("What are thyroid antibodies?", "low"),
-        ("Explain the connection between thyroid and adrenal fatigue", "medium"),
-        ("Lab interpretation: TSH 2.5, Free T4 0.9", "medium"),
-        ("Patient has high TSH but normal T3/T4, experiencing fatigue, weight gain, and cold intolerance. What's going on?", "high"),
-        ("How should I treat this case: 45-year-old female, TSH 8.2, Free T4 low, high TPO antibodies, fatigue, weight gain, hair loss", "high"),
-        ("Differential diagnosis for: elevated cortisol, low DHEA, but low TSH despite high antibodies. Patient has neuropathy but normal glucose", "high"),
-        ("What protocols do you recommend for thyroid support?", "high"),
-    ]
-
-    for message, expected in test_cases:
-        result = analyze_query_complexity(message)
-        status = "✓" if result == expected else "✗"
-        print(f"{status} '{message[:50]}...' → {result} (expected {expected})")

@@ -13,6 +13,10 @@ class ChatRequest(BaseModel):
     # Role-based content filtering
     user_role: Literal["admin", "practitioner", "member"] = "member"
     user_id: str | None = None
+    # Force web search for this query
+    force_web_search: bool = False
+    # Enable high-depth Sunday-first retrieval and high reasoning for this request
+    deep_dive: bool = False
 
 
 class IngestRequest(BaseModel):

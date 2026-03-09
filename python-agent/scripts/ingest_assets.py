@@ -19,7 +19,7 @@ Usage:
     python scripts/ingest_assets.py --assets-dir ../agent-assets --skip-images
 
 Requirements:
-    - OPENAI_API_KEY environment variable
+    - ANTHROPIC_API_KEY environment variable
     - SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables
     - poppler installed for PDF image conversion (brew install poppler)
 """
@@ -104,7 +104,7 @@ async def main():
 
     # Check for required environment variables
     import os
-    required_vars = ["OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"]
+    required_vars = ["ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"]
     missing = [v for v in required_vars if not os.getenv(v)]
     if missing:
         print(f"Error: Missing required environment variables: {', '.join(missing)}")

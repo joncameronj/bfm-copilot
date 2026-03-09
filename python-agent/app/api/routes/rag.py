@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from app.tools.rag_search import smart_search, SearchResult
+from app.tools.rag_search import sunday_first_search, smart_search
 from app.tools.query_analyzer import analyze_query
 from app.embeddings.embedder import embed_query
 
@@ -56,6 +56,10 @@ class RagSearchRequest(BaseModel):
         default=True,
         description="Whether to expand search to related conditions",
     )
+    enforce_sunday_first: bool = Field(
+        default=True,
+        description="Whether to prioritize Sunday seminar chunks before other days",
+    )
 
 
 class RagSearchResultItem(BaseModel):
@@ -70,6 +74,8 @@ class RagSearchResultItem(BaseModel):
     similarity: float
     match_type: str
     matched_tags: list[str]
+    seminar_day: str | None
+    search_phase: str | None
 
 
 class RagSearchResponse(BaseModel):
@@ -96,17 +102,30 @@ async def rag_search(request: RagSearchRequest) -> RagSearchResponse:
     Returns search results with similarity scores and match types.
     """
     try:
-        results = await smart_search(
-            query=request.query,
-            user_id=request.user_id,
-            user_role=request.user_role,
-            conversation_id=request.conversation_id,
-            body_systems=request.body_systems,
-            document_categories=request.document_categories,
-            include_related=request.include_related,
-            limit=request.limit,
-            threshold=request.threshold,
-        )
+        if request.enforce_sunday_first:
+            results = await sunday_first_search(
+                query=request.query,
+                user_id=request.user_id,
+                user_role=request.user_role,
+                conversation_id=request.conversation_id,
+                body_systems=request.body_systems,
+                document_categories=request.document_categories,
+                include_related=request.include_related,
+                limit=request.limit,
+                threshold=request.threshold,
+            )
+        else:
+            results = await smart_search(
+                query=request.query,
+                user_id=request.user_id,
+                user_role=request.user_role,
+                conversation_id=request.conversation_id,
+                body_systems=request.body_systems,
+                document_categories=request.document_categories,
+                include_related=request.include_related,
+                limit=request.limit,
+                threshold=request.threshold,
+            )
 
         # Convert SearchResult objects to response model
         result_items = [
@@ -120,6 +139,14 @@ async def rag_search(request: RagSearchRequest) -> RagSearchResponse:
                 similarity=r.similarity,
                 match_type=r.match_type,
                 matched_tags=r.matched_tags,
+                seminar_day=r.seminar_day,
+                search_phase=(
+                    "sunday_primary"
+                    if r.seminar_day == "sunday"
+                    else "seminar_secondary"
+                    if r.seminar_day in {"friday", "saturday"}
+                    else None
+                ),
             )
             for r in results
         ]

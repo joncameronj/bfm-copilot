@@ -12,6 +12,10 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, TypeVar
 
+from app.utils.logger import get_logger
+
+logger = get_logger("batch")
+
 T = TypeVar("T")
 R = TypeVar("R")
 
@@ -127,15 +131,15 @@ async def process_in_batches(
 
 
 class ProgressReporter:
-    """Simple progress reporter that prints to console."""
+    """Simple progress reporter that logs to console."""
 
     def __init__(self, prefix: str = "Processing"):
         self.prefix = prefix
         self._last_percent = -1
 
     def __call__(self, progress: BatchProgress) -> None:
-        # Only print on significant progress changes
+        # Only log on significant progress changes
         current_percent = int(progress.percent)
         if current_percent > self._last_percent:
             self._last_percent = current_percent
-            print(f"{self.prefix}: {progress}")
+            logger.info(f"{self.prefix}: {progress}")

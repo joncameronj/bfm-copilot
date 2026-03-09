@@ -12,7 +12,10 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from openai import OpenAI
+from app.services.ai_client import get_sync_client, get_fast_model
+from app.utils.logger import get_logger
+
+logger = get_logger("markdown_cleaner")
 
 
 @dataclass
@@ -171,40 +174,32 @@ def _clean_formatting(content: str) -> str:
 
 def _detect_sections_with_llm(content: str, care_category: str) -> tuple[str, list[str]]:
     """
-    Use GPT to detect and insert section headers.
+    Use the configured fast model to detect and insert section headers.
 
     This is optional and adds latency/cost but can significantly improve
     the quality of transcripts for RAG retrieval.
     """
     try:
-        client = OpenAI()
+        client = get_sync_client()
+        model = get_fast_model()
 
         # Take a sample to analyze (don't send entire transcript)
         sample = content[:8000] if len(content) > 8000 else content
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"""You are analyzing a medical seminar transcript about {care_category}.
+        response = client.messages.create(
+            model=model,
+            system=f"""You are analyzing a medical seminar transcript about {care_category}.
 
 Identify the main topics discussed and return a JSON list of topics in the order they appear.
 Focus on clinical topics, conditions, lab markers, and treatments discussed.
 
 Return ONLY a JSON array of topic strings, like:
-["Introduction to {care_category}", "Key Lab Markers", "Treatment Protocols", "Case Discussion"]"""
-                },
-                {
-                    "role": "user",
-                    "content": sample
-                }
-            ],
+["Introduction to {care_category}", "Key Lab Markers", "Treatment Protocols", "Case Discussion"]""",
+            messages=[{"role": "user", "content": sample}],
             max_tokens=500,
-            temperature=0.3,
         )
 
-        topics_text = response.choices[0].message.content.strip()
+        topics_text = response.content[0].text.strip()
 
         # Parse the JSON response
         import json
@@ -218,7 +213,7 @@ Return ONLY a JSON array of topic strings, like:
         return content, []
 
     except Exception as e:
-        print(f"Warning: LLM section detection failed: {e}")
+        logger.warning(f"LLM section detection failed: {e}")
         return content, []
 
 

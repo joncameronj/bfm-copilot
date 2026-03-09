@@ -13,6 +13,9 @@ from functools import lru_cache
 from typing import Optional
 
 from app.services.supabase import get_supabase_client
+from app.utils.logger import get_logger
+
+logger = get_logger("prompt_service")
 
 # Default prompts (fallback if database unavailable)
 DEFAULT_PROMPTS = {
@@ -113,7 +116,7 @@ Practitioners have everything pre-loaded - they just need the protocol NAME.
 3. Give the EXACT supplement names Dr. Rob recommends (from Sunday sessions)
 4. Give the EXACT frequency protocol names and codes (from the uploaded frequency documents)
 5. Explain WHY these specific protocols/supplements are used - pull this explanation from Sunday sessions
-6. If you cannot find a specific approved protocol or supplement in the knowledge base, say "I don't have an approved protocol for this in my knowledge base" - NEVER make up or suggest generic alternatives
+6. If you cannot find a specific approved protocol or supplement after Sunday-first search, do NOT claim it is unapproved. Instead say you could not retrieve it from current Sunday context and ask for a narrower follow-up (condition/case details) to re-search.
 
 **FORBIDDEN (never output these):**
 - Generic supplement suggestions (e.g., "iron supplementation", "liver support")
@@ -172,14 +175,15 @@ The knowledge base contains Dr. Rob's methodologies organized by condition:
 - **Neurological**: Brain health, chronic pain, neuropathy
 
 ### Search Priority (MANDATORY - NO EXCEPTIONS)
-**For ALL questions, you MUST search SUNDAY SESSIONS FIRST and ONLY:**
+**For diagnostic-upload protocol generation, you MUST search SUNDAY SESSIONS FIRST:**
 - Diabetes Sunday session
 - Thyroid Sunday session
 - Hormones Sunday session
 - Neurological Sunday session
 
-**DO NOT search or pull from ANY other source first.** Sunday sessions contain Dr. Rob's protocols, supplement recommendations, and clinical reasoning. This is your ONLY primary source.
+Sunday sessions contain Dr. Rob's protocols, supplement recommendations, and clinical reasoning. This is your PRIMARY source.
 
+If Sunday evidence is insufficient, you may use non-Sunday seminar chunks as secondary support. When doing so, keep recommendations conservative and avoid adding low-confidence protocols.
 After finding the answer in Sunday sessions, you may reference frequency protocol documents for specific codes if needed.
 
 ### Search Protocol
@@ -188,6 +192,7 @@ After finding the answer in Sunday sessions, you may reference frequency protoco
 3. Cite the source document when referencing specific protocols: [Source: Document Title]
 4. If multiple documents are relevant, synthesize information across sources
 5. Reference case studies when the presentation matches
+6. For protocol generation, output the minimal viable set supported by diagnostic triggers and Sunday evidence first
 
 ### CRITICAL: Synthesize and Answer (DO NOT OVER-SEARCH)
 - **ONE search is usually enough** - if your first search returns relevant results, STOP searching and ANSWER immediately
@@ -251,7 +256,7 @@ class PromptService:
             return prompts
 
         except Exception as e:
-            print(f"Warning: Failed to load prompts from database: {e}")
+            logger.warning(f"Failed to load prompts from database: {e}")
             return {}
 
     def _ensure_cache_loaded(self) -> None:
@@ -301,7 +306,7 @@ class PromptService:
             return None
 
         except Exception as e:
-            print(f"Warning: Failed to get prompt metadata: {e}")
+            logger.warning(f"Failed to get prompt metadata: {e}")
             return None
 
     def refresh_cache(self) -> None:

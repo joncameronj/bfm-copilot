@@ -409,44 +409,53 @@ async def search_medical_sources(
 
 
 # =============================================================================
-# OpenAI Agents SDK Integration
+# Tool Schema + Handler for custom AgentRunner
 # =============================================================================
 
-def create_web_search_tool():
-    """
-    Create a FunctionTool for web search in the OpenAI Agents SDK.
+WEB_SEARCH_TOOL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "The search query (e.g., 'morning light circadian rhythm')",
+        },
+        "source_type": {
+            "type": "string",
+            "enum": ["pubmed", "general", "jackkruse", "all"],
+            "description": "Which source to search (default: all)",
+            "default": "all",
+        },
+        "max_results": {
+            "type": "integer",
+            "description": "Maximum results per source (default: 5)",
+            "default": 5,
+        },
+    },
+    "required": ["query"],
+}
 
-    Returns:
-        FunctionTool instance for the search_medical_sources function
-    """
-    from agents import function_tool
+WEB_SEARCH_TOOL_DESCRIPTION = """Search verified medical sources for educational content.
 
-    @function_tool
-    async def web_search_tool(
+Use this tool when you need current research or external educational
+content that may not be in the knowledge base. Results are for
+educational purposes only - never provide treatment recommendations
+based on web search results.
+
+Sources available:
+- pubmed: PubMed peer-reviewed research articles
+- general: Trusted medical websites (Mayo Clinic, Cleveland Clinic, NIH)
+- jackkruse: Jack Kruse's content on circadian biology, light, mitochondria
+- all: Search all sources"""
+
+
+def create_web_search_handler():
+    """Create an async handler for the web search tool."""
+
+    async def handler(
         query: str,
-        source_type: Literal["pubmed", "general", "jackkruse", "all"] = "all",
+        source_type: str = "all",
         max_results: int = 5,
     ) -> str:
-        """
-        Search verified medical sources for educational content.
-
-        Use this tool when you need current research or external educational
-        content that may not be in the knowledge base. Results are for
-        educational purposes only - never provide treatment recommendations
-        based on web search results.
-
-        Args:
-            query: The search query (e.g., "morning light circadian rhythm")
-            source_type: Which source to search:
-                - "pubmed": PubMed peer-reviewed research
-                - "general": Trusted medical websites (Mayo, Cleveland Clinic)
-                - "jackkruse": Jack Kruse's content on light, circadian biology
-                - "all": Search all sources (default)
-            max_results: Maximum results per source (default: 5)
-
-        Returns:
-            Formatted search results with citations
-        """
         result = await search_medical_sources(
             query=query,
             source_type=source_type,
@@ -454,45 +463,4 @@ def create_web_search_tool():
         )
         return result["formatted"]
 
-    return web_search_tool
-
-
-# Tool definition for reference
-WEB_SEARCH_TOOL_DEFINITION = {
-    "type": "function",
-    "function": {
-        "name": "search_medical_sources",
-        "description": """Search verified medical sources for educational content.
-
-        Use this tool when you need current research or external educational
-        content that may not be in the knowledge base. Results are for
-        EDUCATIONAL PURPOSES ONLY.
-
-        Sources available:
-        - pubmed: PubMed peer-reviewed research articles
-        - general: Trusted medical websites (Mayo Clinic, Cleveland Clinic, NIH)
-        - jackkruse: Jack Kruse's content on circadian biology, light, mitochondria
-        - all: Search all sources""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query (e.g., 'morning light circadian rhythm')",
-                },
-                "source_type": {
-                    "type": "string",
-                    "enum": ["pubmed", "general", "jackkruse", "all"],
-                    "description": "Which source to search (default: all)",
-                    "default": "all",
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Maximum results per source (default: 5)",
-                    "default": 5,
-                },
-            },
-            "required": ["query"],
-        },
-    },
-}
+    return handler

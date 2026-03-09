@@ -11,6 +11,10 @@ from typing import Any
 
 import yaml
 
+from app.utils.logger import get_logger
+
+logger = get_logger("doc_processor")
+
 
 @dataclass
 class DocumentMetadata:
@@ -86,7 +90,7 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         content_without_frontmatter = content[match.end() :].strip()
         return frontmatter, content_without_frontmatter
     except yaml.YAMLError as e:
-        print(f"Warning: Failed to parse frontmatter: {e}")
+        logger.warning(f"Failed to parse frontmatter: {e}")
         return {}, content
 
 
@@ -145,7 +149,7 @@ def process_directory(
                 doc = process_markdown_file(filepath)
                 documents.append(doc)
             except Exception as e:
-                print(f"Warning: Failed to process {filepath}: {e}")
+                logger.warning(f"Failed to process {filepath}: {e}")
 
     return documents
 

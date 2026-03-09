@@ -13,7 +13,7 @@ Usage:
     python scripts/ingest_jack_kruse_notes.py
 
 Requirements:
-    - OPENAI_API_KEY environment variable
+    - ANTHROPIC_API_KEY environment variable
     - SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables
     - poppler installed for PDF processing (brew install poppler)
 """
@@ -84,7 +84,7 @@ async def ingest_jack_kruse_notes():
         sys.exit(1)
 
     # Check for required environment variables
-    required_vars = ["OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"]
+    required_vars = ["ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY"]
     missing = [v for v in required_vars if not os.getenv(v)]
     if missing:
         print(f"❌ Error: Missing required environment variables: {', '.join(missing)}")

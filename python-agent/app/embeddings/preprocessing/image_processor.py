@@ -1,5 +1,5 @@
 """
-Image Processor - Extract content from images using GPT-4 Vision API.
+Image Processor - Extract content from images using the configured vision model.
 
 Handles various medical test result images:
 - HRV (Heart Rate Variability) tests
@@ -12,7 +12,7 @@ import base64
 from pathlib import Path
 from typing import Optional
 
-from openai import OpenAI
+from app.services.ai_client import get_sync_client, get_vision_model
 
 
 # Prompts optimized for different image types
@@ -123,7 +123,7 @@ async def process_image_with_vision(
     additional_context: Optional[str] = None,
 ) -> dict:
     """
-    Process an image using GPT-4 Vision API to extract structured content.
+    Process an image using the configured vision-capable model to extract structured content.
 
     Args:
         image_path: Path to the image file
@@ -162,36 +162,37 @@ async def process_image_with_vision(
     if additional_context:
         prompt = f"{prompt}\n\nAdditional context: {additional_context}"
 
-    # Call Vision API
-    client = OpenAI()
+    # Call Vision API via Anthropic
+    client = get_sync_client()
+    model = get_vision_model()
 
-    response = client.chat.completions.create(
-        model="gpt-4o",  # Vision-capable model
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{image_data}",
-                            "detail": "high",  # Use high detail for medical images
-                        },
-                    },
-                ],
-            }
-        ],
+    response = client.messages.create(
+        model=model,
         max_tokens=2000,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": mime_type,
+                        "data": image_data,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }],
     )
 
-    extracted_text = response.choices[0].message.content
+    extracted_text = response.content[0].text
+    tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
     return {
         "extracted_text": extracted_text,
         "image_type": image_type,
         "original_path": str(image_path),
-        "tokens_used": response.usage.total_tokens if response.usage else 0,
+        "tokens_used": tokens_used,
     }
 
 

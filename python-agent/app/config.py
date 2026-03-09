@@ -1,11 +1,24 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # OpenAI
-    openai_api_key: str
-    openai_model: str = "gpt-5.2"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Anthropic (primary AI provider)
+    anthropic_api_key: str | None = None
+    anthropic_chat_model: str = "claude-opus-4-6"
+    anthropic_fast_model: str = "claude-haiku-4-5-20251001"
+    anthropic_vision_model: str = "claude-opus-4-6"
+
+    # OpenAI embeddings (xAI removed standalone embedding models)
+    openai_api_key: str | None = None
+    openai_embedding_model: str = "text-embedding-3-small"
+    openai_embedding_dimensions: int = 1536
 
     # Supabase
     supabase_url: str
@@ -26,13 +39,12 @@ class Settings(BaseSettings):
     # Settings cache TTL in seconds
     settings_cache_ttl: int = 60
 
+    # Chat history forwarding limits (effective context control)
+    chat_history_message_limit: int = 400
+    chat_history_char_budget: int = 1800000
+
     # RAG logging settings
     rag_log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 
 @lru_cache
 def get_settings() -> Settings:

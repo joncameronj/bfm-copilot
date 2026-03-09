@@ -1,7 +1,7 @@
 """
 Query Analyzer - Extract conditions, symptoms, and search terms from user queries.
 
-Uses GPT-4o to analyze queries and extract structured information for smart RAG search.
+Uses the configured fast model to analyze queries and extract structured information for smart RAG search.
 Includes diagnostic-to-protocol mappings derived from Dr. Rob's Sunday teaching sessions.
 """
 
@@ -10,10 +10,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from openai import OpenAI
-
-from app.config import get_settings
+from app.services.ai_client import get_async_client, get_fast_model
 from app.services.prompt_service import get_query_analyzer_prompt
+from app.utils.logger import get_logger
+
+logger = get_logger("query_analyzer")
 
 # =============================================================================
 # DIAGNOSTIC-TO-PROTOCOL MAPPINGS (from Sunday Case Studies)
@@ -76,6 +77,15 @@ DIAGNOSTIC_TO_FREQUENCY: dict[str, list[str]] = {
     "leptin resistance": ["Leptin Resist"],
     "leptin resist": ["Leptin Resist"],
     "high leptin": ["Leptin Resist"],
+
+    # Deuterium
+    "deuterium": ["Deuterium"],
+    "high deuterium": ["Deuterium"],
+    "deuterium depleted": ["Deuterium"],
+    "ddw": ["Deuterium"],
+    "specific gravity": ["Deuterium"],
+    "low specific gravity": ["Deuterium"],
+    "metabolic water": ["Deuterium"],
 
     # Labs/EMF
     "emf exposure": ["NS EMF"],
@@ -169,8 +179,15 @@ DIAGNOSTIC_TO_SUPPLEMENT: dict[str, list[str]] = {
     "diabetic": ["Cell Synergy", "X-39"],
     "neurological": ["Cell Synergy"],
 
-    # Hydration/specific gravity
+    # Deuterium / hydration / specific gravity
+    "deuterium": ["Deuterium Drops", "DDW"],
+    "high deuterium": ["Deuterium Homeopathic", "DDW"],
+    "ddw": ["DDW", "Deuterium Homeopathic"],
+    "deuterium depleted": ["DDW", "Deuterium Homeopathic"],
     "high specific gravity": ["Deuterium Drops"],
+    "low specific gravity": ["Deuterium Drops"],
+    "specific gravity": ["Deuterium Drops"],
+    "metabolic water": ["Deuterium Drops"],
     "dehydration": ["Deuterium Drops"],
     "concentrated urine": ["Deuterium Drops"],
 
@@ -381,35 +398,37 @@ async def analyze_query(
     Returns:
         QueryAnalysis with extracted conditions, symptoms, etc.
     """
-    settings = get_settings()
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = get_async_client()
+    fast_model = get_fast_model()
 
     system_prompt = get_query_analyzer_prompt()
+    # Ensure JSON-only output (Anthropic has no formal json_object mode)
+    if "Return ONLY valid JSON" not in system_prompt:
+        system_prompt += "\n\nReturn ONLY valid JSON. No preamble, no markdown code fences."
 
-    messages = [{"role": "system", "content": system_prompt}]
-
-    # Add conversation context if provided
+    # Build messages (stateless)
+    api_messages = []
     if conversation_context:
-        messages.append(
-            {
-                "role": "user",
-                "content": f"Recent conversation context:\n{conversation_context}",
-            }
-        )
-
-    messages.append({"role": "user", "content": f"Analyze this query:\n{query}"})
+        api_messages.append({"role": "user", "content": f"Recent conversation context:\n{conversation_context}"})
+        api_messages.append({"role": "assistant", "content": "Understood."})
+    api_messages.append({"role": "user", "content": f"Analyze this query:\n{query}"})
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Fast model for analysis
-            messages=messages,
-            temperature=0,
-            response_format={"type": "json_object"},
+        response = await client.messages.create(
+            model=fast_model,
+            system=system_prompt,
+            messages=api_messages,
+            max_tokens=1024,
         )
 
-        content = response.choices[0].message.content
+        content = response.content[0].text if response.content else None
         if content:
-            data = json.loads(content)
+            # Strip markdown code fences if present
+            text = content.strip()
+            if text.startswith("```"):
+                lines = text.split("\n")
+                text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+            data = json.loads(text)
             parsed = QueryAnalysis.from_dict(data)
             parsed.body_systems = _filter_allowed_systems(
                 _normalize_body_systems(parsed.body_systems)
@@ -419,7 +438,7 @@ async def analyze_query(
             return enriched
 
     except Exception as e:
-        print(f"Warning: Query analysis failed: {e}")
+        logger.warning(f"Query analysis failed: {e}")
 
     # Fallback: basic keyword extraction
     fallback = _fallback_analysis(query)
@@ -498,6 +517,10 @@ def _fallback_analysis(query: str) -> QueryAnalysis:
         "pentasol": "biotoxin_protocol",
         "binder": "biotoxin_protocol",
         "detox": "detoxification",
+        "deuterium": "deuterium_toxicity",
+        "ddw": "deuterium_toxicity",
+        "specific gravity": "deuterium_toxicity",
+        "metabolic water": "deuterium_toxicity",
     }
 
     # Common symptoms to look for
@@ -628,7 +651,7 @@ def _filter_allowed_systems(systems: list[str]) -> list[str]:
     """Keep only body systems that are in the allowed canonical set."""
     return [s for s in systems if s in ALLOWED_BODY_SYSTEMS]
 
-# Tool definition for the OpenAI Agents SDK
+# Tool definition for reference (JSON Schema format)
 QUERY_ANALYZER_TOOL_DEFINITION = {
     "type": "function",
     "function": {

@@ -12,6 +12,9 @@ import sys
 from uuid import UUID
 from app.embeddings.embedder import get_embedding
 from app.services.supabase import get_supabase_client
+from app.utils.logger import get_logger
+
+logger = get_logger("ingest_dr_demartino")
 
 # Dr. DeMartino's information chunks
 DR_DEMARTINO_CHUNKS = [
@@ -353,8 +356,8 @@ async def ingest_dr_demartino_knowledge():
         ).limit(1).execute()
 
         if not admin_result.data:
-            print("❌ No admin user found. Cannot ingest document without a user_id.")
-            print("   Please ensure at least one admin user exists.")
+            logger.error("No admin user found. Cannot ingest document without a user_id.")
+            logger.error("   Please ensure at least one admin user exists.")
             sys.exit(1)
 
         admin_user_id = admin_result.data[0]['id']
@@ -366,8 +369,8 @@ async def ingest_dr_demartino_knowledge():
 
         if result.data:
             doc_id = result.data[0]['id']
-            print(f"✓ Found existing Dr. DeMartino document: {doc_id}")
-            print("  Refreshing chunks...")
+            logger.info(f"Found existing Dr. DeMartino document: {doc_id}")
+            logger.info("  Refreshing chunks...")
 
             # Delete existing chunks to refresh
             client.table('document_chunks').delete().eq(
@@ -389,10 +392,10 @@ async def ingest_dr_demartino_knowledge():
             }).execute()
 
             doc_id = doc_result.data[0]['id']
-            print(f"✓ Created new Dr. DeMartino document: {doc_id}")
+            logger.info(f"Created new Dr. DeMartino document: {doc_id}")
 
         # Generate embeddings and create chunks
-        print(f"\nGenerating embeddings and creating {len(DR_DEMARTINO_CHUNKS)} chunks...")
+        logger.info(f"Generating embeddings and creating {len(DR_DEMARTINO_CHUNKS)} chunks...")
 
         for chunk_index, chunk_data in enumerate(DR_DEMARTINO_CHUNKS, 1):
             # Generate embedding for this chunk
@@ -412,7 +415,7 @@ async def ingest_dr_demartino_knowledge():
                 }
             }).execute()
 
-            print(f"  ✓ Chunk {chunk_index}/{len(DR_DEMARTINO_CHUNKS)}: {chunk_data['title']}")
+            logger.info(f"  Chunk {chunk_index}/{len(DR_DEMARTINO_CHUNKS)}: {chunk_data['title']}")
 
         # Update document total_chunks
         client.table('documents').update({
@@ -420,19 +423,13 @@ async def ingest_dr_demartino_knowledge():
             'status': 'indexed'
         }).eq('id', doc_id).execute()
 
-        print(f"\n✅ Successfully ingested Dr. Rob DeMartino's information!")
-        print(f"   Document ID: {doc_id}")
-        print(f"   Total chunks: {len(DR_DEMARTINO_CHUNKS)}")
-        print(f"\n   Dr. DeMartino's information is now available to the RAG system.")
-        print(f"   The system can now provide context about:")
-        print(f"   - Dr. DeMartino's background and credentials")
-        print(f"   - BFM clinical philosophy and methodology")
-        print(f"   - Superior Health Solutions practice")
-        print(f"   - Beyond Functional Medicine coaching programs")
-        print(f"   - BFM frequency protocol categories")
+        logger.info(f"Successfully ingested Dr. Rob DeMartino's information!")
+        logger.info(f"   Document ID: {doc_id}")
+        logger.info(f"   Total chunks: {len(DR_DEMARTINO_CHUNKS)}")
+        logger.info(f"   Dr. DeMartino's information is now available to the RAG system.")
 
     except Exception as e:
-        print(f"❌ Error ingesting Dr. DeMartino's information: {e}")
+        logger.error(f"Error ingesting Dr. DeMartino's information: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
