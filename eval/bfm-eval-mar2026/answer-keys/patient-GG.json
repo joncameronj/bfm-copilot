@@ -7,7 +7,7 @@
     "reviewed_by": "Dr. Rob",
     "review_date": "2026-03-08",
     "overall_grade": "4.5/5",
-    "review_notes": "SNS Balance not triggered (SNS not switched). Vagus Support must go FIRST, then Vagus Trauma after that if insufficient. HRV baroreceptor sensitivity high → triggers CSF Support. X-39 on Day 1 (protein in urine). 5 Levers grouped together in Phase 2."
+    "review_notes": "SNS Balance not triggered (SNS not switched). Vagus Support must go FIRST, then Vagus Trauma after that if insufficient. HRV baroreceptor sensitivity is AVERAGE (not high) → CSF Support NOT triggered. X-39 on Day 1 (protein in urine). 5 Levers grouped together in Phase 2. D-Ribose NOT indicated — Theta/Alpha ratio is 1.8:1 (needs >= 2.5:1)."
   },
   "urgency_min": 4.9,
   "expected_deal_breakers": [
@@ -26,7 +26,6 @@
     "PNS Support",
     "Vagus Support",
     "Vagus Trauma",
-    "CSF Support",
     "Heart Health",
     "Biotoxin",
     "Kidney Repair",
@@ -54,13 +53,12 @@
     "CoQ10",
     "X-39",
     "Innovita Vagus Nerve",
-    "D-Ribose",
     "Kidney Clear"
   ],
   "corrections": {
     "sns_balance": "Do NOT trigger SNS Balance — SNS is not switched for this patient",
     "vagus_order": "Vagus Support BEFORE Vagus Trauma. Never Vagus Trauma first.",
-    "csf_support": "High baroreceptor sensitivity on HRV → CSF Support frequency required",
+    "csf_support": "Baroreceptor sensitivity is AVERAGE → CSF Support NOT triggered. Only trigger CSF Support when baroreceptor sensitivity is explicitly HIGH.",
     "x39_timing": "X-39 on Day 1 (protein in urine is a reason to start immediately)",
     "phase_grouping": "Keep 5 Levers together in Phase 2 (Pineal, Leptin Resist, Pit A, Pars Intermedia), rest to Phase 3",
     "no_snb_balance": "SNS Balance only if SNS is clearly switched; it is not here"

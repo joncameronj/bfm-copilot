@@ -166,23 +166,25 @@ export function DiagnosticsTable({ files, isLoading = false, onRefresh }: Diagno
                     <div className="flex items-center gap-2">
                       {getStatusBadge(file.uploadStatus)}
                       {file.uploadStatus === 'uploading' && (
-                        <button
+                        <Button
+                          variant="link"
                           onClick={() => handleFixStatus(file)}
-                          className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          className="text-xs"
                         >
                           Fix
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
+                    <Button
+                      variant="icon"
                       onClick={() => setDeleteTarget(file)}
-                      className="p-2 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      title="Delete file"
+                      className="text-neutral-400 hover:text-red-600 dark:hover:text-red-400"
+                      aria-label="Delete file"
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))

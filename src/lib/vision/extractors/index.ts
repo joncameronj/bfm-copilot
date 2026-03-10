@@ -7,6 +7,8 @@ import { UA_SYSTEM_PROMPT, UA_USER_PROMPT } from '../prompts/ua-prompt'
 import { VCS_SYSTEM_PROMPT, VCS_USER_PROMPT } from '../prompts/vcs-prompt'
 import { HRV_SYSTEM_PROMPT, HRV_USER_PROMPT } from '../prompts/hrv-prompt'
 import { BRAINWAVE_SYSTEM_PROMPT, BRAINWAVE_USER_PROMPT } from '../prompts/brainwave-prompt'
+import { ORTHO_SYSTEM_PROMPT, ORTHO_USER_PROMPT } from '../prompts/ortho-prompt'
+import { VALSALVA_SYSTEM_PROMPT, VALSALVA_USER_PROMPT } from '../prompts/valsalva-prompt'
 import type { DiagnosticType } from '@/types/shared'
 import type {
   ExtractionResult,
@@ -16,6 +18,8 @@ import type {
   VCSExtractedData,
   BrainwaveExtractedData,
   BloodPanelExtractedData,
+  OrthoExtractedData,
+  ValsalvaExtractedData,
 } from '@/types/diagnostic-extraction'
 
 // Type for extracted data based on diagnostic type
@@ -25,6 +29,8 @@ type ExtractedDataMap = {
   urinalysis: UAExtractedData
   vcs: VCSExtractedData
   brainwave: BrainwaveExtractedData
+  ortho: OrthoExtractedData
+  valsalva: ValsalvaExtractedData
   blood_panel: BloodPanelExtractedData
   nes_scan: Record<string, unknown>
   mold_toxicity: Record<string, unknown>
@@ -50,6 +56,10 @@ export async function extractDiagnosticValues(
       return extractVCS(imageUrl)
     case 'brainwave':
       return extractBrainwave(imageUrl)
+    case 'ortho':
+      return extractOrtho(imageUrl)
+    case 'valsalva':
+      return extractValsalva(imageUrl)
     case 'blood_panel':
       return extractBloodPanel(imageUrl)
     case 'nes_scan':
@@ -93,6 +103,20 @@ async function extractVCS(imageUrl: string): Promise<ExtractionResult<VCSExtract
  */
 async function extractBrainwave(imageUrl: string): Promise<ExtractionResult<BrainwaveExtractedData>> {
   return extractFromImage<BrainwaveExtractedData>(imageUrl, BRAINWAVE_SYSTEM_PROMPT, BRAINWAVE_USER_PROMPT)
+}
+
+/**
+ * Ortho test extraction (NervExpress)
+ */
+async function extractOrtho(imageUrl: string): Promise<ExtractionResult<OrthoExtractedData>> {
+  return extractFromImage<OrthoExtractedData>(imageUrl, ORTHO_SYSTEM_PROMPT, ORTHO_USER_PROMPT)
+}
+
+/**
+ * Valsalva test extraction (NervExpress)
+ */
+async function extractValsalva(imageUrl: string): Promise<ExtractionResult<ValsalvaExtractedData>> {
+  return extractFromImage<ValsalvaExtractedData>(imageUrl, VALSALVA_SYSTEM_PROMPT, VALSALVA_USER_PROMPT)
 }
 
 /**

@@ -113,3 +113,67 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     )
   }
 }
+
+/**
+ * DELETE /api/diagnostics/[id]/generate-report
+ *
+ * Cancels a pending/processing eval report by setting its status to 'cancelled'.
+ * The Python background task checks for this status and stops early.
+ */
+export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+  try {
+    const { id: inputId } = await params
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Resolve analysis ID (same logic as POST)
+    let analysisId = inputId
+
+    const { data: analysis } = await supabase
+      .from('diagnostic_analyses')
+      .select('id, practitioner_id')
+      .eq('id', inputId)
+      .maybeSingle()
+
+    if (analysis) {
+      if (analysis.practitioner_id !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else {
+      const { data: fromUpload } = await supabase
+        .from('diagnostic_analyses')
+        .select('id, practitioner_id')
+        .eq('diagnostic_upload_id', inputId)
+        .eq('practitioner_id', user.id)
+        .maybeSingle()
+
+      if (!fromUpload) {
+        return NextResponse.json({ error: 'Diagnostic analysis not found' }, { status: 404 })
+      }
+      analysisId = fromUpload.id
+    }
+
+    // Cancel any pending/processing eval reports for this analysis
+    const { error } = await supabase
+      .from('diagnostic_eval_reports')
+      .update({ status: 'error', error_message: 'Cancelled by user' })
+      .eq('diagnostic_analysis_id', analysisId)
+      .in('status', ['pending', 'processing'])
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to cancel report' }, { status: 500 })
+    }
+
+    return NextResponse.json({ message: 'Report cancelled' })
+  } catch (error) {
+    console.error('Cancel report error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

@@ -81,6 +81,12 @@ class HRVData:
     switched_sympathetics: bool = False
     pns_negative: bool = False
     vagus_dysfunction: bool = False
+    # Ortho test: Blue (supine) and Red (upright) dots perfectly superimposed
+    # All 4 values must match exactly: HR, R(HF), R(LF1), R(LF2)
+    ortho_dots_superimposed: bool = False
+    # Valsalva test: Blue (normal breathing) and Green (deep breathing) dots perfectly superimposed
+    # All 4 values must match exactly: HR, R(HF), R(LF1), R(LF2)
+    valsalva_dots_superimposed: bool = False
 
 
 @dataclass
@@ -198,10 +204,12 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
                 trigger=f"Theta/Alpha imbalance (ratio {ratio:.1f}:1)",
                 dosage="Double scoop if gap >2:1" if ratio > 2 else "1 scoop",
             ))
-            result.supplements.append(SupplementRecommendation(
-                name="D-Ribose",
-                trigger="Theta > Alpha imbalance",
-            ))
+            # D-Ribose only if Theta >= 2.5x Alpha
+            if ratio >= 2.5:
+                result.supplements.append(SupplementRecommendation(
+                    name="D-Ribose",
+                    trigger=f"Theta >= 2.5x Alpha (ratio {ratio:.1f}:1)",
+                ))
 
     # Deal Breaker 3: PNS Negative Zone
     if bundle.hrv and bundle.hrv.pns_negative:
@@ -237,6 +245,31 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             trigger="Vagus nerve dysfunction",
             timing="At night",
             notes="Innovita Vagus Nerve form code",
+        ))
+
+    # Freeze Response: Locus Coeruleus (Ortho blue+red dots perfectly superimposed)
+    if bundle.hrv and bundle.hrv.ortho_dots_superimposed:
+        result.protocols.append(ProtocolRecommendation(
+            name="Locus Coeruleus Support",
+            priority=1,
+            trigger="Ortho test: Blue (supine) and Red (upright) dots perfectly superimposed — freeze response",
+            category="autonomic",
+            notes="Freeze response — body cannot distinguish between rest and stress states. Address emotional trauma.",
+        ))
+
+    # Toxicity Overlap: NS Tox (Valsalva blue+green dots perfectly superimposed)
+    if bundle.hrv and bundle.hrv.valsalva_dots_superimposed:
+        result.protocols.append(ProtocolRecommendation(
+            name="NS Tox",
+            priority=1,
+            trigger="Valsalva test: Blue (normal breathing) and Green (deep breathing) dots perfectly superimposed — nervous system toxicity",
+            category="autonomic",
+            notes="Nervous system cannot differentiate breathing states — toxic load on NS. Check heavy metals.",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="Pectasol-C",
+            trigger="NS Tox — nervous system toxicity pattern on Valsalva",
+            notes="Check heavy metals; biotoxin binder for NS toxic load",
         ))
 
     # Deal Breaker 5: Low Heart on D-Pulse
@@ -782,6 +815,8 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
             switched_sympathetics=patterns.get("switched_sympathetics", False),
             pns_negative=patterns.get("pns_negative", False),
             vagus_dysfunction=patterns.get("vagus_dysfunction", False),
+            ortho_dots_superimposed=patterns.get("ortho_dots_superimposed", False),
+            valsalva_dots_superimposed=patterns.get("valsalva_dots_superimposed", False),
         )
 
         # Brainwave from HRV

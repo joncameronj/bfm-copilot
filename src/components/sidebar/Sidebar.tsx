@@ -90,7 +90,7 @@ export function Sidebar({ user, unreadChatsCount = 0 }: SidebarProps) {
             }}
             className={cn(
               'group relative flex items-center gap-3 rounded-lg',
-              'text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800 h-10 px-[10px]',
+              'text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800 h-12 px-[10px]',
               'transition-colors duration-200'
             )}
             style={{
@@ -101,7 +101,7 @@ export function Sidebar({ user, unreadChatsCount = 0 }: SidebarProps) {
           >
             {/* Tooltip */}
             {isCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 New chat
               </span>
             )}

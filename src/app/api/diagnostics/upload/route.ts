@@ -61,7 +61,12 @@ export async function POST(request: Request) {
     }
 
     // Valid database enum values for diagnostic_type
-    const validFileTypes = ['d_pulse', 'hrv', 'nes_scan', 'mold_toxicity', 'blood_panel', 'other']
+    const validFileTypes = [
+      'd_pulse', 'hrv', 'nes_scan', 'mold_toxicity', 'blood_panel',
+      'urinalysis', 'vcs', 'brainwave',
+      'ortho', 'valsalva',
+      'other',
+    ]
     const safeFileType = validFileTypes.includes(type) ? type : 'other'
 
     // Create diagnostic file record

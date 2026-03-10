@@ -2,8 +2,22 @@
 
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon, File01Icon, Tick02Icon, Alert01Icon, Loading03Icon } from '@hugeicons/core-free-icons'
-import { Select } from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
 import type { DiagnosticType } from '@/types/shared'
+
+const TYPE_LABELS: Record<DiagnosticType, string> = {
+  d_pulse: 'D-Pulse',
+  hrv: 'HRV',
+  urinalysis: 'Urinalysis (UA)',
+  vcs: 'VCS',
+  brainwave: 'Brainwave',
+  ortho: 'Ortho Test',
+  valsalva: 'Valsalva Test',
+  nes_scan: 'NES Scan',
+  mold_toxicity: 'Mold Toxicity',
+  blood_panel: 'Blood Panel',
+  other: 'Other',
+}
 
 interface UploadFile {
   id: string
@@ -22,7 +36,7 @@ interface FilePreviewProps {
   disabled?: boolean
 }
 
-export function FilePreview({ file, onTypeChange, onRemove, disabled }: FilePreviewProps) {
+export function FilePreview({ file, onRemove, disabled }: FilePreviewProps) {
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -81,35 +95,21 @@ export function FilePreview({ file, onTypeChange, onRemove, disabled }: FilePrev
         </p>
       </div>
 
-      {/* Type Selector */}
-      {file.status === 'pending' && (
-        <div className="w-40">
-          <Select
-            value={file.type}
-            onChange={(e) => onTypeChange(e.target.value as DiagnosticType)}
-            disabled={disabled}
-          >
-            <option value="d_pulse">D-Pulse</option>
-            <option value="hrv">HRV</option>
-            <option value="urinalysis">Urinalysis (UA)</option>
-            <option value="vcs">VCS</option>
-            <option value="brainwave">Brainwave</option>
-            <option value="nes_scan">NES Scan</option>
-            <option value="mold_toxicity">Mold Toxicity</option>
-            <option value="blood_panel">Blood Panel</option>
-            <option value="other">Other</option>
-          </Select>
-        </div>
-      )}
+      {/* Auto-detected type badge */}
+      <span className="flex-shrink-0 px-2.5 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">
+        {TYPE_LABELS[file.type] || file.type}
+      </span>
 
       {/* Remove Button */}
       {(file.status === 'pending' || file.status === 'error') && !disabled && (
-        <button
+        <Button
+          variant="icon"
           onClick={onRemove}
-          className="flex-shrink-0 p-2 text-neutral-400 hover:text-neutral-600 transition-colors"
+          aria-label={`Remove ${file.file.name}`}
+          className="text-neutral-400 hover:text-neutral-600"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={20} />
-        </button>
+        </Button>
       )}
     </div>
   )

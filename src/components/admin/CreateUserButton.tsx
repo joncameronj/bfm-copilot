@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Input, Select, Modal } from '@/components/ui'
+import { Button, Input, Select, Modal, AlertMessage } from '@/components/ui'
 import { type UserRole } from '@/types/roles'
 
 interface CreateUserButtonProps {
@@ -71,15 +71,11 @@ export function CreateUserButton({ onUserCreated }: CreateUserButtonProps) {
       <Modal isOpen={isOpen} onClose={handleClose} title="Create New User">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm">
-              {error}
-            </div>
+            <AlertMessage variant="error">{error}</AlertMessage>
           )}
 
           {success && (
-            <div className="bg-green-50 text-green-600 px-4 py-3 rounded-xl text-sm">
-              {success}
-            </div>
+            <AlertMessage variant="success">{success}</AlertMessage>
           )}
 
           <Input

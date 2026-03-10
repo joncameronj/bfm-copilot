@@ -38,6 +38,169 @@ MAX_CONCURRENT_EVAL_JOBS = 5
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _is_positive(data) -> bool:
+    """Check if a UA value (dict or raw) indicates a positive result."""
+    if isinstance(data, dict):
+        val = str(data.get("value", "")).lower()
+        status = str(data.get("status", "")).lower()
+        return status in ("positive", "abnormal") or val not in ("neg", "negative", "0", "")
+    return bool(data)
+
+
+def _check_exact_match(a: dict, b: dict) -> bool:
+    """All 4 NervExpress values must match exactly (Locus Coeruleus / NS Tox test)."""
+    keys = ["hr", "r_hf", "r_lf1", "r_lf2"]
+    return all(
+        a.get(k) is not None and b.get(k) is not None and a[k] == b[k]
+        for k in keys
+    )
+
+
+def _normalize_bundle(raw_bundle: dict) -> dict:
+    """
+    Transform raw TypeScript vision extraction dicts into the flat
+    DiagnosticBundle-shaped dict that the eval agent (and CLI eval scripts) expect.
+
+    This bridges the structural mismatch between:
+    - Frontend vision extractions: nested {value, status} objects, eye-by-eye VCS, etc.
+    - Python DiagnosticBundle: flat fields like calm_pns, score_correct, ph as float
+    """
+    normalized: dict = {}
+
+    # ----- HRV normalization -----
+    hrv_raw = raw_bundle.get("hrv", {})
+    if hrv_raw:
+        patterns = hrv_raw.get("patterns") or {}
+        calm = hrv_raw.get("calm_position") or {}
+        stressed = hrv_raw.get("stressed_position") or {}
+        recovery = hrv_raw.get("recovery_position") or {}
+        normalized["hrv"] = {
+            "system_energy": hrv_raw.get("system_energy"),
+            "stress_response": hrv_raw.get("stress_response"),
+            "calm_pns": calm.get("pns") if calm else None,
+            "calm_sns": calm.get("sns") if calm else None,
+            "stressed_pns": stressed.get("pns") if stressed else None,
+            "stressed_sns": stressed.get("sns") if stressed else None,
+            "recovery_pns": recovery.get("pns") if recovery else None,
+            "recovery_sns": recovery.get("sns") if recovery else None,
+            "switched_sympathetics": patterns.get("switched_sympathetics", False),
+            "pns_negative": patterns.get("pns_negative", False),
+            "vagus_dysfunction": patterns.get("vagus_dysfunction", False),
+            "ortho_dots_superimposed": False,
+            "valsalva_dots_superimposed": False,
+        }
+
+    # ----- Brainwave — check HRV-embedded AND standalone extraction -----
+    bw_embedded = hrv_raw.get("brainwave") or {} if hrv_raw else {}
+    bw_standalone = raw_bundle.get("brainwave") or {}
+    bw_source = bw_standalone if bw_standalone and bw_standalone.get("alpha") else bw_embedded
+
+    if bw_source:
+        def _bw_val(v):
+            if isinstance(v, dict):
+                return v.get("value", 0) or 0
+            return v or 0
+
+        normalized["brainwave"] = {
+            "alpha": _bw_val(bw_source.get("alpha", 0)),
+            "beta": _bw_val(bw_source.get("beta", 0)),
+            "delta": _bw_val(bw_source.get("delta", 0)),
+            "gamma": _bw_val(bw_source.get("gamma", 0)),
+            "theta": _bw_val(bw_source.get("theta", 0)),
+        }
+
+    # ----- D-Pulse normalization -----
+    dpulse_raw = raw_bundle.get("d_pulse", {})
+    if dpulse_raw:
+        organs = []
+        for m in (dpulse_raw.get("markers") or []):
+            organs.append({
+                "name": m.get("name", ""),
+                "percentage": m.get("percentage") or m.get("value") or 0,
+            })
+        normalized["dpulse"] = {
+            "stress_index": dpulse_raw.get("stress_index"),
+            "vegetative_balance": dpulse_raw.get("vegetative_balance"),
+            "brain_activity": dpulse_raw.get("brain_activity"),
+            "immunity": dpulse_raw.get("immunity"),
+            "physiological_resources": dpulse_raw.get("physiological_resources"),
+            "organs": organs,
+        }
+
+    # ----- UA normalization -----
+    ua_raw = raw_bundle.get("urinalysis", {})
+    if ua_raw:
+        ph_data = ua_raw.get("ph", {})
+        protein_data = ua_raw.get("protein", {})
+        sg_data = ua_raw.get("specific_gravity", {})
+        glucose_data = ua_raw.get("glucose", {})
+        normalized["ua"] = {
+            "ph": ph_data.get("value") if isinstance(ph_data, dict) else ph_data,
+            "protein_positive": _is_positive(protein_data),
+            "protein_value": str(protein_data.get("value", "")) if isinstance(protein_data, dict) else str(protein_data),
+            "specific_gravity": sg_data.get("value") if isinstance(sg_data, dict) else sg_data,
+            "glucose_positive": _is_positive(glucose_data),
+        }
+
+    # ----- VCS normalization — standalone VCS file OR UA-embedded vcs_score -----
+    vcs_raw = raw_bundle.get("vcs", {})
+    if not vcs_raw:
+        vcs_raw = ua_raw.get("vcs_score", {}) if ua_raw else {}
+    if vcs_raw:
+        passed = vcs_raw.get("passed", True)
+        score_correct = vcs_raw.get("score_correct") or vcs_raw.get("correct")
+        if score_correct is None:
+            right = vcs_raw.get("right_eye") or {}
+            left = vcs_raw.get("left_eye") or {}
+            if right and left:
+                r_scores = right.get("scores") or []
+                l_scores = left.get("scores") or []
+                score_correct = len([s for s in r_scores if s]) + len([s for s in l_scores if s])
+        normalized["vcs"] = {
+            "score_correct": score_correct,
+            "score_total": vcs_raw.get("score_total") or vcs_raw.get("total") or 32,
+            "passed": passed,
+        }
+
+    # ----- Ortho normalization -----
+    ortho_raw = raw_bundle.get("ortho", {})
+    if ortho_raw:
+        normalized["ortho"] = ortho_raw
+        # Compute Locus Coeruleus flag (blue supine + red upright exactly matching)
+        supine = ortho_raw.get("supine", {})
+        upright = ortho_raw.get("upright", {})
+        if supine and upright and _check_exact_match(supine, upright):
+            if "hrv" in normalized:
+                normalized["hrv"]["ortho_dots_superimposed"] = True
+
+    # ----- Valsalva normalization -----
+    valsalva_raw = raw_bundle.get("valsalva", {})
+    if valsalva_raw:
+        normalized["valsalva"] = valsalva_raw
+        # Compute NS Tox flag (blue normal + green deep exactly matching)
+        normal = valsalva_raw.get("normal_breathing", {})
+        deep = valsalva_raw.get("deep_breathing", {})
+        if normal and deep and _check_exact_match(normal, deep):
+            if "hrv" in normalized:
+                normalized["hrv"]["valsalva_dots_superimposed"] = True
+
+    # ----- Blood panel (fallback from vision extraction) -----
+    bp_raw = raw_bundle.get("blood_panel", {})
+    if bp_raw:
+        markers = bp_raw.get("markers") or []
+        normalized["labs"] = [
+            {
+                "name": m.get("name", ""),
+                "value": float(m.get("value", 0)) if m.get("value") is not None else 0,
+                "unit": m.get("unit", ""),
+                "status": m.get("status", "normal"),
+            }
+            for m in markers
+        ]
+
+    return normalized
+
+
 async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, str]:
     """
     Fetch the diagnostic bundle and patient name for an analysis.
@@ -64,7 +227,7 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
         "id, file_type, diagnostic_extracted_values(extracted_data, status)"
     ).eq("upload_id", upload_id).execute()
 
-    bundle: dict = {}
+    raw_bundle: dict = {}
     for file_rec in (files_result.data or []):
         file_type = file_rec.get("file_type")
         extractions = file_rec.get("diagnostic_extracted_values") or []
@@ -73,13 +236,42 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
                 extracted = extraction.get("extracted_data") or {}
                 if extracted:
                     # Merge by file type key
-                    bundle[file_type] = extracted
+                    raw_bundle[file_type] = extracted
 
-    if not bundle:
+    if not raw_bundle:
         raise ValueError(
             f"No extracted diagnostic data found for analysis {diagnostic_analysis_id}. "
             "Run extraction first."
         )
+
+    # Normalize vision extraction format → DiagnosticBundle format
+    bundle = _normalize_bundle(raw_bundle)
+
+    # Phase 2: Override vision-extracted labs with structured DB data if available
+    patient_id = analysis.get("patient_id")
+    if patient_id:
+        try:
+            lab_result = client.table("lab_results").select(
+                "id, test_date, lab_values(id, value, evaluation, is_ominous, "
+                "lab_markers(name, display_name, unit, category))"
+            ).eq("patient_id", patient_id).order(
+                "test_date", desc=True
+            ).limit(1).execute()
+
+            if lab_result.data and lab_result.data[0].get("lab_values"):
+                lab_markers = []
+                for lv in lab_result.data[0]["lab_values"]:
+                    marker_info = lv.get("lab_markers") or {}
+                    lab_markers.append({
+                        "name": marker_info.get("display_name") or marker_info.get("name", ""),
+                        "value": float(lv.get("value", 0)),
+                        "unit": marker_info.get("unit", ""),
+                        "status": lv.get("evaluation", "normal"),
+                    })
+                if lab_markers:
+                    bundle["labs"] = lab_markers
+        except Exception as exc:
+            logger.warning("Failed to fetch structured lab data for patient %s: %s", patient_id, exc)
 
     return bundle, patient_name
 
@@ -166,6 +358,14 @@ async def create_eval_report(request: EvalReportRequest):
 
     Returns the report_id immediately; poll GET /agent/eval/{report_id} for status.
     """
+    try:
+        return await _create_eval_report_inner(request)
+    except Exception as exc:
+        logger.error("create_eval_report failed: %s", exc, exc_info=True)
+        raise
+
+
+async def _create_eval_report_inner(request: EvalReportRequest) -> EvalJobResponse:
     # Check for existing pending/processing report to avoid duplicates
     db = get_supabase_client()
     existing = db.table("diagnostic_eval_reports").select("id, status").eq(

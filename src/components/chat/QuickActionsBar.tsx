@@ -9,6 +9,7 @@ import {
   StarIcon,
   StethoscopeIcon,
 } from '@hugeicons/core-free-icons'
+import { Button } from '@/components/ui/Button'
 import type { QuickAction } from '@/types/patient-context'
 import type { IconSvgElement } from '@hugeicons/react'
 
@@ -43,24 +44,17 @@ export function QuickActionsBar({ actions, onActionClick, disabled = false }: Qu
         const IconComponent = iconMap[action.icon] || Search01Icon
 
         return (
-          <button
+          <Button
             key={action.id}
+            variant="secondary"
+            size="sm"
             onClick={() => onActionClick(action.prompt)}
             disabled={disabled}
-            className={`
-              flex items-center gap-2 px-4 py-2.5 rounded-xl
-              bg-white border border-neutral-200
-              text-sm font-medium text-neutral-700
-              hover:bg-neutral-50 hover:border-neutral-300
-              active:bg-neutral-100
-              transition-all duration-150
-              disabled:opacity-50 disabled:cursor-not-allowed
-              shadow-sm hover:shadow
-            `}
+            className="bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 shadow-sm hover:shadow"
           >
             <HugeiconsIcon icon={IconComponent} size={18} className="text-neutral-500" />
             <span>{action.label}</span>
-          </button>
+          </Button>
         )
       })}
     </div>

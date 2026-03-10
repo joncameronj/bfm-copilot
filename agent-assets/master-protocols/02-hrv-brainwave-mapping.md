@@ -63,29 +63,29 @@ Use this to determine the correct frequency based on HRV or D-Pulse brainwave re
 
 ---
 
-### Freeze Response
+### Freeze Response (Locus Coeruleus)
 
 **Section:** AUTONOMIC PATTERNS
 
-**Diagnostic Detail:** Red and blue dots superimposed
+**Diagnostic Detail:** Red (stressed/upright) and Blue (calm/supine) dots are **perfectly superimposed** on the Ortho test. "Superimposed" means an **exact match** — all four values must be identical: HR, R(HF), R(LF1), R(LF2). A near-match (off by even 1 beat on HR or 1 on any R value) does NOT trigger this protocol. The dots must be directly on top of each other.
 
 **Primary Frequency:** Locus Coeruleus Support
 
-**Supplementation / Notes:** Address emotional trauma
+**Supplementation / Notes:** Address emotional trauma. Freeze response = body cannot distinguish between rest and stress states.
 
 **Source Module(s):** Neuro, Hormones
 
 ---
 
-### Toxicity Overlap
+### Toxicity Overlap (NS Tox)
 
 **Section:** AUTONOMIC PATTERNS
 
-**Diagnostic Detail:** Blue and green dots superimposed
+**Diagnostic Detail:** Blue (normal breathing) and Green (deep breathing) dots are **perfectly superimposed** on the Valsalva test. "Superimposed" means an **exact match** — all four values must be identical: HR, R(HF), R(LF1), R(LF2). A near-match (off by even 1 beat on HR or 1 on any R value) does NOT trigger this protocol. The dots must be directly on top of each other.
 
 **Primary Frequency:** NS Tox (nervous system toxicity)
 
-**Supplementation / Notes:** Pectasol-C; check heavy metals
+**Supplementation / Notes:** Pectasol-C; check heavy metals. Nervous system cannot differentiate breathing states = toxic load on NS.
 
 **Source Module(s):** Neuro, Hormones
 
@@ -157,7 +157,7 @@ Use this to determine the correct frequency based on HRV or D-Pulse brainwave re
 
 **Primary Frequency:** Alpha Theta
 
-**Supplementation / Notes:** Cell Synergy (double scoop if gap greater than 2:1); D-Ribose
+**Supplementation / Notes:** Cell Synergy (double scoop if gap greater than 2:1); D-Ribose ONLY if Theta >= 2.5x Alpha (e.g., Theta 25%+ / Alpha 10% = 2.5:1). If ratio is below 2.5:1, D-Ribose is NOT indicated.
 
 **Source Module(s):** All 4 modules
 

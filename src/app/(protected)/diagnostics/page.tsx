@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Tick01Icon, ArrowRight01Icon, AiMagicIcon } from '@hugeicons/core-free-icons'
 import { DiagnosticsUpload } from '@/components/diagnostics/DiagnosticsUpload'
+import { AnalysisProgress } from '@/components/diagnostics/AnalysisProgress'
 import { PatientSearchSelector } from '@/components/shared/PatientSearchSelector'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -37,7 +38,9 @@ export default function DiagnosticsPage() {
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedAnalysisId, setGeneratedAnalysisId] = useState<string | null>(null)
+  const [analysisComplete, setAnalysisComplete] = useState(false)
   const [uploadKey, setUploadKey] = useState(0) // To reset upload component
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
 
   // Fetch uploads for selected patient
   const fetchPatientUploads = useCallback(async () => {
@@ -99,10 +102,14 @@ export default function DiagnosticsPage() {
       return
     }
 
+    const controller = new AbortController()
+    setAbortController(controller)
     setIsGenerating(true)
+    setAnalysisComplete(false)
     try {
       const response = await fetch(`/api/diagnostics/${uploadId}/generate-analysis`, {
         method: 'POST',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -112,6 +119,8 @@ export default function DiagnosticsPage() {
 
       const result = await response.json()
       setGeneratedAnalysisId(result.data?.analysisId)
+      setAnalysisComplete(true)
+
       toast.success(`Analysis generated with ${result.data?.protocolCount || 0} protocol recommendations!`)
 
       // Reset for next upload
@@ -121,16 +130,26 @@ export default function DiagnosticsPage() {
       // Refresh uploads
       await fetchPatientUploads()
 
-      // Navigate to patient profile where they can see:
-      // - The newly generated analysis in "Diagnostic Analyses" section
-      // - Frequency protocols and supplementation when expanding the analysis
-      // - Lab Results count (when blood panels are uploaded)
+      // Let user see 100% completion, then navigate
+      await new Promise(resolve => setTimeout(resolve, 1500))
       router.push(`/patients/${selectedPatientId}`)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        toast('Analysis cancelled', { icon: '🛑' })
+        return
+      }
       console.error('Analysis generation failed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to generate analysis')
     } finally {
       setIsGenerating(false)
+      setAnalysisComplete(false)
+      setAbortController(null)
+    }
+  }
+
+  const handleCancelAnalysis = () => {
+    if (abortController) {
+      abortController.abort()
     }
   }
 
@@ -197,17 +216,20 @@ export default function DiagnosticsPage() {
               Generate Analysis & Protocols
             </h2>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
-            <p className="text-blue-800 dark:text-blue-200 mb-4">
-              Files uploaded successfully! Click below to generate AI analysis and protocol recommendations.
-            </p>
-            <Button
-              onClick={() => handleGenerateAnalysis(currentUploadId)}
-              isLoading={isGenerating}
-            >
-              Generate Analysis & Protocols
-            </Button>
-          </div>
+          {isGenerating ? (
+            <AnalysisProgress isComplete={analysisComplete} onCancel={handleCancelAnalysis} />
+          ) : (
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
+              <p className="text-blue-800 dark:text-blue-200 mb-4">
+                Files uploaded successfully! Click below to generate AI analysis and protocol recommendations.
+              </p>
+              <Button
+                onClick={() => handleGenerateAnalysis(currentUploadId)}
+              >
+                Generate Analysis & Protocols
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

@@ -4,7 +4,7 @@ import { forwardRef, ButtonHTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'icon' | 'link'
   size?: 'sm' | 'md' | 'lg'
   isLoading?: boolean
 }
@@ -36,18 +36,24 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         'bg-red-500 text-white rounded-2xl hover:bg-red-600 active:scale-[0.98]',
       outline:
         'bg-transparent border-2 border-neutral-900 dark:border-neutral-50 text-neutral-900 dark:text-neutral-50 rounded-2xl hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.98]',
+      icon:
+        'bg-transparent text-neutral-600 dark:text-neutral-400 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-50 active:scale-[0.98]',
+      link:
+        'bg-transparent text-blue-600 dark:text-blue-400 hover:underline p-0 min-h-0',
     }
 
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
-      lg: 'px-6 py-3 text-lg',
+      sm: 'px-4 py-2 text-sm min-h-[36px]',
+      md: 'px-5 py-2.5 text-base min-h-[44px]',
+      lg: 'px-6 py-3 text-lg min-h-[48px]',
     }
+
+    const iconSize = variant === 'icon' ? 'min-w-[44px] min-h-[44px] p-2.5' : ''
 
     return (
       <button
         ref={ref}
-        className={cn(baseStyles, variants[variant], sizes[size], className)}
+        className={cn(baseStyles, variants[variant], variant !== 'icon' && variant !== 'link' ? sizes[size] : '', iconSize, className)}
         disabled={disabled || isLoading}
         {...props}
       >

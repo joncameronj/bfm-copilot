@@ -38,11 +38,14 @@ export function DiagnosticsUpload({
   const [uploadId, setUploadId] = useState<string | undefined>(initialUploadId)
   const [isGenerating, setIsGenerating] = useState(false)
   const [analysisGenerated, setAnalysisGenerated] = useState(false)
+  const [analysisAbortController, setAnalysisAbortController] = useState<AbortController | null>(null)
 
   const guessFileType = useCallback((filename: string): DiagnosticType => {
     const lower = filename.toLowerCase()
     if (lower.includes('pulse') || lower.includes('dpulse') || lower.includes('depulse')) return 'd_pulse'
     if (lower.includes('hrv')) return 'hrv'
+    if (lower.includes('ortho')) return 'ortho'
+    if (lower.includes('valsalva')) return 'valsalva'
     if (lower.includes('ua') || lower.includes('urinalysis') || lower.includes('urine')) return 'urinalysis'
     if (lower.includes('vcs') || lower.includes('visual contrast')) return 'vcs'
     if (lower.includes('brainwave') || lower.includes('eeg') || lower.includes('brain')) return 'brainwave'
@@ -180,10 +183,13 @@ export function DiagnosticsUpload({
   const generateAnalysis = async () => {
     if (!uploadId || !patientId) return
 
+    const controller = new AbortController()
+    setAnalysisAbortController(controller)
     setIsGenerating(true)
     try {
       const response = await fetch(`/api/diagnostics/${uploadId}/generate-analysis`, {
         method: 'POST',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -201,10 +207,18 @@ export function DiagnosticsUpload({
       setAnalysisGenerated(true)
       onAnalysisGenerated?.(result.data.analysisId)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
       console.error('Analysis generation failed:', error)
     } finally {
       setIsGenerating(false)
+      setAnalysisAbortController(null)
     }
+  }
+
+  const cancelAnalysis = () => {
+    analysisAbortController?.abort()
   }
 
   const pendingCount = files.filter((f) => f.status === 'pending').length
@@ -245,7 +259,7 @@ export function DiagnosticsUpload({
               : 'Drag & drop up to 6 files, or click to select'}
           </p>
           <p className="text-neutral-400 text-sm mt-2">
-            Supports: D-Pulse, HRV, Urinalysis (UA), VCS, Brainwave, NES Scan, Mold Toxicity, Blood Panels
+            Supports: D-Pulse, HRV, Ortho, Valsalva, Urinalysis (UA), VCS, Brainwave, NES Scan, Mold Toxicity, Blood Panels
           </p>
           <p className="text-neutral-400 text-xs mt-1">
             PDF, Images, Word documents
@@ -288,14 +302,24 @@ export function DiagnosticsUpload({
 
       {/* Generate Analysis Button */}
       {showGenerateButton && uploadId && patientId && allComplete && !analysisGenerated && (
-        <Button
-          onClick={generateAnalysis}
-          isLoading={isGenerating}
-          className="w-full flex items-center justify-center gap-2"
-        >
-          <HugeiconsIcon icon={AiMagicIcon} size={20} />
-          Generate AI Analysis
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={generateAnalysis}
+            isLoading={isGenerating}
+            className="flex-1 flex items-center justify-center gap-2"
+          >
+            <HugeiconsIcon icon={AiMagicIcon} size={20} />
+            {isGenerating ? 'Generating...' : 'Generate AI Analysis'}
+          </Button>
+          {isGenerating && (
+            <Button
+              variant="secondary"
+              onClick={cancelAnalysis}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Analysis Generated Success */}

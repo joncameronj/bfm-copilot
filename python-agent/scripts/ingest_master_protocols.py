@@ -84,6 +84,12 @@ FILE_CONFIG = {
         "body_system": "multi_system",
         "description": "Safety warnings and contraindications for frequency protocols",
     },
+    "10-clinical-decision-rules.md": {
+        "title": "BFM Master Protocol Key: Clinical Decision Rules (Eval-Trained)",
+        "care_category": "general",
+        "body_system": "multi_system",
+        "description": "Eval-trained clinical decision rules from Dr. Rob's review of 5 patient evaluations. Corrects common errors in autonomic pattern classification, supplement phasing, Cell Synergy dosing, vagus ordering, VCS-Leptin-MSH gating, and lab-triggered protocols.",
+    },
 }
 
 

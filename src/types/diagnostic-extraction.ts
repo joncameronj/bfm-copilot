@@ -237,6 +237,62 @@ export interface BrainwaveExtractedData {
 }
 
 // ============================================
+// Ortho Test Extraction (NervExpress)
+// ============================================
+
+export interface OrthoMeasurement {
+  hr: number                          // Heart Rate (bpm)
+  r_hf: number                       // R(HF) power
+  r_lf1: number                      // R(LF1) power
+  r_lf2: number                      // R(LF2) power
+}
+
+export interface OrthoExtractedData {
+  supine: OrthoMeasurement            // Supine (laying, blue dot)
+  upright: OrthoMeasurement           // Upright (standing, red dot)
+
+  // ANS assessment
+  physical_fitness_level?: string     // e.g., "11/7"
+  ans_assessment?: string             // e.g., "PSNS BLOCKED, SNS SWITCHED"
+  psns_status?: string                // e.g., "blocked", "normal", "weak"
+  sns_status?: string                 // e.g., "switched", "normal", "excessive"
+
+  // Dot superimposition (computed downstream, not from vision)
+  dots_superimposed?: boolean
+
+  findings: string[]
+}
+
+// ============================================
+// Valsalva Test Extraction (NervExpress)
+// ============================================
+
+export interface ValsalvaMeasurement {
+  hr: number                          // Heart Rate (bpm)
+  r_hf: number                       // R(HF) power
+  r_lf1: number                      // R(LF1) power
+  r_lf2: number                      // R(LF2) power
+}
+
+export interface ValsalvaExtractedData {
+  normal_breathing: ValsalvaMeasurement   // Normal breathing (blue dot)
+  deep_breathing: ValsalvaMeasurement     // Deep breathing (green dot)
+
+  // Ratios
+  ei_ratio?: number                   // Expiration/Inspiration ratio (normal > 1.2)
+  valsalva_ratio?: number             // Valsalva ratio (normal > 1.2)
+
+  // ANS assessment
+  ans_assessment?: string
+  vagus_function?: string             // e.g., "normal", "impaired", "blocked"
+
+  // Dot superimposition (computed downstream, not from vision)
+  dots_superimposed?: boolean
+
+  findings: string[]
+}
+
+// ============================================
 // Blood Panel Extraction (enhanced)
 // ============================================
 
@@ -284,6 +340,8 @@ export interface DiagnosticDataSummary {
   ua: UAExtractedData | null
   vcs: VCSExtractedData | null
   brainwave: BrainwaveExtractedData | null
+  ortho: OrthoExtractedData | null
+  valsalva: ValsalvaExtractedData | null
   bloodPanel: BloodPanelExtractedData | null
 
   // Aggregated critical findings

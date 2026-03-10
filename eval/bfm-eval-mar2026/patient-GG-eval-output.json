@@ -1,0 +1,472 @@
+{
+  "patient_name": "Gregory Geiger",
+  "report_date": "2025-09-18",
+  "urgency": {
+    "score": 5.0,
+    "rationale": "Gregory presents with 5 of 7 deal breakers active simultaneously: PNS Negative Zone (calm_pns = -3.0), Vagus Nerve Dysfunction (vagus_dysfunction = true), Low Heart on D-Pulse (Heart at 1%), Low pH (pH = 5.79, critically below 6.2), and VCS Failed (score 8/32). Additionally, nearly all D-Pulse organ scores are in single digits indicating catastrophic electron spin inversion (Krebs cycle backwards). Protein spilling in urine (3.0) and high uric acid compound the severity. This is one of the most complex presentations possible in BFM.",
+    "timeline": "6-12 months intensive, likely longer given the catastrophic D-Pulse and multiple deal breakers",
+    "critical_path": "Address pH immediately (Cell Synergy + Tri-Salts) to restore voltage/redox, then PNS Negative Zone and Vagus dysfunction to restore autonomic regulation, then Heart Health to stabilize the energy anchor point."
+  },
+  "deal_breakers": [
+    {
+      "name": "3. PNS Negative Zone",
+      "finding": "HRV shows green dot going backward/wrong direction during recovery \u2014 parasympathetic failure and resistance to healing",
+      "protocol": "PNS Support",
+      "urgency": "PNS in negative zone means the body actively resists healing. No other protocols will hold until parasympathetic recovery is restored. This is the longest deal breaker to resolve (several months).",
+      "patient_data_citation": "hrv.pns_negative = true, hrv.calm_pns = -3.0 (negative zone)"
+    },
+    {
+      "name": "4. Vagus Nerve Dysfunction",
+      "finding": "HRV indicates vagus nerve dysfunction \u2014 red dot >2 hash marks from blue dot, driving without brakes",
+      "protocol": "Vagus Support (basic \u2014 start here per non-negotiable protocol order)",
+      "urgency": "Vagus dysfunction compounds the PNS negative zone finding. Without vagal tone, the body cannot shift into recovery mode. Must start with Vagus Support before escalating to Vagus Balance or Vagus Trauma.",
+      "patient_data_citation": "hrv.vagus_dysfunction = true"
+    },
+    {
+      "name": "5. Low Heart on D-Pulse",
+      "finding": "Heart scores as lowest percentage on D-Pulse \u2014 anchor point indicating emotional trauma and energy deficit",
+      "protocol": "Heart Health",
+      "urgency": "Heart at 1% is the lowest possible anchor point. As the body's primary energy producer, this must be addressed to provide the energy foundation for all other healing.",
+      "patient_data_citation": "dpulse.organs: Heart = 1%"
+    },
+    {
+      "name": "6. Low pH",
+      "finding": "Urinalysis pH = 5.79, critically below 6.2 threshold requiring extra support (Tri-Salts). Severe voltage/redox and zeta potential problems.",
+      "protocol": "Terrain (if supplements don't move pH)",
+      "urgency": "pH of 5.79 is critically acidic. Below 6.2 requires Tri-Salts in addition to Cell Synergy. Voltage and redox cannot function in this environment. Must correct before frequencies can be effective.",
+      "patient_data_citation": "ua.ph = 5.79 (below 6.2 critical threshold)"
+    },
+    {
+      "name": "7. VCS Failed",
+      "finding": "VCS score 8/32 \u2014 severely failed, indicating significant biotoxin load (mold, Lyme, infections), leptin disruption",
+      "protocol": "Biotoxin, Leptin Resist",
+      "urgency": "Score of 8/32 is catastrophically low (threshold is <24/32). This indicates massive biotoxin burden. Activates the VCS \u2192 Leptin \u2192 MSH cascade requiring strict sequencing: address Leptin FIRST, then MSH.",
+      "patient_data_citation": "vcs.score_correct = 8, vcs.score_total = 32, vcs.passed = false"
+    }
+  ],
+  "frequency_phases": [
+    {
+      "phase": 1,
+      "protocol_name": "PNS Support",
+      "trigger": "PNS Negative Zone deal breaker \u2014 parasympathetic failure",
+      "patient_data_citation": "hrv.pns_negative = true, hrv.calm_pns = -3.0",
+      "sequencing_note": "Run at every visit. This is the longest deal breaker to resolve (several months).",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Vagus Support",
+      "trigger": "Vagus Nerve Dysfunction deal breaker \u2014 vagus nerve stuck, can't fire",
+      "patient_data_citation": "hrv.vagus_dysfunction = true",
+      "sequencing_note": "ALWAYS start with Vagus Support first per non-negotiable vagus protocol order. Do NOT escalate to Vagus Balance or Vagus Trauma until Vagus Support has been tried and found insufficient.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Heart Health",
+      "trigger": "Low Heart on D-Pulse deal breaker \u2014 Heart at 1%, energy anchor failing",
+      "patient_data_citation": "dpulse.organs: Heart = 1%",
+      "sequencing_note": "Run alongside autonomic deal breakers to restore energy production.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Terrain",
+      "trigger": "Low pH deal breaker \u2014 pH 5.79, critically below 6.2. Terrain frequency indicated if supplements alone don't move pH.",
+      "patient_data_citation": "ua.ph = 5.79",
+      "sequencing_note": "Start Cell Synergy + Tri-Salts immediately. If pH does not improve on retest in 2-4 weeks, add Terrain frequency.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Biotoxin",
+      "trigger": "VCS Failed deal breaker \u2014 score 8/32 indicating massive biotoxin load",
+      "patient_data_citation": "vcs.score_correct = 8, vcs.score_total = 32, vcs.passed = false",
+      "sequencing_note": "Pair with Pectasol-C. Part of the VCS \u2192 Leptin \u2192 MSH cascade. Address biotoxins and leptin FIRST before any MSH protocols.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Leptin Resist",
+      "trigger": "VCS Failed activates VCS \u2192 Leptin \u2192 MSH cascade. Leptin resistance must be addressed FIRST as it gates ALL other hormones.",
+      "patient_data_citation": "vcs.passed = false (VCS score 8/32 triggers leptin cascade)",
+      "sequencing_note": "Non-negotiable gating rule: Leptin must be trending down BEFORE moving to MSH protocols (Pit A Support, Pars Intermedia). Do NOT jump to MSH support before Leptin is addressed.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 1,
+      "protocol_name": "Aldehyde Detox",
+      "trigger": "High uric acid on UA strip indicating ammonia high or acetaldehyde high",
+      "patient_data_citation": "labs: Uric Acid (UA strip) = 300, status = high",
+      "sequencing_note": "Run alongside deal breaker frequencies. Supports detox pathways.",
+      "layer_label": "High Priorities",
+      "layer_description": "Deal breakers and urgent protocols. Address these first."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Pit A Support",
+      "trigger": "Protein spilling in urine indicates UB rate imbalance and MSH issue. Part of VCS \u2192 Leptin \u2192 MSH cascade.",
+      "patient_data_citation": "ua.protein_positive = true, ua.protein_value = 3.0",
+      "sequencing_note": "ONLY begin after Leptin Resist is trending down. This is the MSH arm of the VCS cascade. Non-negotiable gating rule.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Pars Intermedia",
+      "trigger": "MSH support \u2014 protein spilling in urine and VCS cascade indicate low MSH likely",
+      "patient_data_citation": "ua.protein_positive = true, ua.protein_value = 3.0; vcs.passed = false",
+      "sequencing_note": "ONLY begin after Leptin Resist is trending down. Pairs with Pit A Support.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Liver Tox",
+      "trigger": "Liver at 7% on D-Pulse \u2014 low liver score but no confirmed elevated liver enzymes (labs not yet available)",
+      "patient_data_citation": "dpulse.organs: Liver = 7%",
+      "sequencing_note": "Use Liver Tox (general) since liver enzymes have not been confirmed elevated. If labs return with elevated AST/ALT, switch to Liver Inflame.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Gallbladder Support",
+      "trigger": "Gallbladder at 1% on D-Pulse \u2014 usually drags with liver",
+      "patient_data_citation": "dpulse.organs: Gallbladder = 1%",
+      "sequencing_note": "Address alongside liver. Look for low stomach acid markers.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Lung Support",
+      "trigger": "Lungs at 1% on D-Pulse combined with failed VCS indicating biotoxic illness",
+      "patient_data_citation": "dpulse.organs: Lungs = 1%; vcs.passed = false",
+      "sequencing_note": "Pairs with Biotoxin protocol already running in Layer 1.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Bladder Support",
+      "trigger": "Bladder at 1% on D-Pulse",
+      "patient_data_citation": "dpulse.organs: Bladder = 1%",
+      "sequencing_note": "Address alongside kidney when kidney labs return.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Pineal Support",
+      "trigger": "Five Levers assessment \u2014 melatonin/circadian lever. Sleep quality unknown but given catastrophic D-Pulse, pineal likely compromised.",
+      "patient_data_citation": "dpulse.organs: Brain = 5%; multiple catastrophic organ scores",
+      "sequencing_note": "Part of Five Levers protocol group in Layer 2.",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 2,
+      "protocol_name": "Blood Support",
+      "trigger": "Protein spilling in urine may indicate RBC destruction/heme protein damage",
+      "patient_data_citation": "ua.protein_positive = true, ua.protein_value = 3.0",
+      "sequencing_note": "Check for KPU markers (zinc, B6 + bilirubin together).",
+      "layer_label": "Next If No Response",
+      "layer_description": "Secondary protocols if no response after 4-6 weeks."
+    },
+    {
+      "phase": 3,
+      "protocol_name": "Cyto Lower",
+      "trigger": "All systems in single digits on D-Pulse (catastrophic). Cyto Lower indicated for biotoxic illness with high inflammation.",
+      "patient_data_citation": "dpulse.organs: Nearly all organs at 1-7% (single digits)",
+      "sequencing_note": "Cyto Lower Gate: Cannot run until MSH > 8 and Leptin Resist is resolved. Run for 1 hour 45 minutes (time-dependent). This is a Layer 3 protocol \u2014 only after Leptin is addressed.",
+      "layer_label": "If They Are Still Stuck",
+      "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
+    },
+    {
+      "phase": 3,
+      "protocol_name": "Kidney Repair",
+      "trigger": "Kidneys at 1% on D-Pulse. Lab confirmation of GFR needed before aggressive kidney protocols.",
+      "patient_data_citation": "dpulse.organs: Kidneys = 1%",
+      "sequencing_note": "Rotate with Kidney Vitality. Await lab results for GFR confirmation. If labs show low GFR, escalate to Layer 2.",
+      "layer_label": "If They Are Still Stuck",
+      "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
+    },
+    {
+      "phase": 3,
+      "protocol_name": "Kidney Vitality",
+      "trigger": "Kidneys at 1% on D-Pulse. Rotate with Kidney Repair.",
+      "patient_data_citation": "dpulse.organs: Kidneys = 1%",
+      "sequencing_note": "Rotate with Kidney Repair.",
+      "layer_label": "If They Are Still Stuck",
+      "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
+    }
+  ],
+  "supplementation": [
+    {
+      "name": "Cell Synergy",
+      "trigger": "pH 5.79 critically low (<6.2 requires extra support); also foundational for catastrophic D-Pulse with all systems in single digits",
+      "dosage": "1 scoop/day standard",
+      "timing": "Daily, with or without food",
+      "patient_data_citation": "ua.ph = 5.79; dpulse.organs: nearly all organs 1-7%",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "Tri-Salts",
+      "trigger": "pH <6.2 requires Tri-Salts in addition to Cell Synergy",
+      "dosage": "Standard serving, diluted well in water",
+      "timing": "Daily \u2014 must dilute well, do not chug (nausea risk)",
+      "patient_data_citation": "ua.ph = 5.79 (below 6.2 critical threshold)",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "Pectasol-C",
+      "trigger": "VCS failed at 8/32 \u2014 biotoxin binder required",
+      "dosage": "Powder (use immersion blender) or capsules",
+      "timing": "Daily, paired with Biotoxin frequency",
+      "patient_data_citation": "vcs.score_correct = 8, vcs.passed = false",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "Serculate",
+      "trigger": "Heart at 1% on D-Pulse \u2014 lowest anchor point, energy deficit",
+      "dosage": "Per form code",
+      "timing": "Daily \u2014 patients typically feel better quickly",
+      "patient_data_citation": "dpulse.organs: Heart = 1%",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "CoQ10",
+      "trigger": "Heart at 1% on D-Pulse \u2014 mitochondrial electron transport support needed for heart anchor",
+      "dosage": "Per product; target RBC CoQ10 >1.65, better >2.0",
+      "timing": "Daily",
+      "patient_data_citation": "dpulse.organs: Heart = 1%",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "Innovita Vagus Nerve",
+      "trigger": "Vagus nerve dysfunction deal breaker triggered",
+      "dosage": "Per form code",
+      "timing": "Nighttime",
+      "patient_data_citation": "hrv.vagus_dysfunction = true",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "X39",
+      "trigger": "ALL patients Day 1 \u2014 stem cell stimulation and UB rate support. Especially critical with protein spilling in urine (UB rate imbalance) and catastrophic D-Pulse.",
+      "dosage": "12 hours on / 12 hours off, rotate placement every 2-3 days",
+      "timing": "Nightly; placement at C7, below belly button, or over specific injury site",
+      "patient_data_citation": "ua.protein_positive = true, ua.protein_value = 3.0; dpulse.organs: all single digits",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "L-Ornithine L-Aspartate",
+      "trigger": "High uric acid indicating ammonia high or acetaldehyde high",
+      "dosage": "Per product",
+      "timing": "When ammonia/uric acid high",
+      "patient_data_citation": "labs: Uric Acid (UA strip) = 300, status = high",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "Adipothin",
+      "trigger": "VCS \u2192 Leptin \u2192 MSH cascade activated by VCS failure. Leptin resistance support required.",
+      "dosage": "Per form code",
+      "timing": "Daily",
+      "patient_data_citation": "vcs.passed = false (score 8/32) \u2014 activates leptin cascade",
+      "priority": 2,
+      "layer": 2
+    },
+    {
+      "name": "Hypothala",
+      "trigger": "MSH support \u2014 downstream from leptin in VCS cascade. Contains hypothalamus + pituitary codes.",
+      "dosage": "Per form code",
+      "timing": "Daily",
+      "patient_data_citation": "vcs.passed = false; ua.protein_positive = true (MSH indicator)",
+      "priority": 2,
+      "layer": 2
+    },
+    {
+      "name": "Livergy",
+      "trigger": "Liver at 7% on D-Pulse. Start form code support; escalate if labs confirm elevated AST/ALT/GGT.",
+      "dosage": "Per form code",
+      "timing": "Daily",
+      "patient_data_citation": "dpulse.organs: Liver = 7%",
+      "priority": 2,
+      "layer": 2
+    },
+    {
+      "name": "Kidney Clear",
+      "trigger": "Kidneys at 1% on D-Pulse. Await lab confirmation of low GFR to determine escalation.",
+      "dosage": "Per form code",
+      "timing": "Daily",
+      "patient_data_citation": "dpulse.organs: Kidneys = 1%",
+      "priority": 2,
+      "layer": 2
+    },
+    {
+      "name": "Epi Pineal",
+      "trigger": "Five Levers: melatonin/pineal assessment. Given catastrophic D-Pulse with Brain at 5%, pineal support warranted if sleep issues present.",
+      "dosage": "Per form code",
+      "timing": "Nighttime",
+      "patient_data_citation": "dpulse.organs: Brain = 5%",
+      "priority": 3,
+      "layer": 3
+    },
+    {
+      "name": "Rejuvenation (Molecular H2)",
+      "trigger": "Advanced support for catastrophic D-Pulse and oxidative stress if initial protocols do not move labs/scores.",
+      "dosage": "1 tab/day standard",
+      "timing": "Drop in water; let fizz; drink",
+      "patient_data_citation": "dpulse.organs: nearly all organs at 1-7% single digit catastrophic levels",
+      "priority": 3,
+      "layer": 3
+    }
+  ],
+  "five_levers": [
+    {
+      "lever_number": 1,
+      "lever_name": "Melatonin",
+      "patient_status": "Not directly assessed \u2014 no saliva test or sleep quality data available. However, Brain at 5% on D-Pulse and catastrophic system-wide depletion suggest circadian disruption is highly likely. Alpha/theta ratio is 10:18 (theta > alpha, nearly 2:1) which correlates with poor sleep architecture.",
+      "recommendation": "Assess sleep quality. Add Pineal Support frequency in Layer 2. If sleep issues confirmed, add Epi Pineal (Innovita, no exogenous melatonin) and Silent Night patch. Blue blocking glasses by 8 PM. Adrenal Quiet frequency at night if needed.",
+      "patient_data_citation": "brainwave: alpha = 10, theta = 18 (theta > alpha at 1.8:1 ratio); dpulse.organs: Brain = 5%"
+    },
+    {
+      "lever_number": 2,
+      "lever_name": "Leptin",
+      "patient_status": "VCS catastrophically failed at 8/32, which activates the VCS \u2192 Leptin \u2192 MSH cascade. Leptin resistance is presumed present per the cascade gating rule. No direct leptin lab yet but VCS failure is a reliable proxy indicator.",
+      "recommendation": "Leptin Resist frequency is already in Layer 1 deal breakers. Adipothin (Innovita) added in Layer 2 pending lab confirmation. Leptin Rules Diet education mandatory. Pectasol-C already included for biotoxin binding. Lab test for leptin ($49) should be ordered.",
+      "patient_data_citation": "vcs.score_correct = 8, vcs.passed = false \u2014 triggers leptin cascade"
+    },
+    {
+      "lever_number": 3,
+      "lever_name": "MSH",
+      "patient_status": "No MSH lab drawn yet. However, VCS failure at 8/32 activates the VCS \u2192 Leptin \u2192 MSH cascade, making low MSH highly likely. Protein spilling in urine (3.0) further supports MSH/UB rate imbalance. Cannot proceed with MSH protocols until leptin is addressed.",
+      "recommendation": "Order MSH lab ($80). Pit A Support and Pars Intermedia frequencies are staged in Layer 2, gated behind Leptin Resist. Hypothala supplement (Innovita) in Layer 2. Sunlight exposure is primary treatment for MSH. Apex nasal spray to be considered once VCS is improving.",
+      "patient_data_citation": "vcs.passed = false; ua.protein_positive = true, ua.protein_value = 3.0"
+    },
+    {
+      "lever_number": 4,
+      "lever_name": "Vitamin D",
+      "patient_status": "No Vitamin D lab drawn yet. Cannot recommend supplementation without lab confirmation per phasing rules. Given catastrophic presentation, Vitamin D is likely low but must be confirmed.",
+      "recommendation": "Order Vitamin D blood test (target 60-80 ng/mL). If <60: Sun exposure is primary; supplement 10,000 IU/day \u00d7 4-6 weeks then 4,000 IU maintenance with Vitamin K at 200 mcg per 1,000 IU D. Use D-Minder app. Check nitric oxide test strips. No frequency exists for Vitamin D \u2014 sunlight is required.",
+      "patient_data_citation": "No Vitamin D lab available in diagnostic bundle \u2014 lab must be ordered"
+    },
+    {
+      "lever_number": 5,
+      "lever_name": "UB Rates",
+      "patient_status": "Protein spilling in urine at 3.0 is a direct indicator of UB rate imbalance. Combined with catastrophic D-Pulse (all systems single digits) and VCS failure, UB rates are severely compromised.",
+      "recommendation": "X39 patches are already included as Day 1 (ALL patients). Placement: C7, below belly button, or over specific injury site. 12 hours on/12 hours off. Rotate every 2-3 days. No direct frequency for UB rates \u2014 address the other 4 levers to support improvement. Check for autoimmune markers on labs.",
+      "patient_data_citation": "ua.protein_positive = true, ua.protein_value = 3.0; dpulse.organs: all single digit catastrophic"
+    }
+  ],
+  "patient_analogies": [
+    {
+      "finding": "All D-Pulse Organs in Single Digits (Catastrophic)",
+      "analogy": "Imagine your body is like a house where the electrical system has gone haywire. Instead of electricity flowing the right direction to power your appliances, it's running backwards \u2014 so nothing works properly. Your cells are like little batteries that have been put in the wrong way. The energy cycle that every cell depends on has reversed direction, which is why virtually every organ system is showing critically low function.",
+      "what_this_means": "What this means for you is that your body's energy production system \u2014 the Krebs cycle inside every cell \u2014 is not running correctly. This explains why so many different body systems are struggling at once. It's not that each organ has its own separate problem; it's that the foundational energy supply to ALL of them is compromised.",
+      "hopeful_framing": "The good news is that we've seen this pattern before and we know exactly what to do. By restoring your body's pH, voltage, and fundamental energy pathways, these numbers can come up. It will be slow and steady, but the body has a remarkable ability to recover once we get the foundation right."
+    },
+    {
+      "finding": "PNS Negative Zone + Vagus Dysfunction",
+      "analogy": "Your nervous system has two sides \u2014 one that hits the gas pedal (stress response) and one that hits the brakes (recovery). Right now, your brake system isn't just weak \u2014 it's going in reverse. It's as if you're trying to slow your car down but pressing the brake actually makes it speed up. On top of that, the main nerve that controls your brakes \u2014 the vagus nerve \u2014 is stuck and can't fire properly. It's like driving without brakes AND having a disconnected brake line.",
+      "what_this_means": "What this means for you is that your body is unable to shift into recovery and repair mode. Every time it tries to heal, the system pushes back against it. This is called 'resistance to healing' and it explains why you may feel like nothing gets better no matter what you try.",
+      "hopeful_framing": "The good news is that we have specific frequency protocols designed exactly for this pattern. PNS Support and Vagus Support are well-established protocols that we use regularly. It takes time \u2014 this is the longest deal breaker to resolve \u2014 but we've seen patients in this exact situation recover their parasympathetic function."
+    },
+    {
+      "finding": "Critically Low pH (5.79)",
+      "analogy": "Think of your body like a swimming pool. If the water chemistry is off \u2014 too acidic \u2014 nothing works right. The filters clog, algae grows, and the pool becomes unusable. Your body's internal 'water chemistry' (pH) is severely off. At 5.79, your cells are sitting in an environment that's far too acidic for normal function. This affects the electrical charge on your cells and how well everything flows.",
+      "what_this_means": "What this means for you is that your body's voltage and electrical potential are compromised. Cells need the right pH environment to communicate, transport nutrients, and eliminate waste. When pH is this low, even good treatments can't work as effectively because the basic terrain isn't right.",
+      "hopeful_framing": "The good news is that pH is one of the most responsive markers we track. With Cell Synergy and Tri-Salts, many patients see their pH begin to shift within weeks. Once we get your pH above 6.5, everything else we do becomes more effective."
+    },
+    {
+      "finding": "VCS Failed at 8/32",
+      "analogy": "The Visual Contrast Sensitivity test is like a canary in a coal mine for hidden toxins in your body. When someone can't distinguish between certain shades of gray, it tells us that biotoxins \u2014 from things like mold, infections, or environmental exposures \u2014 are affecting your nervous system. Your score of 8 out of 32 tells us there is a significant toxic burden that your body hasn't been able to clear on its own.",
+      "what_this_means": "What this means for you is that there are biotoxins circulating in your system that are disrupting hormones, brain function, and immune response. These toxins create a chain reaction: they cause leptin resistance, which then lowers a hormone called MSH, which then causes a cascade of other problems. This single finding actually explains a lot of your other results.",
+      "hopeful_framing": "The good news is that we have a well-defined protocol for biotoxin removal. Pectasol-C is a powerful binder that will start pulling these toxins out, and the Biotoxin frequency helps your body's own detox pathways. As your VCS score improves, we'll add Apex to further support your recovery."
+    },
+    {
+      "finding": "Heart at 1% on D-Pulse",
+      "analogy": "Your heart score on the D-Pulse is like a battery meter on your phone showing 1%. The heart isn't just a pump \u2014 it's your body's main energy generator. When it scores this low, it almost always means there's an emotional trauma component alongside a physical energy deficit. Think of it as your body's power plant running on fumes.",
+      "what_this_means": "What this means for you is that your body doesn't have enough energy at its core to power all the healing it needs to do. The heart is the anchor point \u2014 when it's this low, it drags everything else down with it.",
+      "hopeful_framing": "The good news is that Heart Health frequency combined with Serculate and CoQ10 is one of our most responsive protocols. Many patients notice a difference in energy and wellbeing within weeks of starting this combination."
+    }
+  ],
+  "monitoring": [
+    {
+      "metric": "Urinalysis pH",
+      "baseline": "5.79",
+      "target": ">6.5 (above 6.2 to discontinue Tri-Salts, above 6.5 for deal breaker clearance)",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "VCS Score",
+      "baseline": "8/32",
+      "target": ">24/32 (passed)",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "HRV: PNS Negative Zone",
+      "baseline": "PNS negative (calm_pns = -3.0)",
+      "target": "PNS in positive zone during recovery",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "HRV: Vagus Dysfunction",
+      "baseline": "Vagus dysfunction present",
+      "target": "Red dot within 2 hash marks of blue dot",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "D-Pulse: Heart",
+      "baseline": "1%",
+      "target": ">40%",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "D-Pulse: All Organ Systems",
+      "baseline": "Nearly all systems 1-7% (catastrophic single digits)",
+      "target": "Progressive improvement out of single digits; expect slow rise",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "Brainwave: Theta/Alpha Ratio",
+      "baseline": "Theta 18 / Alpha 10 (1.8:1 ratio \u2014 approaching but not exceeding 2:1)",
+      "target": "Alpha > Theta (normal ratio)",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "Urinalysis: Protein",
+      "baseline": "Positive at 3.0",
+      "target": "Negative / minimal protein",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "Uric Acid (UA strip)",
+      "baseline": "300 (high)",
+      "target": "Normal range",
+      "reassessment_interval": "Every 2-4 weeks (in-office)"
+    },
+    {
+      "metric": "LabCorp Bloodwork (Leptin, MSH, Vitamin D, Ferritin, CRP, liver enzymes, GFR, homocysteine, thyroid panel, spike protein)",
+      "baseline": "Not yet drawn",
+      "target": "Within functional ranges per BFM standards",
+      "reassessment_interval": "3 months after initial draw"
+    }
+  ],
+  "clinical_summary": "Gregory Geiger presents with one of the most severe BFM profiles possible, with 5 of 7 deal breakers active simultaneously and a catastrophic D-Pulse where nearly every organ system scores in single digits (Heart 1%, Kidneys 1%, Lungs 1%, Bladder 1%, Stomach 1%, Gallbladder 1%, with remaining organs at 3-7%). This pattern \u2014 all systems in single digits \u2014 indicates electron spin inversion with the Krebs cycle running backwards, representing the most foundational level of cellular dysfunction. His pH of 5.79 is critically acidic (well below the 6.2 danger threshold), confirming severe voltage/redox compromise and zeta potential failure. The VCS score of 8/32 is catastrophically low, indicating a massive biotoxin burden that triggers the non-negotiable VCS \u2192 Leptin \u2192 MSH cascade. His autonomic nervous system shows PNS in negative zone (calm_pns = -3.0) with concurrent vagus nerve dysfunction \u2014 the body is actively resisting healing and has lost its ability to shift into parasympathetic recovery mode.\n\nThe treatment approach must be methodical and strictly sequenced. Layer 1 (High Priorities) addresses all five deal breakers simultaneously: PNS Support and Vagus Support (starting with basic Vagus Support per non-negotiable protocol order) to restore autonomic regulation; Heart Health to address the 1% heart anchor; Terrain if pH doesn't move with Cell Synergy + Tri-Salts; and Biotoxin + Leptin Resist to begin clearing the biotoxin/leptin cascade. The Aldehyde Detox frequency addresses his elevated uric acid. Day 1 supplements include Cell Synergy (1 scoop standard), Tri-Salts (pH <6.2), Pectasol-C (VCS failed), Serculate and CoQ10 (Heart at 1%), Innovita Vagus Nerve form code (vagus deal breaker), X39 patches (all patients Day 1), and L-Ornithine L-Aspartate (high uric acid). Comprehensive labs must be ordered immediately \u2014 Leptin, MSH, Vitamin D, ferritin, CRP, liver enzymes, GFR, homocysteine, thyroid panel, and spike protein antibodies \u2014 as many Layer 2 protocols and supplements depend on lab confirmation.\n\nThe brainwave pattern shows theta (18) exceeding alpha (10) at a 1.8:1 ratio \u2014 approaching but not yet exceeding the 2:1 threshold that would trigger the Alpha/Theta deal breaker. This should be monitored closely; if it worsens to >2:1, the Alpha Theta frequency and D-Ribose must be added. Gregory's system energy of 11 and stress response of 7 on HRV further confirm profound depletion. This is a case that will require consistent treatment at minimum 2\u00d7 per week for many months. Given the severity and number of deal breakers, the practitioner should watch for the 'BE MORE ATTENTIVE' finding on future HRV assessments, which would warrant increasing to 3\u00d7/week and doubling Cell Synergy to 2 scoops. Patience and strict protocol sequencing \u2014 especially the Leptin-before-MSH gating rule \u2014 will be essential for Gregory's recovery.",
+  "confidence_notes": "MISSING DATA \u2014 CRITICAL: No comprehensive lab panel (LabCorp bloodwork) is available. Leptin, MSH, Vitamin D, ferritin, CRP, liver enzymes (AST/ALT/GGT), GFR, homocysteine, thyroid markers (TSH, T3, T4, TPO, TGB), and spike protein antibodies have not been drawn. Many Layer 2 supplements and frequencies are staged pending these results. The VCS \u2192 Leptin \u2192 MSH cascade is activated based on VCS failure alone; direct leptin and MSH labs will confirm and refine treatment. Brainwave theta/alpha ratio is 1.8:1 \u2014 close to but not exceeding the 2:1 deal breaker threshold, so Alpha/Theta deal breaker is NOT triggered at this time but should be closely monitored. The HRV data is missing stressed and recovery phase values (stressed_pns, stressed_sns, recovery_pns, recovery_sns are all null), which limits full autonomic pattern assessment \u2014 specifically, we cannot fully evaluate the POTS pattern, freeze response, or toxicity overlap patterns. SNS switching is reported as false, which is consistent with the available data (calm_sns = 1.5, not clearly switched to wrong side). The UA strip labs for uric acid, magnesium, and ascorbate are noted but are screening-level \u2014 comprehensive blood chemistry will provide more definitive values."
+}

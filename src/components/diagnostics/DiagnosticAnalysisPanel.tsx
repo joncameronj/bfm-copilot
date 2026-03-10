@@ -6,10 +6,11 @@ import {
   Alert01Icon,
   File01Icon,
   Loading03Icon,
+  PillIcon,
   Tick01Icon,
 } from '@hugeicons/core-free-icons'
+import { Button } from '@/components/ui/Button'
 import { FrequencyRecommendationCard } from '@/components/protocols/FrequencyRecommendationCard'
-import { SupplementationSection } from '@/components/diagnostics/SupplementationSection'
 import { LogProtocolsFooter } from '@/components/diagnostics/LogProtocolsFooter'
 import { DiagnosticEvalReport } from '@/components/diagnostics/DiagnosticEvalReport'
 import { LayerQuickRefModal } from '@/components/diagnostics/LayerQuickRefModal'
@@ -20,6 +21,7 @@ import {
   ANALYSIS_STATUS_COLORS,
   type DiagnosticAnalysisWithRecommendations,
   type FlattenedFrequencyCard,
+  type Supplementation,
 } from '@/types/diagnostic-analysis'
 import { cn } from '@/lib/utils'
 import type { EvalReportData } from './DiagnosticEvalReportPdf'
@@ -128,6 +130,24 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
     }
   }
 
+  const handleCancelReport = async () => {
+    if (evalState.phase !== 'polling' && evalState.phase !== 'generating') return
+
+    try {
+      await fetch(`/api/diagnostics/${analysis.id}/generate-report`, {
+        method: 'DELETE',
+      })
+    } catch {
+      // Best-effort cancel
+    }
+
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    setEvalState({ phase: 'idle' })
+  }
+
   const handleToggleExecution = (frequencyId: string) => {
     setFrequencyCards(prev =>
       prev.map(card =>
@@ -225,7 +245,7 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
           <div>
             <p className="font-medium text-blue-900">Analysis in progress</p>
             <p className="text-sm text-blue-700">
-              Dr. Rob is analyzing the diagnostic files and generating protocol recommendations...
+              Copilot is analyzing the diagnostic files and generating protocol recommendations...
             </p>
           </div>
         </div>
@@ -252,7 +272,7 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
               <span className="text-lg">🩺</span>
             </div>
             <div>
-              <p className="font-medium text-neutral-900">Dr. Rob&apos;s Analysis</p>
+              <p className="font-medium text-neutral-900">Copilot&apos;s Analysis</p>
               <p className="text-sm text-neutral-500">Based on diagnostic files and medical knowledge base</p>
             </div>
           </div>
@@ -267,6 +287,7 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
         <EvalReportSection
           evalState={evalState}
           onGenerate={handleGenerateReport}
+          onCancel={handleCancelReport}
           onView={() => setShowReport(true)}
           onQuickView={() => setShowQuickView(true)}
         />
@@ -303,47 +324,15 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
         />
       )}
 
-      {/* Frequency Cards */}
-      {analysis.status === 'complete' && frequencyCards.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium text-neutral-900">
-              FSM Frequency Protocols ({frequencyCards.length})
-            </h4>
-            <div className="flex items-center gap-2 text-sm text-neutral-500">
-              <HugeiconsIcon icon={Tick01Icon} size={16} className="text-emerald-600" />
-              <span>
-                {frequencyCards.filter(f => f.status === 'executed').length} executed
-              </span>
-            </div>
-          </div>
-          <div className="space-y-4">
-            {frequencyCards.map(frequency => (
-              <FrequencyRecommendationCard
-                key={frequency.frequencyId}
-                frequency={frequency}
-                onToggleExecution={handleToggleExecution}
-                onDecline={handleDecline}
-                isLoading={loadingId === frequency.originalProtocolId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Supplementation (Practitioners Only) */}
-      {analysis.status === 'complete' && isPractitionerOrAdmin && analysis.supplementation && analysis.supplementation.length > 0 && (
-        <SupplementationSection supplementation={analysis.supplementation} />
-      )}
-
-      {/* Empty State */}
-      {analysis.status === 'complete' && frequencyCards.length === 0 && (
-        <div className="bg-neutral-50 rounded-2xl p-8 text-center">
-          <p className="text-neutral-600">No protocol recommendations generated.</p>
-          <p className="text-sm text-neutral-500 mt-1">
-            The analysis did not produce specific protocol recommendations based on the available data.
-          </p>
-        </div>
+      {/* Layered Protocols & Supplementation */}
+      {analysis.status === 'complete' && (
+        <LayeredProtocolsSection
+          frequencyCards={frequencyCards}
+          supplementation={isPractitionerOrAdmin ? (analysis.supplementation || []) : []}
+          onToggleExecution={handleToggleExecution}
+          onDecline={handleDecline}
+          loadingId={loadingId}
+        />
       )}
 
       {/* Sticky Footer */}
@@ -362,11 +351,12 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
 interface EvalReportSectionProps {
   evalState: EvalState
   onGenerate: () => void
+  onCancel: () => void
   onView: () => void
   onQuickView: () => void
 }
 
-function EvalReportSection({ evalState, onGenerate, onView, onQuickView }: EvalReportSectionProps) {
+function EvalReportSection({ evalState, onGenerate, onCancel, onView, onQuickView }: EvalReportSectionProps) {
   if (evalState.phase === 'idle') {
     return (
       <div className="border border-dashed border-neutral-300 rounded-2xl p-5 flex items-center justify-between">
@@ -376,28 +366,39 @@ function EvalReportSection({ evalState, onGenerate, onView, onQuickView }: EvalR
             Claude Opus 4.6 · All 9 master protocols · Deep clinical analysis · ~3 min
           </p>
         </div>
-        <button
+        <Button
           onClick={onGenerate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+          size="sm"
+          className="bg-blue-600 hover:bg-blue-700"
         >
           <HugeiconsIcon icon={File01Icon} size={16} />
           Generate Full Report
-        </button>
+        </Button>
       </div>
     )
   }
 
   if (evalState.phase === 'generating' || evalState.phase === 'polling') {
     return (
-      <div className="bg-blue-50 rounded-2xl p-5 flex items-center gap-4">
-        <HugeiconsIcon icon={Loading03Icon} size={24} className="text-blue-600 animate-spin" />
-        <div>
-          <p className="font-medium text-blue-900">Generating full eval report...</p>
-          <p className="text-sm text-blue-700">
-            Claude Opus 4.6 is analyzing all 9 master protocol files against your patient data.
-            This takes approximately 3 minutes.
-          </p>
+      <div className="bg-blue-50 rounded-2xl p-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <HugeiconsIcon icon={Loading03Icon} size={24} className="text-blue-600 animate-spin flex-shrink-0" />
+          <div>
+            <p className="font-medium text-blue-900">Generating full eval report...</p>
+            <p className="text-sm text-blue-700">
+              Claude Opus 4.6 is analyzing all 9 master protocol files against your patient data.
+              This takes approximately 3 minutes.
+            </p>
+          </div>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onCancel}
+          className="flex-shrink-0"
+        >
+          Cancel
+        </Button>
       </div>
     )
   }
@@ -412,12 +413,14 @@ function EvalReportSection({ evalState, onGenerate, onView, onQuickView }: EvalR
             <p className="text-sm text-red-700">{evalState.message}</p>
           </div>
         </div>
-        <button
+        <Button
+          variant="danger"
+          size="sm"
           onClick={onGenerate}
-          className="flex-shrink-0 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          className="flex-shrink-0"
         >
           Retry
-        </button>
+        </Button>
       </div>
     )
   }
@@ -443,25 +446,165 @@ function EvalReportSection({ evalState, onGenerate, onView, onQuickView }: EvalR
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onQuickView}
-            className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-medium transition-colors"
           >
             Quick View
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             onClick={onView}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             <HugeiconsIcon icon={File01Icon} size={16} />
             Open Report
-          </button>
+          </Button>
         </div>
       </div>
     )
   }
 
   return null
+}
+
+// ---------------------------------------------------------------------------
+// Layered Protocols & Supplementation Section
+// ---------------------------------------------------------------------------
+
+const LAYER_GROUPS = [
+  {
+    layer: 1,
+    label: 'Layer 1 — High Priorities',
+    colorClass: 'bg-red-50 text-red-700',
+    dividerClass: 'bg-red-200',
+  },
+  {
+    layer: 2,
+    label: 'Layer 2 — Next If No Response',
+    colorClass: 'bg-amber-50 text-amber-700',
+    dividerClass: 'bg-amber-200',
+  },
+  {
+    layer: 3,
+    label: 'Layer 3 — If They Are Still Stuck',
+    colorClass: 'bg-neutral-100 text-neutral-600',
+    dividerClass: 'bg-neutral-300',
+  },
+]
+
+interface LayeredProtocolsSectionProps {
+  frequencyCards: FlattenedFrequencyCard[]
+  supplementation: Supplementation[]
+  onToggleExecution: (id: string) => void
+  onDecline: (id: string) => void
+  loadingId: string | null
+}
+
+function LayeredProtocolsSection({
+  frequencyCards,
+  supplementation,
+  onToggleExecution,
+  onDecline,
+  loadingId,
+}: LayeredProtocolsSectionProps) {
+  const executedCount = frequencyCards.filter(f => f.status === 'executed').length
+  const hasContent = frequencyCards.length > 0 || supplementation.length > 0
+
+  if (!hasContent) {
+    return (
+      <div className="bg-neutral-50 rounded-2xl p-8 text-center">
+        <p className="text-neutral-600">No protocol recommendations generated.</p>
+        <p className="text-sm text-neutral-500 mt-1">
+          The analysis did not produce specific protocol recommendations based on the available data.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-neutral-900">
+          Protocols for Copilot
+        </h4>
+        {executedCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            <HugeiconsIcon icon={Tick01Icon} size={16} className="text-emerald-600" />
+            <span>{executedCount} executed</span>
+          </div>
+        )}
+      </div>
+
+      {LAYER_GROUPS.map(({ layer, label, colorClass, dividerClass }) => {
+        const layerCards = frequencyCards.filter(c =>
+          layer === 3 ? c.priority >= 3 : c.priority === layer
+        )
+        // Layer 1 also captures unassigned supplements (layer=0 or undefined)
+        const layerSupps = supplementation.filter(s =>
+          layer === 1
+            ? s.layer === 1 || !s.layer || s.layer === 0
+            : s.layer === layer
+        )
+
+        if (layerCards.length === 0 && layerSupps.length === 0) return null
+
+        return (
+          <div key={layer} className="space-y-3">
+            {/* Layer header */}
+            <div className="flex items-center gap-3">
+              <div className={cn('h-px flex-1', dividerClass)} />
+              <span className={cn('text-xs font-bold tracking-wider uppercase px-3 py-1 rounded-full whitespace-nowrap', colorClass)}>
+                {label}
+              </span>
+              <div className={cn('h-px flex-1', dividerClass)} />
+            </div>
+
+            {/* Frequency cards */}
+            {layerCards.length > 0 && (
+              <div className="space-y-3">
+                {layerCards.map(frequency => (
+                  <FrequencyRecommendationCard
+                    key={frequency.frequencyId}
+                    frequency={frequency}
+                    onToggleExecution={onToggleExecution}
+                    onDecline={onDecline}
+                    isLoading={loadingId === frequency.originalProtocolId}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Supplement cards */}
+            {layerSupps.length > 0 && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {layerSupps.map((supp, idx) => (
+                  <div key={idx} className="bg-white border border-neutral-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <HugeiconsIcon icon={PillIcon} size={16} className="text-neutral-500" />
+                      <h5 className="font-semibold text-neutral-900 text-sm">{supp.name}</h5>
+                    </div>
+                    <div className="space-y-1 text-xs text-neutral-600">
+                      {supp.dosage && (
+                        <p><span className="font-medium text-neutral-700">Dosage:</span> {supp.dosage}</p>
+                      )}
+                      {supp.timing && (
+                        <p><span className="font-medium text-neutral-700">Timing:</span> {supp.timing}</p>
+                      )}
+                      {supp.rationale && (
+                        <p className="pt-1 border-t border-neutral-100 text-neutral-500">{supp.rationale}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { cn } from '@/lib/utils'
+import { AlertMessage } from '@/components/ui/AlertMessage'
 
 export function PasswordSection() {
   const [currentPassword, setCurrentPassword] = useState('')
@@ -77,16 +77,9 @@ export function PasswordSection() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {message && (
-            <div
-              className={cn(
-                'px-4 py-3 rounded-xl text-sm',
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-600'
-                  : 'bg-red-50 text-red-600'
-              )}
-            >
+            <AlertMessage variant={message.type === 'success' ? 'success' : 'error'}>
               {message.text}
-            </div>
+            </AlertMessage>
           )}
 
           <Input

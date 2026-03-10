@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { AlertMessage } from '@/components/ui/AlertMessage'
 import { cn } from '@/lib/utils'
 import type { UserPreferences } from '@/types/settings'
 
@@ -120,14 +121,9 @@ export function NotificationsSection({ preferences }: NotificationsSectionProps)
         </div>
 
         {message && (
-          <div
-            className={cn(
-              'mt-4 px-4 py-3 rounded-xl text-sm',
-              message.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
-            )}
-          >
+          <AlertMessage variant={message.type === 'success' ? 'success' : 'error'} className="mt-4">
             {message.text}
-          </div>
+          </AlertMessage>
         )}
 
         <div className="flex justify-end pt-6">

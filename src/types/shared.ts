@@ -92,6 +92,8 @@ export type DiagnosticType =
   | 'urinalysis'    // UA - pH, protein levels
   | 'vcs'           // Visual Contrast Spectrum
   | 'brainwave'     // EEG/brainwave analysis
+  | 'ortho'         // NervExpress Ortho test (supine/upright)
+  | 'valsalva'      // NervExpress Valsalva test (normal/deep breathing)
   | 'other'
 
 export interface DiagnosticUpload {

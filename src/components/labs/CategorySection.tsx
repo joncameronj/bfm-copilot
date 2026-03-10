@@ -4,6 +4,8 @@ import { useState } from 'react';
 import type { LabMarker, MarkerResult, LabFormValues } from '@/types/labs';
 import type { CategoryInfo } from '@/lib/labs/categories';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { ArrowDown01Icon, PlusSignIcon, Tick02Icon, Alert01Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
 
@@ -87,16 +89,11 @@ export function CategorySection({
         </span>
         <div className="flex w-full items-center ml-4">
           <div aria-hidden="true" className="w-full border-t border-neutral-200 dark:border-neutral-700" />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className={cn(
-              'inline-flex items-center gap-x-1.5 rounded-full',
-              'bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50',
-              'px-3 py-1.5 text-sm font-semibold whitespace-nowrap',
-              'hover:bg-neutral-100 dark:hover:bg-neutral-700',
-              'transition-colors'
-            )}
+            className="rounded-full whitespace-nowrap"
           >
             {isExpanded ? (
               <HugeiconsIcon icon={ArrowDown01Icon} size={20} className="-ml-1 text-neutral-500 dark:text-neutral-400" />
@@ -119,7 +116,7 @@ export function CategorySection({
                 {flaggedCount} flagged
               </span>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -186,18 +183,13 @@ export function CategorySection({
 
                   {/* Value Input */}
                   <div className="flex gap-1">
-                    <input
+                    <Input
                       type="number"
                       step="any"
                       placeholder="Enter"
                       value={value ?? ''}
                       onChange={(e) => handleInputChange(marker.id, e.target.value)}
-                      className={cn(
-                        'w-full text-center rounded-lg px-3 py-2 text-sm',
-                        'bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-600',
-                        'focus:border-neutral-400 dark:focus:border-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 dark:focus:ring-neutral-100/20',
-                        'text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-500'
-                      )}
+                      className="text-center text-sm"
                     />
                     {marker.unit && (
                       <div className="flex items-center px-2 rounded text-xs bg-neutral-100 dark:bg-neutral-600 text-neutral-500 dark:text-neutral-300 whitespace-nowrap">

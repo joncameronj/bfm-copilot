@@ -97,6 +97,7 @@ export function Navigation({ isCollapsed = false, unreadChatsCount = 0 }: Naviga
           <Link
             key={item.href}
             href={item.href}
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
               'group relative flex items-center gap-3 rounded-lg text-base font-semibold',
               'transition-colors duration-200 h-10 px-[10px]',
@@ -111,7 +112,7 @@ export function Navigation({ isCollapsed = false, unreadChatsCount = 0 }: Naviga
           >
             {/* Tooltip when collapsed */}
             {isCollapsed && (
-              <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {item.label}
                 {item.icon === 'Chats' && unreadChatsCount > 0 && ` (${unreadChatsCount})`}
               </span>
@@ -145,9 +146,10 @@ export function Navigation({ isCollapsed = false, unreadChatsCount = 0 }: Naviga
       {isAdmin && (
         <Link
           href={ADMIN_NAV_ITEM.href}
+          aria-current={pathname.startsWith('/admin') ? 'page' : undefined}
           className={cn(
             'group relative flex items-center gap-3 rounded-lg text-base font-semibold',
-            'transition-colors duration-200 h-10 px-[10px]',
+            'transition-colors duration-200 h-12 px-[10px]',
             pathname.startsWith('/admin')
               ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-50'
               : 'text-neutral-900 dark:text-neutral-50 hover:bg-neutral-100 dark:hover:bg-neutral-800'
@@ -159,7 +161,7 @@ export function Navigation({ isCollapsed = false, unreadChatsCount = 0 }: Naviga
         >
           {/* Tooltip when collapsed */}
           {isCollapsed && (
-            <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <span className="absolute left-full ml-2 px-2 py-1 bg-neutral-900 dark:bg-neutral-700 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
               {ADMIN_NAV_ITEM.label}
             </span>
           )}

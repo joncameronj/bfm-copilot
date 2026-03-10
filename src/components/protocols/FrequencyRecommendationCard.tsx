@@ -41,11 +41,6 @@ export function FrequencyRecommendationCard({
             <span className={cn('px-2 py-1 text-xs font-medium rounded-full', categoryColor)}>
               {categoryLabel}
             </span>
-            {frequency.priority <= 2 && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700">
-                High Priority
-              </span>
-            )}
           </div>
 
           {/* Frequency Name (Main Title) */}

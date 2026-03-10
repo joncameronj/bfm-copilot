@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { AlertMessage } from '@/components/ui/AlertMessage'
 import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Settings01Icon, File01Icon, ThumbsUpIcon, StethoscopeIcon, Delete02Icon, Add01Icon } from '@hugeicons/core-free-icons'
@@ -154,9 +155,9 @@ function PracticeInfoTab() {
       />
 
       {message && (
-        <div className={cn('px-4 py-3 rounded-xl text-sm', message.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600')}>
+        <AlertMessage variant={message.type === 'success' ? 'success' : 'error'}>
           {message.text}
-        </div>
+        </AlertMessage>
       )}
 
       <div className="flex justify-end pt-4">
@@ -553,9 +554,9 @@ function SettingsTab({ preferences, onSave }: { preferences: UserPreferences | n
       </div>
 
       {message && (
-        <div className={cn('px-4 py-3 rounded-xl text-sm', message.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600')}>
+        <AlertMessage variant={message.type === 'success' ? 'success' : 'error'}>
           {message.text}
-        </div>
+        </AlertMessage>
       )}
 
       <div className="flex justify-end pt-4">

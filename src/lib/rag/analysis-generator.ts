@@ -84,9 +84,36 @@ Structure your response as JSON with the following format:
 }
 
 LAYERED PROTOCOL SYSTEM — assign every protocol and supplement to a layer:
-- Layer 1 ("High Priorities"): Deal breakers + primary in-office protocols + Day 1 supplements (Cell Synergy, Tri-Salts, Pectasol-C, X-39, Serculate, CoQ10, Vagus Nerve). Set priority=1, layer=1, layer_label="High Priorities".
+- Layer 1 ("High Priorities"): Deal breakers + primary in-office protocols + Day 1 supplements (Cell Synergy, Tri-Salts, Pectasol-C, X-39, Serculate, CoQ10, Vagus Nerve, Deuterium Drops if specific gravity ≤1.005). Set priority=1, layer=1, layer_label="High Priorities".
 - Layer 2 ("Next If No Response"): Condition-specific protocols (Thyroid, Hormone, Gut, Liver) + lab-triggered supplements (Vitamin D, IP6 Gold, Homocysteine Factor, Adipothin, Livergy, Pancreos). Set priority=2, layer=2, layer_label="Next If No Response".
-- Layer 3 ("If They Are Still Stuck"): Experimental protocols (Deuterium, EMF Cord) + advanced detox + advanced supplements (Epi Pineal, Hypothala, Rejuvenation H2, Fatty 15). Set priority=3, layer=3, layer_label="If They Are Still Stuck".
+- Layer 3 ("If They Are Still Stuck"): Experimental protocols (EMF Cord, Deuterium frequency for high deuterium >130ppm) + advanced detox + advanced supplements (Epi Pineal, Hypothala, Rejuvenation H2, Fatty 15). Set priority=3, layer=3, layer_label="If They Are Still Stuck".
+
+EVAL-TRAINED CLINICAL DECISION RULES (from Dr. Rob's review — apply strictly):
+
+AUTONOMIC PATTERN CLASSIFICATION (most common error — get this right):
+- SNS SWITCHED (upper-left quadrant, SNS clearly elevated): → SNS Balance (35@709)
+- LOWER-LEFT QUADRANT (both SNS and PNS depleted): → MIDBRAIN SUPPORT, NOT SNS Balance
+- RED DOT ON BLUE DOT (fight/flight freeze): → LOCUS COERULEUS + SNS Balance
+- PNS NEGATIVE ONLY (no SNS switch): → PNS Support + Vagus Support, NOT SNS Balance
+- HIGH BARORECEPTOR SENSITIVITY: → CSF SUPPORT frequency
+
+VAGUS ORDER (non-negotiable): Vagus Support FIRST → Vagus Balance (if SNS also switched) → Vagus Trauma ONLY if insufficient
+NEVER start with Vagus Trauma. NEVER reverse this order.
+
+CELL SYNERGY: Standard = 1 scoop. Double = 2 scoops (NOT 4). Only double for "BE MORE ATTENTIVE" or extreme Alpha/Theta ratio.
+
+X-39: ALWAYS Day 1 for ALL patients. Never push to Week 3-4.
+
+SUPPLEMENT PHASING (Day 1 = in-office ONLY, Week 1-2 = lab ONLY):
+- Day 1: Cell Synergy, Tri-Salts (pH<6.2 only), Pectasol-C (VCS fail), Serculate (Heart low), CoQ10 (Heart low), X-39 (ALL), Innovita Vagus (vagus DB), D-Ribose (Alpha/Theta DB), Deuterium Drops (SG≤1.005)
+- Week 1-2: Vitamin D, IP6 Gold, Homocysteine Factor, Adipothin, Livergy, Pancreos, Kidney Clear — ONLY with lab confirmation
+- DO NOT recommend Vitamin D, Integra Cell, or lab-dependent supplements without lab results
+
+VCS → LEPTIN → MSH GATING: VCS fail → address Leptin FIRST (Biotoxin + Leptin Resist + Adipothin), THEN MSH (Pit A Support, Pars Intermedia). Never jump to MSH before Leptin.
+
+LAB RETEST: 3 months for bloodwork (NOT 6 weeks). In-office retest: every 2-4 weeks.
+
+FAKE FREQUENCIES TO NEVER USE: "Brain Activity Support", "Stress Index Regulation", "Cervical Support", "Stress Response Support", "Energy Restoration" — NONE of these exist.
 
 Guidelines for protocols:
 - Recommend the MINIMAL VIABLE protocol set based on highest-signal diagnostic findings (typically 2-4; only add more when clearly justified by extracted diagnostics)
@@ -644,6 +671,8 @@ async function getExtractedDiagnosticData(
       ua: null,
       vcs: null,
       brainwave: null,
+      ortho: null,
+      valsalva: null,
       bloodPanel: null,
       dealBreakers: [],
       findings: [],
@@ -1082,7 +1111,7 @@ REMEMBER (CRITICAL):
 
   const response = await client.messages.create({
     model: getAnalysisModel(),
-    max_tokens: 4000,
+    max_tokens: 25000,
     temperature: 0.7,
     system: systemPrompt + JSON_SYSTEM_SUFFIX,
     messages: [
@@ -1094,6 +1123,10 @@ REMEMBER (CRITICAL):
   const content = textBlock && 'text' in textBlock ? textBlock.text : null
   if (!content) {
     throw new Error('No response from AI')
+  }
+
+  if (response.stop_reason === 'max_tokens') {
+    console.error('[Analysis] Response truncated at max_tokens limit — JSON will be incomplete')
   }
 
   try {
@@ -1224,9 +1257,9 @@ REMEMBER (CRITICAL):
       if (s.layer && typeof s.layer === 'number') return s
       // Derive layer from supplement name heuristics
       const name = (s.name || '').toLowerCase()
-      const day1Names = ['cell synergy', 'tri-salts', 'trisalts', 'pectasol', 'x-39', 'x39', 'serculate', 'coq10', 'vagus nerve']
+      const day1Names = ['cell synergy', 'tri-salts', 'trisalts', 'pectasol', 'x-39', 'x39', 'serculate', 'coq10', 'vagus nerve', 'deuterium drops']
       const layer2Names = ['vitamin d', 'ip6 gold', 'ip6gold', 'homocysteine', 'adipothin', 'livergy', 'pancreos']
-      const layer3Names = ['epi pineal', 'hypothala', 'rejuvenation', 'fatty 15', 'deuterium']
+      const layer3Names = ['epi pineal', 'hypothala', 'rejuvenation', 'fatty 15', 'deuterium homeopathic']
       if (day1Names.some(n => name.includes(n))) return { ...s, layer: 1 }
       if (layer2Names.some(n => name.includes(n))) return { ...s, layer: 2 }
       if (layer3Names.some(n => name.includes(n))) return { ...s, layer: 3 }
@@ -1240,7 +1273,9 @@ REMEMBER (CRITICAL):
       reasoningChain: (parsed.reasoning_chain as string[]) || [],
     }
   } catch (parseError) {
-    console.error('Failed to parse AI response:', parseError)
+    console.error('[Analysis] Failed to parse AI response:', parseError)
+    console.error('[Analysis] Raw content (first 500 chars):', content?.slice(0, 500))
+    console.error('[Analysis] Raw content (last 200 chars):', content?.slice(-200))
     throw new Error('Failed to parse analysis response')
   }
 }
