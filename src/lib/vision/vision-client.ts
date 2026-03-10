@@ -18,7 +18,8 @@ export async function extractFromImage<T>(
   const model = getDefaultVisionModel()
 
   try {
-    const response = await client.messages.create({
+    // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
+    const stream = client.messages.stream({
       model,
       max_tokens: maxTokens,
       temperature: 0.1,
@@ -39,6 +40,8 @@ export async function extractFromImage<T>(
         },
       ],
     })
+
+    const response = await stream.finalMessage()
 
     const textBlock = response.content.find((b) => b.type === 'text')
     const content = textBlock && 'text' in textBlock ? textBlock.text : null
@@ -92,7 +95,8 @@ export async function extractFromMultipleImages<T>(
       },
     }))
 
-    const response = await client.messages.create({
+    // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
+    const stream = client.messages.stream({
       model,
       max_tokens: maxTokens,
       temperature: 0.1,
@@ -104,6 +108,8 @@ export async function extractFromMultipleImages<T>(
         },
       ],
     })
+
+    const response = await stream.finalMessage()
 
     const textBlock = response.content.find((b) => b.type === 'text')
     const content = textBlock && 'text' in textBlock ? textBlock.text : null

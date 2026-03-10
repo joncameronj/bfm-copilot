@@ -1109,7 +1109,8 @@ REMEMBER (CRITICAL):
     ? DR_ROB_PRACTITIONER_PROMPT
     : DR_ROB_MEMBER_PROMPT
 
-  const response = await client.messages.create({
+  // Use streaming to avoid Anthropic SDK timeout on long-running analysis calls
+  const stream = client.messages.stream({
     model: getAnalysisModel(),
     max_tokens: 25000,
     temperature: 0.7,
@@ -1118,6 +1119,8 @@ REMEMBER (CRITICAL):
       { role: 'user', content: userMessage },
     ],
   })
+
+  const response = await stream.finalMessage()
 
   const textBlock = response.content.find((b) => b.type === 'text')
   const content = textBlock && 'text' in textBlock ? textBlock.text : null

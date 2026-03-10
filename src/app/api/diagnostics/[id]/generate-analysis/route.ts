@@ -9,7 +9,7 @@ import type { DiagnosticType } from '@/types/shared'
 import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // Allow up to 120 seconds for extraction + AI generation
+export const maxDuration = 300 // Allow up to 5 minutes for multi-file extraction + AI generation
 
 interface RouteParams {
   params: Promise<{ id: string }>
