@@ -61,8 +61,11 @@ docker-compose*
 
 # --- Documentation and markdown ---
 docs/
-*.md
 README*
+
+# --- Ignore top-level markdown but keep agent-assets protocols ---
+/*.md
+!agent-assets/
 
 # --- Temporary and system files ---
 tmp/
