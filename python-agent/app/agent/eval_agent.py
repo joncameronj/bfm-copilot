@@ -23,8 +23,12 @@ from app.utils.logger import get_logger
 
 logger = get_logger("eval_agent")
 
-# Path to master protocol files (relative to repo root)
-_MASTER_PROTOCOLS_DIR = Path(__file__).parent.parent.parent.parent / "agent-assets" / "master-protocols"
+# Path to master protocol files — check env var first (Docker), then relative to repo root (local dev)
+_MASTER_PROTOCOLS_DIR = Path(
+    os.environ.get("MASTER_PROTOCOLS_DIR", "")
+) if os.environ.get("MASTER_PROTOCOLS_DIR") else (
+    Path(__file__).parent.parent.parent.parent / "agent-assets" / "master-protocols"
+)
 
 # JSON schema for the EvalReport — injected into prompt so Opus knows the output format
 _EVAL_REPORT_SCHEMA = json.dumps(EvalReport.model_json_schema(), indent=2)

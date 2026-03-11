@@ -18,15 +18,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Copy only dependency files first for better cache utilization
-COPY --link pyproject.toml ./
+COPY --link python-agent/pyproject.toml ./
 
 # Create virtual environment and install dependencies
 RUN uv venv && \
     PATH="/app/.venv/bin:$PATH" uv pip install -r pyproject.toml
 
 # Copy the rest of the application code
-COPY --link app ./app
-COPY --link scripts ./scripts
+COPY --link python-agent/app ./app
+COPY --link python-agent/scripts ./scripts
 
 # --- Final stage: minimal runtime image ---
 FROM base AS final
@@ -43,7 +43,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Copy application code
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/scripts ./scripts
-COPY --link pyproject.toml ./
+COPY --link python-agent/pyproject.toml ./
+
+# Copy master protocol markdown files from repo root
+COPY --link agent-assets/master-protocols ./agent-assets/master-protocols
+
+# Tell eval_agent where to find protocols in the container
+ENV MASTER_PROTOCOLS_DIR=/app/agent-assets/master-protocols
 
 # Set permissions
 RUN chown -R appuser:appuser /app
