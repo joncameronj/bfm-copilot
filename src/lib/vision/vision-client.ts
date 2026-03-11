@@ -5,6 +5,34 @@ import { getAnthropicClient, extractJSON, JSON_SYSTEM_SUFFIX } from '@/lib/anthr
 import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { ExtractionResult } from '@/types/diagnostic-extraction'
 
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
+type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number]
+
+async function fetchImageAsBase64(imageUrl: string): Promise<{
+  data: string
+  mediaType: SupportedImageType | 'application/pdf'
+  isPdf: boolean
+}> {
+  const response = await fetch(imageUrl)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
+  }
+
+  const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || ''
+  const buffer = Buffer.from(await response.arrayBuffer())
+  const data = buffer.toString('base64')
+
+  if (contentType === 'application/pdf') {
+    return { data, mediaType: 'application/pdf', isPdf: true }
+  }
+
+  const mediaType = SUPPORTED_IMAGE_TYPES.includes(contentType as SupportedImageType)
+    ? (contentType as SupportedImageType)
+    : ('image/jpeg' as const)
+
+  return { data, mediaType, isPdf: false }
+}
+
 /**
  * Extract structured data from an image using Anthropic Vision
  */
@@ -18,6 +46,12 @@ export async function extractFromImage<T>(
   const model = getDefaultVisionModel()
 
   try {
+    const { data, mediaType, isPdf } = await fetchImageAsBase64(imageUrl)
+
+    const fileContent = isPdf
+      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
+      : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
+
     // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
     const stream = client.messages.stream({
       model,
@@ -29,13 +63,7 @@ export async function extractFromImage<T>(
           role: 'user',
           content: [
             { type: 'text', text: userPrompt },
-            {
-              type: 'image',
-              source: {
-                type: 'url',
-                url: imageUrl,
-              },
-            },
+            fileContent,
           ],
         },
       ],
@@ -87,13 +115,12 @@ export async function extractFromMultipleImages<T>(
   const model = getDefaultVisionModel()
 
   try {
-    const imageContent = imageUrls.map((url) => ({
-      type: 'image' as const,
-      source: {
-        type: 'url' as const,
-        url,
-      },
-    }))
+    const fetched = await Promise.all(imageUrls.map(fetchImageAsBase64))
+    const imageContent = fetched.map(({ data, mediaType, isPdf }) =>
+      isPdf
+        ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
+        : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
+    )
 
     // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
     const stream = client.messages.stream({

@@ -33,6 +33,7 @@ export default function DiagnosticsPage() {
   const urlPatientId = searchParams.get('patient')
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(urlPatientId || undefined)
+  const [selectedPatientName, setSelectedPatientName] = useState<string | null>(null)
   const [patientUploads, setPatientUploads] = useState<DiagnosticUploadData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null)
@@ -66,6 +67,22 @@ export default function DiagnosticsPage() {
   useEffect(() => {
     fetchPatientUploads()
   }, [fetchPatientUploads])
+
+  // Fetch patient name when selected
+  useEffect(() => {
+    if (!selectedPatientId) {
+      setSelectedPatientName(null)
+      return
+    }
+    fetch(`/api/patients/${selectedPatientId}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((result) => {
+        if (result?.data) {
+          setSelectedPatientName(`${result.data.firstName} ${result.data.lastName}`)
+        }
+      })
+      .catch(() => {})
+  }, [selectedPatientId])
 
   // Handle patient change
   const handlePatientChange = (patientId: string | undefined) => {
@@ -121,7 +138,21 @@ export default function DiagnosticsPage() {
       setGeneratedAnalysisId(result.data?.analysisId)
       setAnalysisComplete(true)
 
-      toast.success(`Analysis generated with ${result.data?.protocolCount || 0} protocol recommendations!`)
+      const name = selectedPatientName || 'patient'
+      toast((t) => (
+        <div className="flex items-center gap-3">
+          <span>Analysis complete for <strong>{name}</strong></span>
+          <button
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap"
+            onClick={() => {
+              toast.dismiss(t.id)
+              router.push(`/patients/${selectedPatientId}`)
+            }}
+          >
+            View Analysis
+          </button>
+        </div>
+      ), { duration: 10000, icon: '\u2705' })
 
       // Reset for next upload
       setCurrentUploadId(null)

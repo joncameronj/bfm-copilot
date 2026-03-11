@@ -22,10 +22,29 @@ const STEPS = [
 const STEP_DURATIONS = [8, 25, 35, 25, 57] // seconds per step
 const TICK_MS = 500
 
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
 export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps) {
   const [progress, setProgress] = useState(0)
   const [stuckTimer, setStuckTimer] = useState(0)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const startTime = useRef(Date.now())
+
+  // Elapsed timer
+  useEffect(() => {
+    if (isComplete) return
+
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isComplete])
 
   useEffect(() => {
     if (isComplete) {
@@ -86,10 +105,15 @@ export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps
         />
       </div>
 
-      {/* Percentage */}
-      <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-4">
-        {Math.round(progress)}% complete
-      </p>
+      {/* Percentage + Timer */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+          {Math.round(progress)}% complete
+        </p>
+        <span className="font-mono text-sm text-blue-500 dark:text-blue-400 tabular-nums">
+          {formatElapsed(elapsedSeconds)}
+        </span>
+      </div>
 
       {/* Steps */}
       <div className="space-y-3">
@@ -152,12 +176,24 @@ export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps
         </p>
       )}
 
-      {/* Cancel button */}
+      {/* Cancel button with confirmation */}
       {!isComplete && onCancel && (
         <div className="flex justify-center mt-4">
-          <Button variant="secondary" size="sm" onClick={onCancel}>
-            Cancel Analysis
-          </Button>
+          {showCancelConfirm ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-600 dark:text-neutral-400">Cancel analysis?</span>
+              <Button variant="danger" size="sm" onClick={onCancel}>
+                Yes, Cancel
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowCancelConfirm(false)}>
+                No, Continue
+              </Button>
+            </div>
+          ) : (
+            <Button variant="danger" size="sm" onClick={() => setShowCancelConfirm(true)}>
+              Cancel Analysis
+            </Button>
+          )}
         </div>
       )}
     </div>

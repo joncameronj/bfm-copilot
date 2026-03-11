@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { DiagnosticsUpload } from '@/components/diagnostics/DiagnosticsUpload'
@@ -24,8 +25,11 @@ export function PatientDiagnosticsModal({
   patientName,
   onSuccess,
 }: PatientDiagnosticsModalProps) {
+  const router = useRouter()
   const [status, setStatus] = useState<AnalysisStatus>('idle')
   const [, setUploadComplete] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const handleUploadComplete = useCallback(() => {
     setUploadComplete(true)
@@ -33,7 +37,20 @@ export function PatientDiagnosticsModal({
 
   const handleAnalysisGenerated = useCallback(() => {
     setStatus('complete')
-    toast.success('Analysis complete!')
+    toast((t) => (
+      <div className="flex items-center gap-3">
+        <span>Analysis complete for <strong>{patientName}</strong></span>
+        <button
+          className="text-sm font-medium text-blue-600 hover:text-blue-700 whitespace-nowrap"
+          onClick={() => {
+            toast.dismiss(t.id)
+            router.push(`/patients/${patientId}`)
+          }}
+        >
+          View Analysis
+        </button>
+      </div>
+    ), { duration: 10000, icon: '\u2705' })
 
     // Auto-close after a short delay to show the success state
     setTimeout(() => {
@@ -41,7 +58,7 @@ export function PatientDiagnosticsModal({
       handleClose()
     }, 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onSuccess])
+  }, [onSuccess, patientName, patientId, router])
 
   const handleClose = () => {
     setStatus('idle')
@@ -54,6 +71,14 @@ export function PatientDiagnosticsModal({
     setStatus('analyzing')
   }, [])
 
+  const handleCancelAnalysis = () => {
+    abortRef.current?.abort()
+    setStatus('idle')
+    setShowCancelConfirm(false)
+  }
+
+  const isAnalyzing = status === 'analyzing' || status === 'generating'
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={`Upload Diagnostics for ${patientName}`} size="3xl">
       <div className="space-y-6">
@@ -62,17 +87,20 @@ export function PatientDiagnosticsModal({
           <span>Patient: <strong className="text-neutral-900">{patientName}</strong></span>
         </div>
 
-        {/* Status Indicator */}
+        {/* Status Indicator — shown during analysis/generating */}
         <AnalysisStatusIndicator status={status} />
 
-        {/* Diagnostics Upload */}
+        {/* Diagnostics Upload — visually hidden once analysis starts (keep mounted for API call) */}
         {status !== 'complete' && (
-          <DiagnosticsUploadWithStatus
-            patientId={patientId}
-            onComplete={handleUploadComplete}
-            onAnalysisGenerated={handleAnalysisGenerated}
-            onGenerateStart={handleGenerateStart}
-          />
+          <div className={isAnalyzing ? 'hidden' : undefined}>
+            <DiagnosticsUploadWithStatus
+              patientId={patientId}
+              onComplete={handleUploadComplete}
+              onAnalysisGenerated={handleAnalysisGenerated}
+              onGenerateStart={handleGenerateStart}
+              abortRef={abortRef}
+            />
+          </div>
         )}
 
         {/* Success Message */}
@@ -89,10 +117,29 @@ export function PatientDiagnosticsModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="secondary" onClick={handleClose}>
-            <HugeiconsIcon icon={Cancel01Icon} size={16} className="mr-2" />
-            {status === 'complete' ? 'Close' : 'Cancel'}
-          </Button>
+          {isAnalyzing && !showCancelConfirm && (
+            <Button variant="danger" onClick={() => setShowCancelConfirm(true)}>
+              <HugeiconsIcon icon={Cancel01Icon} size={16} className="mr-2" />
+              Cancel Analysis
+            </Button>
+          )}
+          {isAnalyzing && showCancelConfirm && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-600 dark:text-neutral-400">Cancel analysis?</span>
+              <Button variant="danger" onClick={handleCancelAnalysis}>
+                Yes, Cancel
+              </Button>
+              <Button variant="secondary" onClick={() => setShowCancelConfirm(false)}>
+                No, Continue
+              </Button>
+            </div>
+          )}
+          {!isAnalyzing && (
+            <Button variant="secondary" onClick={handleClose}>
+              <HugeiconsIcon icon={Cancel01Icon} size={16} className="mr-2" />
+              {status === 'complete' ? 'Close' : 'Cancel'}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>
@@ -105,6 +152,7 @@ interface DiagnosticsUploadWithStatusProps {
   onComplete?: () => void
   onAnalysisGenerated?: (analysisId: string) => void
   onGenerateStart?: () => void
+  abortRef?: { current: AbortController | null }
 }
 
 function DiagnosticsUploadWithStatus({
@@ -112,11 +160,9 @@ function DiagnosticsUploadWithStatus({
   onComplete,
   onAnalysisGenerated,
   onGenerateStart,
+  abortRef,
 }: DiagnosticsUploadWithStatusProps) {
-  const [isGenerating, setIsGenerating] = useState(false)
-
   const handleAnalysisGenerated = useCallback((analysisId: string) => {
-    setIsGenerating(false)
     onAnalysisGenerated?.(analysisId)
   }, [onAnalysisGenerated])
 
@@ -137,6 +183,7 @@ function DiagnosticsUploadWithStatus({
         onComplete={onComplete}
         onAnalysisGenerated={handleAnalysisGenerated}
         showGenerateButton={true}
+        abortRef={abortRef}
       />
     </div>
   )
