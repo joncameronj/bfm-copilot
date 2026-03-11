@@ -50,7 +50,7 @@ export function LabCalculator({ onSave, patientId: _patientId, patient }: LabCal
   useEffect(() => {
     if (patient) {
       setPatientContext({
-        gender: patient.gender === 'other' ? 'male' : patient.gender,
+        gender: patient.gender,
         age: calculateAge(patient.dateOfBirth),
         dateOfBirth: patient.dateOfBirth,
       });
