@@ -36,7 +36,7 @@ export function PatientLabUploadModal({
 
   // Patient context for lab calculations
   const patientContext: PatientContext = {
-    gender: patientGender === 'other' ? 'male' : patientGender,
+    gender: patientGender,
     age: patientAge,
   }
 
