@@ -18,7 +18,7 @@ export interface Patient {
   firstName: string
   lastName: string
   dateOfBirth: Date
-  gender: 'male' | 'female' | 'other'
+  gender: 'male' | 'female'
   email?: string
   phone?: string
   chiefComplaints?: string

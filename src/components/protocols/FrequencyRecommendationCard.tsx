@@ -33,91 +33,87 @@ export function FrequencyRecommendationCard({
   const isDeclined = frequency.status === 'declined'
 
   return (
-    <div className="bg-white border border-neutral-200 rounded-2xl p-6">
+    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className={cn('px-2 py-1 text-xs font-medium rounded-full', categoryColor)}>
-              {categoryLabel}
-            </span>
-          </div>
+      <div className="mb-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', categoryColor)}>
+            {categoryLabel}
+          </span>
+        </div>
 
-          {/* Frequency Name (Main Title) */}
-          <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-            {frequency.frequencyName}
-          </h3>
+        {/* Frequency Name (Main Title) */}
+        <h3 className="text-sm font-semibold text-neutral-900 mb-1.5">
+          {frequency.frequencyName}
+        </h3>
 
-          {/* Rationale */}
-          {frequency.frequencyRationale && (
-            <p className="text-sm text-neutral-600 mb-2">{frequency.frequencyRationale}</p>
+        {/* Rationale */}
+        {frequency.frequencyRationale && (
+          <p className="text-xs text-neutral-700 leading-relaxed mb-1.5">{frequency.frequencyRationale}</p>
+        )}
+
+        {/* Metadata */}
+        <div className="space-y-0.5">
+          {frequency.diagnosticTrigger && (
+            <p className="text-xs text-neutral-500">
+              <span className="font-medium">Trigger:</span> {frequency.diagnosticTrigger}
+            </p>
           )}
-
-          {/* Metadata */}
-          <div className="space-y-1">
-            {frequency.diagnosticTrigger && (
-              <p className="text-xs text-neutral-500">
-                <span className="font-medium">Trigger:</span> {frequency.diagnosticTrigger}
-              </p>
-            )}
-            {frequency.sourceReference && (
-              <p className="text-xs text-neutral-500">
-                <span className="font-medium">Source:</span> {frequency.sourceReference}
-              </p>
-            )}
-          </div>
+          {frequency.sourceReference && (
+            <p className="text-xs text-neutral-500">
+              <span className="font-medium">Source:</span> {frequency.sourceReference}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Actions - Show for recommended status only */}
       {frequency.status === 'recommended' && !isDeclined && (
-        <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
+        <div className="flex items-center gap-2 pt-3 border-t border-neutral-100">
           {!isStaged ? (
             <>
-              {/* Execute Button (Default State) */}
               <Button
+                size="sm"
                 onClick={() => onToggleExecution(frequency.frequencyId)}
                 disabled={isLoading}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 text-xs"
               >
                 {isLoading ? (
-                  <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+                  <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
                 ) : (
-                  <HugeiconsIcon icon={PlayIcon} size={18} />
+                  <HugeiconsIcon icon={PlayIcon} size={14} />
                 )}
-                Execute Protocol
+                Execute
               </Button>
-
-              {/* Decline Button - Red styling */}
               <Button
+                size="sm"
                 variant="secondary"
                 onClick={() => onDecline(frequency.originalProtocolId)}
                 disabled={isLoading}
-                className="flex items-center gap-2 bg-red-50 text-red-600 hover:bg-red-100"
+                className="flex items-center gap-1.5 text-xs bg-red-50 text-red-600 hover:bg-red-100"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={18} />
+                <HugeiconsIcon icon={Cancel01Icon} size={14} />
                 Decline
               </Button>
             </>
           ) : (
             <>
-              {/* Executed State (Staged for Logging) - Emerald styling */}
               <Button
+                size="sm"
                 onClick={() => onToggleExecution(frequency.frequencyId)}
-                className="flex items-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                className="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
               >
-                <HugeiconsIcon icon={Tick01Icon} size={18} />
-                Executed Protocol
+                <HugeiconsIcon icon={Tick01Icon} size={14} />
+                Executed
               </Button>
-
-              {/* Decline Button (Still Available) */}
               <Button
+                size="sm"
                 variant="secondary"
                 onClick={() => onDecline(frequency.originalProtocolId)}
                 disabled={isLoading}
-                className="flex items-center gap-2 bg-red-50 text-red-600 hover:bg-red-100"
+                className="flex items-center gap-1.5 text-xs bg-red-50 text-red-600 hover:bg-red-100"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={18} />
+                <HugeiconsIcon icon={Cancel01Icon} size={14} />
                 Decline
               </Button>
             </>
@@ -125,19 +121,19 @@ export function FrequencyRecommendationCard({
         </div>
       )}
 
-      {/* Already Executed Status - Emerald */}
+      {/* Already Executed Status */}
       {isAlreadyExecuted && (
-        <div className="flex items-center gap-2 pt-4 border-t border-neutral-100 text-emerald-600">
-          <HugeiconsIcon icon={Tick01Icon} size={18} />
-          <span className="text-sm font-medium">Protocol Executed</span>
+        <div className="flex items-center gap-1.5 pt-3 border-t border-neutral-100 text-emerald-600">
+          <HugeiconsIcon icon={Tick01Icon} size={14} />
+          <span className="text-xs font-medium">Protocol Executed</span>
         </div>
       )}
 
-      {/* Declined Status - Red */}
+      {/* Declined Status */}
       {isDeclined && (
-        <div className="flex items-center gap-2 pt-4 border-t border-neutral-100 text-red-600">
-          <HugeiconsIcon icon={Cancel01Icon} size={18} />
-          <span className="text-sm">Declined</span>
+        <div className="flex items-center gap-1.5 pt-3 border-t border-neutral-100 text-red-600">
+          <HugeiconsIcon icon={Cancel01Icon} size={14} />
+          <span className="text-xs">Declined</span>
         </div>
       )}
     </div>

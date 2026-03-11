@@ -14,7 +14,7 @@ interface PatientProfileActionsProps {
   patientId: string
   patientName: string
   patientAge: number
-  patientGender: 'male' | 'female' | 'other'
+  patientGender: 'male' | 'female'
 }
 
 export function PatientProfileActions({

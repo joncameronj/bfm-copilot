@@ -147,11 +147,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       `)
       .eq('upload_id', diagnosticUploadId)
 
+    const extractionResults: Array<{ fileId: string; fileType: string; status: string; error?: string }> = []
+
     if (!filesError && files) {
       for (const file of files) {
-        // Check if file already has successful extraction
+        // Check if file already has usable extraction (complete or needs_review both have data)
         const existingExtraction = (file.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
-        if (existingExtraction?.status === 'complete') {
+        if (existingExtraction?.status === 'complete' || existingExtraction?.status === 'needs_review') {
+          extractionResults.push({ fileId: file.id, fileType: file.file_type, status: existingExtraction.status })
           continue // Skip already extracted files
         }
 
@@ -166,13 +169,14 @@ export async function POST(request: Request, { params }: RouteParams) {
               `[Auto-Extract] Failed to create signed URL for file ${file.id}:`,
               signedUrlError
             )
+            extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: `Signed URL failed: ${signedUrlError?.message || 'no URL returned'}` })
             continue
           }
 
           // Create or update extraction record
           let extractionId = existingExtraction?.id
           if (!extractionId) {
-            const { data: newExtraction } = await supabase
+            const { data: newExtraction, error: insertError } = await supabase
               .from('diagnostic_extracted_values')
               .insert({
                 diagnostic_file_id: file.id,
@@ -182,6 +186,12 @@ export async function POST(request: Request, { params }: RouteParams) {
               })
               .select('id')
               .single()
+
+            if (insertError) {
+              console.error(`[Auto-Extract] Failed to insert extraction record for file ${file.id}:`, insertError)
+              extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: `DB insert failed: ${insertError.message}` })
+              continue
+            }
             extractionId = newExtraction?.id
           } else {
             await supabase
@@ -207,7 +217,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
           // Update extraction record
           if (extractionId) {
-            await supabase
+            const { error: updateError } = await supabase
               .from('diagnostic_extracted_values')
               .update({
                 extracted_data: result.data,
@@ -217,6 +227,10 @@ export async function POST(request: Request, { params }: RouteParams) {
                 error_message: result.error || null,
               })
               .eq('id', extractionId)
+
+            if (updateError) {
+              console.error(`[Auto-Extract] Failed to update extraction record for file ${file.id}:`, updateError)
+            }
           }
 
           // Mark file as processed
@@ -242,12 +256,26 @@ export async function POST(request: Request, { params }: RouteParams) {
             }
           }
 
+          extractionResults.push({ fileId: file.id, fileType: file.file_type, status, error: result.error })
           console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
         } catch (extractError) {
           console.error(`[Auto-Extract] Failed to extract file ${file.id}:`, extractError)
+          extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: extractError instanceof Error ? extractError.message : 'Unknown error' })
           // Continue with other files - don't fail the whole analysis
         }
       }
+    }
+
+    // Log extraction summary
+    const successCount = extractionResults.filter(r => r.status === 'complete' || r.status === 'needs_review').length
+    console.log(`[Auto-Extract] ${successCount}/${extractionResults.length} files extracted successfully`)
+
+    if (successCount === 0 && extractionResults.length > 0) {
+      const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
+      return NextResponse.json(
+        { error: `All file extractions failed: ${failures}` },
+        { status: 400 }
+      )
     }
 
     // Create pending analysis record
@@ -294,17 +322,11 @@ export async function POST(request: Request, { params }: RouteParams) {
           raw_analysis: {
             protocols: analysis.protocols,
             supplementation: analysis.supplementation,
+            eval_report: analysis.evalReport || null,
           },
           supplementation: analysis.supplementation,
           status: 'complete',
-          rag_context: {
-            chunks: analysis.ragContext.map(c => ({
-              chunk_id: c.chunk_id,
-              document_id: c.document_id,
-              title: c.title,
-              similarity: c.similarity,
-            })),
-          },
+          rag_context: {},
         })
         .eq('id', pendingAnalysis.id)
 
@@ -341,7 +363,6 @@ export async function POST(request: Request, { params }: RouteParams) {
           recommendationIds.push(recRecord.id)
 
           // Create reasoning records for explainability
-          // This populates the recommendation_reasoning table
           await createReasoningRecords({
             recommendationId: recRecord.id,
             frequencies: protocol.frequencies.map(f => ({
@@ -350,7 +371,7 @@ export async function POST(request: Request, { params }: RouteParams) {
               source_reference: f.source_reference,
               diagnostic_trigger: f.diagnostic_trigger,
             })),
-            ragChunks: analysis.ragContext,
+            ragChunks: [],
             diagnosticData: analysis.extractedData,
             reasoningChain: analysis.reasoningChain || [],
           })

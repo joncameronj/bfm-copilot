@@ -161,7 +161,6 @@ export function PatientForm({ patient, onSubmit, onCancel }: PatientFormProps) {
         >
           <option value="male">Male</option>
           <option value="female">Female</option>
-          <option value="other">Other</option>
         </Select>
       </div>
 

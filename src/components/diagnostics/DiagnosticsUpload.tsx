@@ -24,6 +24,7 @@ interface DiagnosticsUploadProps {
   onComplete?: (files: UploadFile[], uploadId?: string, statusUpdated?: boolean) => void
   onAnalysisGenerated?: (analysisId: string) => void
   showGenerateButton?: boolean
+  abortRef?: { current: AbortController | null }
 }
 
 export function DiagnosticsUpload({
@@ -32,6 +33,7 @@ export function DiagnosticsUpload({
   onComplete,
   onAnalysisGenerated,
   showGenerateButton = true,
+  abortRef,
 }: DiagnosticsUploadProps) {
   const [files, setFiles] = useState<UploadFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
@@ -185,6 +187,9 @@ export function DiagnosticsUpload({
 
     const controller = new AbortController()
     setAnalysisAbortController(controller)
+    if (abortRef) {
+      abortRef.current = controller
+    }
     setIsGenerating(true)
     try {
       const response = await fetch(`/api/diagnostics/${uploadId}/generate-analysis`, {

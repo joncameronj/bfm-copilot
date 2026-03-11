@@ -6,7 +6,7 @@ export interface Patient {
   firstName: string;
   lastName: string;
   dateOfBirth: Date;
-  gender: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
   email?: string;
   phone?: string;
   chiefComplaints?: string;
@@ -49,7 +49,7 @@ export interface CreatePatientInput {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
-  gender: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
   email?: string;
   phone?: string;
   chiefComplaints?: string;
@@ -69,7 +69,7 @@ export interface PatientRow {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
   email: string | null;
   phone: string | null;
   chief_complaints: string | null;

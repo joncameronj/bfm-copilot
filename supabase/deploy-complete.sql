@@ -33,7 +33,7 @@ CREATE TABLE public.patients (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     date_of_birth DATE NOT NULL,
-    gender TEXT NOT NULL CHECK (gender IN ('male', 'female', 'other')),
+    gender TEXT NOT NULL CHECK (gender IN ('male', 'female')),
     email TEXT,
     phone TEXT,
     chief_complaints TEXT,
@@ -186,7 +186,7 @@ CREATE TABLE public.diagnostic_uploads (
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     patient_id UUID REFERENCES public.patients(id) ON DELETE SET NULL,
     status TEXT DEFAULT 'pending'
-        CHECK (status IN ('pending', 'uploading', 'processing', 'complete', 'error')),
+        CHECK (status IN ('pending', 'uploading', 'uploaded', 'processing', 'complete', 'error')),
     analysis_summary TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

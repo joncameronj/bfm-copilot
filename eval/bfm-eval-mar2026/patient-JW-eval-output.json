@@ -3,44 +3,44 @@
   "report_date": "2025-01-27",
   "urgency": {
     "score": 4.0,
-    "rationale": "JW presents with 4 active deal breakers: PNS Negative Zone (calm_pns = -2.5), Vagus Nerve Dysfunction (vagus_dysfunction = true), Low Heart on D-Pulse (Heart at 32%), and Low pH (pH = 6.43). Additionally, she has a significant Alpha/Theta imbalance (Theta 31 vs Alpha 10, ratio >3:1), making 5 deal breakers total. The combination of parasympathetic failure, vagal dysfunction, low pH, heart as an anchor point, and severe brainwave imbalance indicates a complex, multi-system case requiring urgent and sustained intervention.",
-    "timeline": "4-6 months intensive, with re-evaluation at 3 months for labs and every 2-4 weeks in-office",
-    "critical_path": "PNS Negative Zone and Vagus Nerve Dysfunction must be addressed first as they represent the deepest autonomic failure patterns, followed immediately by Alpha/Theta correction and pH stabilization."
+    "rationale": "JW presents with 4 active deal breakers: PNS Negative Zone (calm_pns = -2.5), Vagus Nerve Dysfunction (vagus_dysfunction = true), Low Heart on D-Pulse (Heart at 32%), and Low pH (pH = 6.43). Additionally, she has a severe Alpha/Theta imbalance (Theta 31% vs Alpha 10% = 3.1:1 ratio), which constitutes a 5th deal breaker. The combination of parasympathetic failure, vagus dysfunction, severe brainwave imbalance, and low voltage/pH creates a deeply compromised autonomic and metabolic picture requiring urgent and sustained intervention.",
+    "timeline": "4-6 months intensive, with reassessment every 2-4 weeks in-office",
+    "critical_path": "PNS Negative Zone and Vagus Nerve Dysfunction must be addressed first \u2014 the parasympathetic system is in failure and the vagus nerve cannot fire properly. Without restoring autonomic regulation, no other protocols will hold."
   },
   "deal_breakers": [
     {
       "name": "PNS Negative Zone",
-      "finding": "Green dot goes backward/wrong direction during recovery; parasympathetic failure with calm_pns = -2.5",
+      "finding": "HRV shows green dot going backward/wrong direction during recovery \u2014 PNS is in negative zone at -2.5",
       "protocol": "PNS Support",
-      "urgency": "PNS in negative zone indicates autoimmune tendency, myelin degradation, and parasympathetic failure. This is the longest-resolving deal breaker and must begin immediately. It represents resistance to healing \u2014 the body cannot recover from stress.",
+      "urgency": "Parasympathetic failure means the body cannot recover or heal. This is the longest deal breaker to resolve and must begin immediately. Resistance to healing is present.",
       "patient_data_citation": "hrv.pns_negative = true, hrv.calm_pns = -2.5"
     },
     {
       "name": "Vagus Nerve Dysfunction",
-      "finding": "Vagus nerve dysfunction flagged on HRV; vagus cannot fire properly",
-      "protocol": "Vagus Support",
-      "urgency": "Vagus dysfunction means the body's primary brake system is impaired. Must start with Vagus Support (basic) per protocol order. This compounds PNS failure and prevents effective recovery from any stressor.",
+      "finding": "HRV indicates vagus nerve dysfunction \u2014 vagus cannot fire properly",
+      "protocol": "Vagus Support (basic \u2014 start here per non-negotiable protocol order)",
+      "urgency": "Vagus nerve is stuck and cannot fire. This compounds the PNS negative zone finding and must be addressed concurrently. Per protocol order: Vagus Support first, then escalate only if insufficient.",
       "patient_data_citation": "hrv.vagus_dysfunction = true"
     },
     {
       "name": "Alpha/Theta Imbalance",
-      "finding": "Theta (31%) vastly exceeds Alpha (10%) \u2014 ratio is 3.1:1, well beyond the >2:1 threshold",
+      "finding": "Brainwave shows Theta (31%) > Alpha (10%) at a 3.1:1 ratio, far exceeding the >2:1 threshold",
       "protocol": "Alpha Theta",
-      "urgency": "Theta > Alpha at >2:1 ratio indicates concussion history, PTSD, blue light toxicity, or EMF damage. CSF vortex may be running backwards. This severely impairs cognitive function and healing capacity.",
-      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10 (ratio 3.1:1)"
+      "urgency": "Severe brainwave imbalance indicates concussion history, PTSD, blue light toxicity, or EMF exposure. The 3.1:1 ratio is well above the 2:1 concern threshold. CSF vortex may be backwards.",
+      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10, ratio = 3.1:1"
     },
     {
       "name": "Low Heart on D-Pulse",
-      "finding": "Heart scores at 32%, one of the lowest organs on D-Pulse, indicating emotional trauma and energy deficit",
+      "finding": "Heart scores at 32% on D-Pulse \u2014 among the lowest organ scores",
       "protocol": "Heart Health",
-      "urgency": "Heart as a low anchor point always indicates emotional trauma is present and energy production is failing. This must be addressed to restore the body's primary energy generator.",
+      "urgency": "Heart as a low anchor point indicates emotional trauma (always present per protocol) and energy deficit. Heart is tied for lowest with Liver at 32%.",
       "patient_data_citation": "dpulse.organs Heart = 32%"
     },
     {
       "name": "Low pH",
-      "finding": "Urinalysis pH = 6.43, below the 6.5 threshold indicating voltage/redox problems and zeta potential issues",
-      "protocol": "Terrain",
-      "urgency": "Low pH indicates the body's voltage and redox systems are compromised. At 6.43 (below 6.5 but above 6.2), Cell Synergy is the primary intervention. Terrain frequency is added if supplements alone don't move pH.",
+      "finding": "Urinalysis pH at 6.43, below the 6.5 threshold indicating voltage/redox problems and zeta potential issues",
+      "protocol": "Terrain (if supplements don't move pH)",
+      "urgency": "Low pH indicates voltage and redox dysfunction. At 6.43, this is below 6.5 (bad) but above 6.2, so Tri-Salts are not yet indicated. Cell Synergy at 1 scoop is the first-line intervention.",
       "patient_data_citation": "ua.ph = 6.43"
     }
   ],
@@ -50,142 +50,133 @@
       "protocol_name": "PNS Support",
       "trigger": "PNS Negative Zone deal breaker \u2014 parasympathetic failure",
       "patient_data_citation": "hrv.pns_negative = true, hrv.calm_pns = -2.5",
-      "sequencing_note": "Longest-resolving deal breaker; begin immediately and run consistently throughout treatment.",
+      "sequencing_note": "Run as priority deal breaker. This is the longest deal breaker to resolve (several months).",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 1,
       "protocol_name": "Vagus Support",
-      "trigger": "Vagus Nerve Dysfunction deal breaker \u2014 vagus nerve cannot fire properly",
+      "trigger": "Vagus Nerve Dysfunction deal breaker \u2014 vagus cannot fire",
       "patient_data_citation": "hrv.vagus_dysfunction = true",
-      "sequencing_note": "MUST start with Vagus Support (basic) first. Do NOT escalate to Vagus Trauma unless Vagus Support is insufficient. SNS is not switched so Vagus Balance is not indicated at this time.",
+      "sequencing_note": "Start with Vagus Support (basic) per non-negotiable protocol order. Do NOT start with Vagus Trauma. Escalate to Vagus Balance only if SNS also switches. Escalate to Vagus Trauma only if Vagus Support is insufficient.",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 1,
       "protocol_name": "Alpha Theta",
-      "trigger": "Theta:Alpha ratio = 3.1:1, exceeding the >2:1 deal breaker threshold",
+      "trigger": "Theta (31%) > Alpha (10%) at 3.1:1 ratio \u2014 exceeds 2:1 threshold",
       "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10",
-      "sequencing_note": "Run consistently; this will take months to resolve given the severity of the gap.",
+      "sequencing_note": "Deal breaker frequency. Run consistently to rebalance brainwave pattern.",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 1,
       "protocol_name": "Heart Health",
-      "trigger": "Heart is at 32% on D-Pulse \u2014 low anchor point indicating emotional trauma and energy deficit",
+      "trigger": "Low Heart on D-Pulse at 32% \u2014 emotional trauma and energy deficit",
       "patient_data_citation": "dpulse.organs Heart = 32%",
-      "sequencing_note": "Run alongside other deal breaker frequencies.",
+      "sequencing_note": "Deal breaker frequency for low heart anchor point.",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 1,
       "protocol_name": "Terrain",
-      "trigger": "pH = 6.43, below 6.5 threshold; Terrain frequency if Cell Synergy supplementation alone does not move pH",
+      "trigger": "Low pH at 6.43 \u2014 if Cell Synergy alone does not move pH above 6.5",
       "patient_data_citation": "ua.ph = 6.43",
-      "sequencing_note": "Begin Cell Synergy first; add Terrain frequency if pH does not improve within 2-4 weeks.",
+      "sequencing_note": "Run only if Cell Synergy supplementation does not raise pH above 6.5 within 2-4 weeks.",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 1,
       "protocol_name": "Bladder Support",
-      "trigger": "Bladder is the lowest organ on D-Pulse at 28%",
+      "trigger": "Bladder lowest organ on D-Pulse at 28%",
       "patient_data_citation": "dpulse.organs Bladder = 28%",
-      "sequencing_note": "Address alongside kidney; bladder is the lowest single organ reading.",
+      "sequencing_note": "Address alongside kidney support. Bladder is the single lowest organ score.",
       "layer_label": "High Priorities",
       "layer_description": "Deal breakers and urgent protocols. Address these first."
     },
     {
       "phase": 2,
       "protocol_name": "Kidney Repair",
-      "trigger": "Kidneys at 30% on D-Pulse \u2014 low anchor point; address alongside bladder",
+      "trigger": "Kidneys low on D-Pulse at 30% \u2014 second lowest organ score",
       "patient_data_citation": "dpulse.organs Kidneys = 30%",
-      "sequencing_note": "Rotate with Kidney Vitality. Lab confirmation of GFR needed to determine full kidney protocol.",
+      "sequencing_note": "Rotate with Kidney Vitality. Address alongside bladder.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
       "protocol_name": "Kidney Vitality",
-      "trigger": "Kidneys at 30% on D-Pulse \u2014 alternate with Kidney Repair",
+      "trigger": "Kidneys low on D-Pulse at 30% \u2014 rotate with Kidney Repair",
       "patient_data_citation": "dpulse.organs Kidneys = 30%",
-      "sequencing_note": "Rotate with Kidney Repair.",
+      "sequencing_note": "Alternate with Kidney Repair.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
       "protocol_name": "Liver Tox",
-      "trigger": "Liver at 32% on D-Pulse \u2014 low anchor. No lab confirmation of elevated enzymes yet, so Liver Tox (general) is appropriate, NOT Liver Inflame.",
+      "trigger": "Liver low on D-Pulse at 32% \u2014 but no confirmed elevated liver enzymes (labs not yet available for AST/ALT). Use Liver Tox (general), NOT Liver Inflame.",
       "patient_data_citation": "dpulse.organs Liver = 32%",
-      "sequencing_note": "If labs return with elevated AST/ALT/GGT, switch to Liver Inflame.",
+      "sequencing_note": "Use Liver Tox for general liver stress when enzymes are NOT confirmed elevated. Switch to Liver Inflame only if labs show elevated AST/ALT.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
-      "protocol_name": "Gallbladder Support",
-      "trigger": "Gallbladder at 40% on D-Pulse, dragging with liver (32%)",
-      "patient_data_citation": "dpulse.organs Gallbladder = 40%, dpulse.organs Liver = 32%",
-      "sequencing_note": "Address liver simultaneously per protocol.",
+      "protocol_name": "Small Intestine",
+      "trigger": "Low Heart (32%) + Low Small Intestine (31%) together indicate residual vagus nerve problem",
+      "patient_data_citation": "dpulse.organs Heart = 32%, dpulse.organs Small Intestine = 31%",
+      "sequencing_note": "Heart + Small Intestine low together = additional vagus nerve support needed beyond the basic Vagus Support deal breaker protocol.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
       "protocol_name": "Aldehyde Detox",
-      "trigger": "High uric acid on UA strip \u2014 indicates ammonia high or acetaldehyde high",
-      "patient_data_citation": "labs: Uric Acid (UA strip) = 100, status = high",
-      "sequencing_note": "Lab-triggered frequency for detox pathway.",
+      "trigger": "High uric acid on UA strip (value = 100, status = high)",
+      "patient_data_citation": "labs: Uric Acid (UA strip) value = 100, status = high",
+      "sequencing_note": "Lab-triggered frequency for high uric acid indicating ammonia or acetaldehyde burden.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
       "protocol_name": "Leptin Resist",
-      "trigger": "Five Levers assessment \u2014 leptin must be assessed and addressed; VCS score is 25/32 (passed but borderline); leptin gates all other hormones",
-      "patient_data_citation": "vcs.score_correct = 25 (borderline); no leptin lab available yet",
-      "sequencing_note": "Leptin lab needed to confirm. If leptin elevated, this becomes priority before any MSH work. Part of Five Levers Layer 2 protocol.",
+      "trigger": "Five Levers assessment \u2014 Leptin must be assessed and addressed as gatekeeper for all other hormones. No lab confirmation yet but protocol awareness is critical.",
+      "patient_data_citation": "No leptin lab available \u2014 pending lab work",
+      "sequencing_note": "Run only once leptin resistance is confirmed by lab. Leptin gates all other hormones per VCS/Leptin/MSH cascade.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 2,
       "protocol_name": "Pineal Support",
-      "trigger": "Five Levers assessment \u2014 melatonin/circadian rhythm must be assessed; brainwave imbalance suggests disrupted sleep architecture",
-      "patient_data_citation": "brainwave.theta = 31 >> brainwave.alpha = 10; system_energy = 10",
-      "sequencing_note": "Part of Five Levers protocol group in Layer 2.",
+      "trigger": "Five Levers: Melatonin assessment \u2014 high delta (47%) when awake suggests low direct current and possible circadian disruption",
+      "patient_data_citation": "brainwave.delta = 47%",
+      "sequencing_note": "Part of Five Levers protocol group. Address alongside Alpha Theta work.",
       "layer_label": "Next If No Response",
       "layer_description": "Secondary protocols if no response after 4-6 weeks."
     },
     {
       "phase": 3,
       "protocol_name": "Midbrain Support",
-      "trigger": "System energy extremely low at 10; both SNS and PNS in negative/depleted territory (lower-left quadrant pattern) \u2014 total energy depletion",
-      "patient_data_citation": "hrv.system_energy = 10, hrv.calm_sns = -1.0, hrv.calm_pns = -2.5",
-      "sequencing_note": "Per Section 2 Pattern B decision rules, lower-left quadrant (both SNS and PNS negative/depleted) triggers Midbrain Support for energy restoration, NOT SNS Balance. Add if Layer 1 deal breaker frequencies do not restore energy.",
+      "trigger": "HRV shows very low system energy (10) with both SNS and PNS in negative/depleted territory \u2014 lower-left quadrant pattern indicating total energy depletion",
+      "patient_data_citation": "hrv.system_energy = 10, hrv.calm_pns = -2.5, hrv.calm_sns = -1.0",
+      "sequencing_note": "Per Section 10 Pattern B: Lower-left quadrant (both SNS and PNS negative/depleted) triggers Midbrain Support for energy restoration, NOT SNS Balance. Use if Layer 1/2 protocols do not restore energy.",
       "layer_label": "If They Are Still Stuck",
       "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
     },
     {
       "phase": 3,
-      "protocol_name": "Pit A Support",
-      "trigger": "Five Levers \u2014 MSH assessment; requires leptin to be addressed first per VCS/Leptin/MSH cascade",
-      "patient_data_citation": "No MSH lab available; VCS borderline at 25/32",
-      "sequencing_note": "NEVER run before leptin is trending down. This is gated by the VCS \u2192 Leptin \u2192 MSH cascade. Only add after Leptin Resist is confirmed and addressed.",
-      "layer_label": "If They Are Still Stuck",
-      "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
-    },
-    {
-      "phase": 3,
-      "protocol_name": "Pars Intermedia",
-      "trigger": "Five Levers \u2014 MSH support; paired with Pit A Support",
-      "patient_data_citation": "No MSH lab available; awaiting leptin results",
-      "sequencing_note": "Same gating as Pit A Support \u2014 only after leptin addressed.",
+      "protocol_name": "Sacral Plexus",
+      "trigger": "Low parasympathetic on HRV (PNS negative) \u2014 sacral parasympathetic weakness may be contributing",
+      "patient_data_citation": "hrv.pns_negative = true, hrv.calm_pns = -2.5",
+      "sequencing_note": "Pairs with low parasympathetic on HRV. Use if PNS Support alone does not resolve negative zone.",
       "layer_label": "If They Are Still Stuck",
       "layer_description": "Deep-dive protocols for resistant cases after 2-3 months."
     }
@@ -193,43 +184,25 @@
   "supplementation": [
     {
       "name": "Cell Synergy",
-      "trigger": "Low pH (6.43) requiring voltage/redox support; also foundational for Alpha/Theta imbalance (>2:1 ratio warrants double scoop)",
-      "dosage": "2 scoops/day (double dose because Alpha/Theta ratio is 3.1:1, well beyond 2:1 threshold)",
-      "timing": "Daily, with or without food",
-      "patient_data_citation": "ua.ph = 6.43; brainwave.theta = 31 vs brainwave.alpha = 10 (ratio 3.1:1)",
+      "trigger": "Low pH (6.43) below 6.5 threshold; also supports Alpha/Theta imbalance (3.1:1 ratio \u2014 double scoop indicated since gap > 2:1)",
+      "dosage": "2 scoops/day (double dose because Alpha/Theta ratio is 3.1:1, exceeding 2:1 threshold)",
+      "timing": "With or without food, daily",
+      "patient_data_citation": "ua.ph = 6.43; brainwave.theta = 31, brainwave.alpha = 10 (3.1:1 ratio)",
       "priority": 1,
       "layer": 1
     },
     {
       "name": "D-Ribose",
-      "trigger": "Alpha/Theta imbalance deal breaker triggered (Theta:Alpha >2:1)",
-      "dosage": "Per product",
+      "trigger": "Theta >= 2.5x Alpha \u2014 Theta 31% / Alpha 10% = 3.1:1, exceeding the 2.5:1 threshold for D-Ribose",
+      "dosage": "Per product label",
       "timing": "Daily",
-      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10 (ratio 3.1:1)",
-      "priority": 1,
-      "layer": 1
-    },
-    {
-      "name": "Serculate",
-      "trigger": "Low Heart on D-Pulse (32%) \u2014 heart form code for energy and cardiovascular support",
-      "dosage": "Per form code",
-      "timing": "Daily; patients feel better quickly",
-      "patient_data_citation": "dpulse.organs Heart = 32%",
-      "priority": 1,
-      "layer": 1
-    },
-    {
-      "name": "CoQ10",
-      "trigger": "Low Heart on D-Pulse (32%) \u2014 mitochondrial electron transport support for failing heart energy",
-      "dosage": "Per product; target RBC CoQ10 >1.65, better >2.0",
-      "timing": "Daily",
-      "patient_data_citation": "dpulse.organs Heart = 32%",
+      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10 (3.1:1 ratio >= 2.5:1 threshold)",
       "priority": 1,
       "layer": 1
     },
     {
       "name": "Innovita Vagus Nerve",
-      "trigger": "Vagus Nerve Dysfunction deal breaker triggered",
+      "trigger": "Vagus nerve deal breaker triggered \u2014 chronic vagus nerve dysfunction",
       "dosage": "Per form code",
       "timing": "Nighttime",
       "patient_data_citation": "hrv.vagus_dysfunction = true",
@@ -237,17 +210,26 @@
       "layer": 1
     },
     {
-      "name": "X39",
-      "trigger": "ALL patients Day 1 \u2014 stem cell stimulation and UB rates support",
-      "dosage": "12 hrs on / 12 hrs off; rotate placement every 2-3 days",
-      "timing": "Nightly; C7 or below belly button or injury site",
-      "patient_data_citation": "Universal Day 1 recommendation per protocol rules",
+      "name": "Serculate",
+      "trigger": "Low Heart on D-Pulse at 32% \u2014 Heart form code for energy and cardiovascular support",
+      "dosage": "Per form code",
+      "timing": "Daily; patients typically feel better quickly",
+      "patient_data_citation": "dpulse.organs Heart = 32%",
+      "priority": 1,
+      "layer": 1
+    },
+    {
+      "name": "CoQ10",
+      "trigger": "Low Heart on D-Pulse at 32% \u2014 mitochondrial electron transport support for heart",
+      "dosage": "Per product; target RBC CoQ10 >1.65, better >2.0",
+      "timing": "Daily",
+      "patient_data_citation": "dpulse.organs Heart = 32%",
       "priority": 1,
       "layer": 1
     },
     {
       "name": "Deuterium Drops",
-      "trigger": "Low specific gravity on urinalysis (1.005) \u2014 cell is not making metabolic water",
+      "trigger": "Specific gravity at 1.005 \u2014 the cell isn't making metabolic water",
       "dosage": "Per BFM dosing protocol",
       "timing": "Daily",
       "patient_data_citation": "ua.specific_gravity = 1.005",
@@ -256,16 +238,16 @@
     },
     {
       "name": "L-Ornithine L-Aspartate",
-      "trigger": "High uric acid on UA strip \u2014 ammonia detoxification pathway",
+      "trigger": "High uric acid on UA strip \u2014 ammonia detoxification pathway indicated",
       "dosage": "Per product",
       "timing": "When ammonia/uric acid high",
-      "patient_data_citation": "labs: Uric Acid (UA strip) = 100, status = high",
+      "patient_data_citation": "labs: Uric Acid (UA strip) value = 100, status = high",
       "priority": 2,
       "layer": 2
     },
     {
       "name": "Kidney Clear",
-      "trigger": "Kidneys at 30% on D-Pulse \u2014 kidney form code support. Final dosing pending lab confirmation of GFR.",
+      "trigger": "Kidneys low on D-Pulse at 30% \u2014 kidney form code support. Note: awaiting lab confirmation of eGFR to fully confirm.",
       "dosage": "Per form code",
       "timing": "Daily",
       "patient_data_citation": "dpulse.organs Kidneys = 30%",
@@ -274,28 +256,28 @@
     },
     {
       "name": "Livergy",
-      "trigger": "Liver at 32% on D-Pulse \u2014 liver form code. Pending lab confirmation of elevated AST/ALT/GGT before final decision.",
+      "trigger": "Liver low on D-Pulse at 32% \u2014 liver form code support. Note: recommend only once labs confirm elevated AST/ALT/GGT. If enzymes normal, Liver Tox frequency alone may suffice.",
       "dosage": "Per form code",
       "timing": "Daily",
-      "patient_data_citation": "dpulse.organs Liver = 32%; labs pending for enzyme confirmation",
+      "patient_data_citation": "dpulse.organs Liver = 32%",
       "priority": 2,
       "layer": 2
     },
     {
       "name": "Epi Pineal",
-      "trigger": "Five Levers melatonin assessment \u2014 circadian/sleep support for severely imbalanced brainwaves; add if patient does not improve with initial recommendations",
+      "trigger": "High waking delta (47%) suggests circadian disruption and potential pineal dysfunction \u2014 add if sleep issues persist after initial protocols",
       "dosage": "Per form code",
       "timing": "Nighttime",
-      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10; hrv.system_energy = 10",
+      "patient_data_citation": "brainwave.delta = 47%",
       "priority": 3,
       "layer": 3
     },
     {
       "name": "Hypothala",
-      "trigger": "Five Levers MSH assessment \u2014 contains hypothalamus + pituitary codes; only after leptin is addressed per cascade rules",
+      "trigger": "Five Levers: MSH support \u2014 contains Hypothalamus + pituitary codes. Add only AFTER leptin is confirmed addressed per VCS/Leptin/MSH cascade.",
       "dosage": "Per form code",
       "timing": "Daily",
-      "patient_data_citation": "No MSH lab available; gated by leptin assessment",
+      "patient_data_citation": "No MSH lab available \u2014 pending lab work. Assessed as part of Five Levers.",
       "priority": 3,
       "layer": 3
     }
@@ -304,145 +286,139 @@
     {
       "lever_number": 1,
       "lever_name": "Melatonin",
-      "patient_status": "Likely compromised. Brainwave pattern shows severe Theta dominance (31%) over Alpha (10%), with high Delta (47%) \u2014 suggestive of disrupted circadian rhythm and poor sleep architecture. System energy is critically low (10). No saliva melatonin test available yet.",
-      "recommendation": "Assess melatonin via 2 AM saliva test (Genova, $120). Begin Pineal Support frequency in Layer 2. Blue-blocking glasses by 8 PM. Epi Pineal (Innovita) in Layer 3 if initial protocols insufficient. Silent Night patch consideration (50% respond if good methylator).",
-      "patient_data_citation": "brainwave.theta = 31, brainwave.alpha = 10, brainwave.delta = 47; hrv.system_energy = 10"
+      "patient_status": "Likely compromised. High waking delta at 47% suggests low direct current and possible circadian disruption. Alpha/Theta ratio of 3.1:1 further indicates nervous system dysregulation affecting sleep architecture. No saliva melatonin test available.",
+      "recommendation": "Assess sleep quality. Run Pineal Support frequency in Layer 2. Add Epi Pineal (Innovita \u2014 no exogenous melatonin) and Silent Night patch in Layer 3 if sleep does not improve. Blue blocking glasses by 8 PM. Consider 2 AM saliva test ($120, Genova) for baseline.",
+      "patient_data_citation": "brainwave.delta = 47%, brainwave.theta = 31, brainwave.alpha = 10 (3.1:1 ratio)"
     },
     {
       "lever_number": 2,
       "lever_name": "Leptin",
-      "patient_status": "Unknown \u2014 no leptin lab drawn yet. VCS score is 25/32 (passed but near the 24/32 threshold). Given borderline VCS and multiple system failures, leptin resistance should be suspected and tested. Leptin is the primary hormonal gatekeeper and must be assessed before any downstream hormone work.",
-      "recommendation": "Order leptin lab ($49). If elevated or resistant, initiate Leptin Resist frequency + Adipothin supplement + leptin-style diet education. This must be resolved BEFORE any MSH protocols per the VCS \u2192 Leptin \u2192 MSH cascade.",
-      "patient_data_citation": "vcs.score_correct = 25 (borderline); no leptin lab in data"
+      "patient_status": "Unknown \u2014 no leptin lab drawn yet. VCS passed (25/32), so biotoxin-driven leptin resistance is less likely but not ruled out. Leptin is the primary hormonal gatekeeper and must be assessed.",
+      "recommendation": "Order leptin lab ($49). If elevated or resistant, initiate Leptin Resist frequency + Adipothin (Innovita) + leptin-style diet education. Must address leptin BEFORE any MSH protocols per VCS/Leptin/MSH cascade.",
+      "patient_data_citation": "vcs.score_correct = 25/32 (passed); no leptin lab available"
     },
     {
       "lever_number": 3,
       "lever_name": "MSH",
-      "patient_status": "Unknown \u2014 no MSH lab drawn. Given the severity of autonomic dysfunction (PNS negative, vagus dysfunction) and low system energy (10), low MSH is plausible. However, MSH cannot be addressed until leptin is evaluated and controlled per cascade rules.",
-      "recommendation": "Order MSH lab ($80). Do NOT initiate Pit A Support or Pars Intermedia until leptin is confirmed down. Sunlight exposure is the primary treatment. Hypothala (Innovita) reserved for Layer 3.",
-      "patient_data_citation": "No MSH lab available; hrv.system_energy = 10; hrv.pns_negative = true"
+      "patient_status": "Unknown \u2014 no MSH lab drawn yet. Given the severe autonomic dysfunction (PNS negative, vagus dysfunction) and overall depleted pattern, MSH may be low. Cannot assess until leptin is addressed first.",
+      "recommendation": "Order MSH lab ($80). Do NOT initiate Pit A Support or Pars Intermedia frequencies until leptin is confirmed addressed. Per cascade: Leptin first \u2192 then MSH. Sunlight exposure is primary MSH treatment.",
+      "patient_data_citation": "No MSH lab available \u2014 must await leptin assessment first per cascade rules"
     },
     {
       "lever_number": 4,
       "lever_name": "Vitamin D",
-      "patient_status": "Unknown \u2014 no Vitamin D lab drawn yet. Cannot recommend supplementation without lab confirmation. Given borderline VCS and overall depletion pattern, Vitamin D deficiency is a reasonable concern but must be confirmed.",
-      "recommendation": "Order Vitamin D blood test (target 60-80 ng/mL). Use D-Minder app for sun exposure tracking. If lab confirms <60: 10,000 IU/day \u00d7 4-6 weeks then 4,000 IU maintenance + Vitamin K at 200 mcg per 1,000 IU D. No frequency exists for Vitamin D \u2014 sunlight is primary treatment.",
-      "patient_data_citation": "No Vitamin D lab in data; cannot assume abnormal"
+      "patient_status": "Unknown \u2014 no Vitamin D lab drawn yet. Given the overall depleted metabolic picture and low system energy (10), Vitamin D deficiency is a significant concern but cannot be assumed without lab confirmation.",
+      "recommendation": "Order Vitamin D blood test (target 60-80 ng/mL). DO NOT supplement until lab confirms level <60. If low: 10,000 IU/day x 4-6 weeks \u2192 4,000 IU maintenance. Vitamin K: 200 mcg per 1,000 IU D. Prioritize sun exposure and D-Minder app. No frequency exists for Vitamin D.",
+      "patient_data_citation": "No Vitamin D lab available \u2014 awaiting lab work"
     },
     {
       "lever_number": 5,
       "lever_name": "UB Rates",
-      "patient_status": "Protein is negative on urinalysis, which is a positive sign. However, the overall depletion pattern (system energy 10, multiple low organ scores, low pH) suggests UB rate optimization is still needed. X39 patches initiated Day 1 for stem cell stimulation.",
-      "recommendation": "X39 patches Day 1 (already recommended). 12 hrs on / 12 hrs off. C7 or below belly button placement. Monitor protein on urinalysis at each visit. No direct frequency for UB rates \u2014 look at other 4 levers.",
-      "patient_data_citation": "ua.protein_positive = false; X39 initiated per universal Day 1 rule"
+      "patient_status": "Protein negative on urinalysis (ua.protein_positive = false). D-Pulse organs are generally low (28-40% range) but NOT in single digits. X-39 is NOT triggered \u2014 neither protein in urine nor catastrophic single-digit D-Pulse organs are present.",
+      "recommendation": "X-39 is NOT indicated at this time. Monitor UB rates through repeat urinalysis every 2-4 weeks. If protein appears in urine or organ scores drop to single digits, initiate X-39 patches at that time. No direct frequency for UB rates \u2014 assess via the other 4 levers.",
+      "patient_data_citation": "ua.protein_positive = false, ua.protein_value = 'Neg'; D-Pulse organs range 28-40% (not single digits)"
     }
   ],
   "patient_analogies": [
     {
-      "finding": "PNS Negative Zone (parasympathetic failure)",
-      "analogy": "Think of your nervous system like a car with two pedals \u2014 a gas pedal (stress response) and a brake pedal (rest and recovery). Right now, your brake pedal is not just weak, it's actually pushing you backwards when you try to rest. Instead of recovering when you relax, your body is going deeper into a stressed state.",
-      "what_this_means": "What this means for you is that your body currently resists healing. When you try to rest or recover, your nervous system actually moves in the wrong direction. This is why you may feel exhausted even after sleep, or why relaxation techniques might not seem to help.",
-      "hopeful_framing": "The good news is that we have a specific frequency protocol (PNS Support) designed exactly for this pattern. While it is the longest of our deal breakers to resolve \u2014 typically several months \u2014 it does respond to consistent treatment, and many patients notice gradual improvement in their ability to recover and rest."
+      "finding": "PNS Negative Zone (Parasympathetic Failure)",
+      "analogy": "Think of your nervous system as having two gears \u2014 a 'go' gear and a 'rest and repair' gear. Right now, your 'rest and repair' gear is not just weak, it's actually running in reverse. It's as if someone put the healing system into reverse gear, so instead of recovering when you rest, your body is actually losing ground.",
+      "what_this_means": "What this means for you is that your body has been struggling to recover and heal, even when you feel like you're resting. This explains persistent fatigue and why you may feel like you're not getting better despite trying.",
+      "hopeful_framing": "The good news is we have specific frequency protocols designed exactly for this pattern. PNS Support is one of our most well-understood protocols, and while it takes patience (several months), we see consistent improvement when we address it directly."
     },
     {
       "finding": "Vagus Nerve Dysfunction",
-      "analogy": "Your vagus nerve is like the main communication highway between your brain and all your internal organs \u2014 your heart, gut, lungs, and more. Right now, this highway has major construction and traffic isn't flowing properly. Your brain is sending signals but they're not getting through efficiently.",
-      "what_this_means": "What this means for you is that your organs aren't getting clear instructions from your brain about when to slow down, digest food, or recover from stress. This can show up as digestive issues, heart irregularities, or feeling 'wired but tired.'",
-      "hopeful_framing": "The good news is that the vagus nerve is very responsive to targeted frequency work. We'll start with Vagus Support \u2014 our foundational protocol \u2014 and your vagus nerve supplement at night. Most patients begin noticing improvements in weeks to months."
+      "analogy": "Your vagus nerve is like the main communication cable between your brain and your organs \u2014 it tells your heart to slow down, your gut to digest, and your body to calm after stress. Right now, that cable is stuck and not transmitting signals properly. It's like having a phone line that's plugged in but can't carry a call.",
+      "what_this_means": "What this means for you is that your brain's 'calm down' signals aren't reaching your body effectively. This can show up as digestive issues, difficulty relaxing, heart rate irregularities, and a general feeling of being 'wired but tired.'",
+      "hopeful_framing": "The good news is that vagus nerve restoration is something we address step by step with a proven protocol sequence. We start with basic Vagus Support and build from there. Many patients notice improvements in digestion and overall calm within weeks."
     },
     {
-      "finding": "Alpha/Theta Brainwave Imbalance (3.1:1 ratio)",
-      "analogy": "Your brain has different gears \u2014 like a car's transmission. Alpha waves are your 'cruising gear' for calm alertness, and theta waves are your 'dream gear' for deep rest and creativity. Right now, your dream gear is running three times stronger than your cruising gear, even during the day. It's like trying to drive on the highway stuck in first gear.",
-      "what_this_means": "What this means for you is that your brain may feel foggy, have difficulty concentrating, or feel like you're walking through a haze. You may feel tired during the day but struggle to get quality sleep at night because the brainwave patterns are reversed.",
-      "hopeful_framing": "The good news is that our Alpha Theta frequency protocol specifically retrains these brainwave patterns. Combined with Cell Synergy (which we're giving at double dose specifically because your ratio is so wide) and D-Ribose, most patients see gradual sharpening of mental clarity over the coming months."
+      "finding": "Alpha/Theta Brainwave Imbalance (3.1:1)",
+      "analogy": "Your brain operates on different wavelengths, like radio stations. The 'Alpha' station is your calm, focused, awake state \u2014 and the 'Theta' station is the drowsy, drifting state you'd normally only use when falling asleep. Right now, your Theta station is playing three times louder than your Alpha station while you're awake. It's like trying to drive your car while the radio is blasting a lullaby.",
+      "what_this_means": "What this means for you is that your brain is spending too much time in a foggy, unfocused state during waking hours. This can cause brain fog, difficulty concentrating, fatigue, and feeling 'not quite there' even when you're trying to be alert.",
+      "hopeful_framing": "The good news is we have the Alpha Theta frequency protocol specifically designed to retune this balance. With consistent treatment plus nutritional support like Cell Synergy and D-Ribose, we see brainwave patterns normalize over weeks to months."
     },
     {
-      "finding": "Low Heart on D-Pulse (32%)",
-      "analogy": "Your heart showed up as one of the weakest systems in your body scan \u2014 like a battery that's been drained down to about a third of its charge. In our framework, a low heart reading always points to emotional stress or trauma that's been stored in the body, not necessarily a structural heart problem.",
-      "what_this_means": "What this means for you is that your body's primary energy generator is running low. The heart doesn't just pump blood \u2014 it's your body's electrical powerhouse. When it's depleted, everything else has to work harder.",
-      "hopeful_framing": "The good news is that heart scores typically respond well to treatment within weeks. We're starting you on Heart Health frequency plus Serculate and CoQ10 supplements, which patients often notice making a difference relatively quickly."
+      "finding": "Low pH (Voltage/Redox Problem)",
+      "analogy": "Your body runs on electricity at the cellular level, and pH is like a voltage meter for your cells. A healthy reading is above 6.5 \u2014 yours is at 6.43, which means your cellular batteries are running a bit low. It's like your phone being at 15% battery \u2014 everything still works, but it's sluggish and some features start shutting down.",
+      "what_this_means": "What this means for you is that your cells don't have quite enough energy to do their jobs efficiently \u2014 healing, detoxing, and generating energy are all slowed when voltage is low.",
+      "hopeful_framing": "The good news is this is one of the most responsive findings we see. Cell Synergy supplementation typically begins raising pH within weeks, and we monitor this closely with repeat urinalysis every 2-4 weeks."
     },
     {
-      "finding": "Low pH (6.43) and Low Specific Gravity (1.005)",
-      "analogy": "Think of your body like a swimming pool. The pH tells us if the water chemistry is balanced \u2014 yours is slightly too acidic, like a pool that needs more alkalizer. The specific gravity tells us how well your cells are making their own water \u2014 yours is very dilute, meaning your cellular engines aren't producing the metabolic water they should be.",
-      "what_this_means": "What this means for you is that your body's internal chemistry is off-balance. The low pH affects how well your cells can generate energy and communicate, while the low specific gravity suggests your mitochondria (the tiny power plants in every cell) aren't working at full capacity.",
-      "hopeful_framing": "The good news is that pH often responds within weeks to the right supplementation. Cell Synergy is our primary tool for this, and Deuterium Drops will help support your cellular water production. We'll track your pH at every visit to make sure it's moving in the right direction."
+      "finding": "Low Specific Gravity (1.005) \u2014 Cells Not Making Metabolic Water",
+      "analogy": "Your mitochondria \u2014 the tiny power plants in every cell \u2014 are supposed to produce water as a byproduct of making energy. A specific gravity of 1.005 tells us your cells aren't producing enough of this metabolic water. It's like a car engine that should be producing exhaust and heat as it runs, but it's barely warm \u2014 the engine isn't firing properly.",
+      "what_this_means": "What this means for you is that your cellular energy production is impaired at a fundamental level, which connects to the fatigue and low system energy we're seeing across your other tests.",
+      "hopeful_framing": "The good news is we can support this directly with Deuterium Drops, which help your mitochondria manage their water chemistry better. This is a targeted intervention that addresses the root issue."
     }
   ],
   "monitoring": [
     {
       "metric": "Urinalysis pH",
       "baseline": "6.43",
-      "target": "\u22656.5, ideally 6.5-7.0",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "target": ">6.5 (ideally 6.5-7.0)",
+      "reassessment_interval": "Every 2-4 weeks (in-office UA)"
     },
     {
       "metric": "Urinalysis Specific Gravity",
       "baseline": "1.005",
-      "target": ">1.010 (indicates improved metabolic water production)",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "target": ">1.010 (indicating improved metabolic water production)",
+      "reassessment_interval": "Every 2-4 weeks (in-office UA)"
     },
     {
-      "metric": "HRV PNS Recovery Pattern",
-      "baseline": "PNS negative zone (calm_pns = -2.5)",
-      "target": "PNS moves into positive zone during recovery",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "metric": "HRV \u2014 PNS Zone",
+      "baseline": "PNS in negative zone (calm_pns = -2.5)",
+      "target": "PNS positive (green dot moving in correct direction during recovery)",
+      "reassessment_interval": "Every 2-4 weeks (in-office HRV)"
     },
     {
-      "metric": "HRV Vagus Distance",
-      "baseline": "Vagus dysfunction = true",
-      "target": "Red and blue dots within 2 hash marks",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "metric": "HRV \u2014 Vagus Nerve Distance",
+      "baseline": "Vagus dysfunction present",
+      "target": "Red and blue dots within 2 hash marks; vagus firing properly",
+      "reassessment_interval": "Every 2-4 weeks (in-office HRV)"
     },
     {
       "metric": "Brainwave Alpha/Theta Ratio",
-      "baseline": "Theta 31 : Alpha 10 (3.1:1)",
-      "target": "Theta:Alpha ratio <2:1, ideally Alpha > Theta",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "baseline": "Theta 31% / Alpha 10% = 3.1:1",
+      "target": "Theta:Alpha <2:1 (Alpha dominant over Theta)",
+      "reassessment_interval": "Every 2-4 weeks (in-office D-Pulse brainwave)"
     },
     {
       "metric": "D-Pulse Heart Score",
       "baseline": "32%",
-      "target": ">50%",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "target": ">50% (trending upward)",
+      "reassessment_interval": "Every 2-4 weeks (in-office D-Pulse)"
     },
     {
       "metric": "D-Pulse Bladder Score",
-      "baseline": "28%",
-      "target": ">40%",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "baseline": "28% (lowest organ)",
+      "target": ">40% (trending upward)",
+      "reassessment_interval": "Every 2-4 weeks (in-office D-Pulse)"
     },
     {
-      "metric": "D-Pulse Kidneys Score",
+      "metric": "D-Pulse Kidney Score",
       "baseline": "30%",
-      "target": ">40%",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
-    },
-    {
-      "metric": "VCS Score",
-      "baseline": "25/32 (passed but borderline)",
-      "target": "\u226528/32 with improvement in columns C & D",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "target": ">45% (trending upward)",
+      "reassessment_interval": "Every 2-4 weeks (in-office D-Pulse)"
     },
     {
       "metric": "Uric Acid",
-      "baseline": "High (UA strip value 100)",
+      "baseline": "High (UA strip value = 100)",
       "target": "Normal range",
       "reassessment_interval": "Every 2-4 weeks (in-office UA strip)"
     },
     {
-      "metric": "System Energy (HRV)",
-      "baseline": "10",
-      "target": ">50",
-      "reassessment_interval": "Every 2-4 weeks (in-office)"
+      "metric": "Lab Panel (Leptin, MSH, Vitamin D, Ferritin, CRP, Liver Enzymes, eGFR, Homocysteine)",
+      "baseline": "Not yet drawn",
+      "target": "All within BFM optimal ranges",
+      "reassessment_interval": "3 months after initial draw (LabCorp/bloodwork)"
     },
     {
-      "metric": "Lab Panel (Leptin, MSH, Vitamin D, Liver Enzymes, Ferritin, CRP, GFR, Homocysteine)",
-      "baseline": "Not yet drawn",
-      "target": "Establish baselines; retest at 3 months",
-      "reassessment_interval": "3 months for lab retesting"
+      "metric": "HRV System Energy",
+      "baseline": "10 (very low)",
+      "target": ">50 (indicating improved autonomic resilience)",
+      "reassessment_interval": "Every 2-4 weeks (in-office HRV)"
     }
   ],
-  "clinical_summary": "Jennifer Weber presents with a complex, multi-system case featuring 5 active deal breakers: PNS Negative Zone (calm_pns = -2.5), Vagus Nerve Dysfunction, severe Alpha/Theta Imbalance (3.1:1 ratio), Low Heart on D-Pulse (32%), and Low pH (6.43). Her HRV shows critically low system energy (10) with both sympathetic and parasympathetic values in negative territory (calm_sns = -1.0, calm_pns = -2.5), representing a lower-left quadrant depletion pattern \u2014 total energy collapse rather than a sympathetic switch. Her brainwave pattern is significantly disrupted with Theta dominating Alpha by more than 3:1, and high Delta (47%) suggesting severely impaired cellular energy production. Her D-Pulse reveals globally depressed organ scores with no system above 40%, and her lowest anchors being Bladder (28%), Kidneys (30%), Brain (31%), Small Intestine (31%), Heart (32%), and Liver (32%). Urinalysis shows borderline acidic pH (6.43), critically low specific gravity (1.005) indicating impaired metabolic water production, and high uric acid suggesting ammonia or acetaldehyde burden.\n\nThe treatment strategy is layered and sequenced precisely. Layer 1 (High Priorities) addresses all 5 deal breakers simultaneously: PNS Support, Vagus Support (basic \u2014 per non-negotiable protocol order), Alpha Theta, Heart Health, and Terrain (if Cell Synergy alone doesn't correct pH), plus Bladder Support for her lowest anchor point. Day 1 supplements include Cell Synergy at 2 scoops (justified by >2:1 Alpha/Theta gap), D-Ribose, Serculate, CoQ10, Innovita Vagus Nerve, X39 patches, and Deuterium Drops. Layer 2 introduces condition-specific and lab-triggered protocols including kidney support, liver support (Liver Tox since enzymes are not confirmed elevated), Gallbladder Support, Aldehyde Detox for high uric acid, and the Five Levers frequency group (Leptin Resist, Pineal Support). Layer 3 holds Midbrain Support for persistent energy depletion, and the MSH cascade protocols (Pit A Support, Pars Intermedia) which are strictly gated behind leptin resolution.\n\nCritical next steps include ordering comprehensive labs: Leptin, MSH, Vitamin D, full liver panel (AST/ALT/GGT), ferritin, CRP, homocysteine, GFR, and BUN/Creatinine ratio. These results will unlock Layer 2 supplement recommendations and may reveal additional frequency needs. JW should be seen at the standard 2\u00d7 per week frequency. Given the severity and number of deal breakers, if a 'BE MORE ATTENTIVE' finding appears on subsequent HRV, treatment frequency should increase to 3\u00d7 or more per week. Lab retesting at 3 months; in-office diagnostics (D-Pulse, HRV, UA, VCS) every 2-4 weeks to track progress.",
-  "confidence_notes": "Several key data points are missing that limit complete protocol assignment: (1) Stressed and recovery HRV dot positions (stressed_pns, stressed_sns, recovery_pns, recovery_sns all null) \u2014 cannot fully assess SNS switching pattern or recovery dynamics; vagus distance in hash marks is not numerically specified. (2) No bloodwork labs available \u2014 Leptin, MSH, Vitamin D, liver enzymes, ferritin, CRP, homocysteine, GFR, BUN/Creatinine, Pro-BNP are all unknown. This means all lab-triggered supplements and frequencies in Layers 2-3 are provisional pending results. (3) D-Pulse stress index, vegetative balance, brain activity, immunity, and physiological resources fields are all null. (4) No spike protein test results available. (5) VCS passed at 25/32 but is borderline \u2014 columns C & D detail is not provided for biotoxin specificity. (6) The uric acid value of '100' appears to be from a UA strip rather than a serum lab; interpretation is directional (high) but not precisely quantifiable. (7) No 'BE MORE ATTENTIVE' notation is present in the data, so standard 2\u00d7/week visit frequency is recommended."
+  "clinical_summary": "Jennifer Weber presents with a complex, multi-system picture dominated by severe autonomic dysfunction and energy depletion. Five deal breakers are active: PNS Negative Zone (calm_pns = -2.5), Vagus Nerve Dysfunction, Alpha/Theta Imbalance (3.1:1 ratio), Low Heart on D-Pulse (32%), and Low pH (6.43). Her HRV system energy is critically low at 10, with both sympathetic and parasympathetic arms in negative territory (calm_sns = -1.0, calm_pns = -2.5), creating a lower-left quadrant pattern of total energy depletion. Importantly, SNS is NOT switched (switched_sympathetics = false), so SNS Balance is NOT indicated \u2014 the system is depleted, not crossed. The brainwave pattern shows severe Theta dominance (31%) over Alpha (10%) at 3.1:1, with high waking Delta (47%) indicating very low direct current and potential circadian disruption. D-Ribose is indicated because the ratio exceeds the 2.5:1 threshold.\n\nThe D-Pulse reveals uniformly depressed organ scores ranging from 28% (Bladder, lowest) to 40% (Gallbladder and Lungs, highest). No organs are in single digits, so X-39 patches are NOT triggered. The Heart (32%) + Small Intestine (31%) pairing further confirms vagus nerve involvement. Kidneys (30%) and Brain (31%) are notably low. Urinalysis shows pH at 6.43 (below 6.5 threshold but above 6.2, so Tri-Salts are not needed), specific gravity at 1.005 (indicating the cell is not making metabolic water \u2014 Deuterium Drops indicated), and high uric acid (suggesting ammonia or acetaldehyde burden requiring Aldehyde Detox and L-Ornithine L-Aspartate). VCS passed at 25/32, so biotoxin deal breaker is NOT triggered, though the score is marginal and should be monitored.\n\nThe treatment plan prioritizes the five deal breakers in Layer 1 (PNS Support, Vagus Support, Alpha Theta, Heart Health, and Terrain if pH doesn't respond to Cell Synergy), followed by organ-specific and lab-triggered protocols in Layer 2 (Kidney Repair/Vitality, Liver Tox, Small Intestine, Aldehyde Detox, and Five Levers frequencies pending lab results). Layer 3 reserves Midbrain Support for persistent energy depletion, Sacral Plexus for refractory PNS issues, and advanced supplements. All Five Levers must be assessed: Melatonin likely compromised (high delta), Leptin unknown (order lab), MSH unknown (order lab, address only after leptin), Vitamin D unknown (order lab, do not supplement until confirmed low), and UB Rates not currently triggered. Standard 2x/week visit frequency is appropriate. Comprehensive labs should be ordered immediately and retested at 3 months.",
+  "confidence_notes": "Several important data points are missing that limit confidence: (1) Stressed and recovery HRV values (stressed_pns, stressed_sns, recovery_pns, recovery_sns) are null \u2014 cannot fully characterize the ortho or Valsalva patterns beyond what is explicitly flagged (pns_negative and vagus_dysfunction). (2) No bloodwork labs are available yet \u2014 Leptin, MSH, Vitamin D, Ferritin, CRP, liver enzymes (AST/ALT/GGT), eGFR, Homocysteine, and other critical markers have not been drawn. All lab-triggered supplements and frequencies are conditional on these results. (3) D-Pulse stress_index, vegetative_balance, brain_activity, immunity, and physiological_resources are all null. (4) The vagus_dysfunction flag is present but the exact hash mark distance between red and blue dots is not quantified. (5) HRV conclusions page findings (ectopic beats, baroreceptor sensitivity, 'BE MORE ATTENTIVE') are not available. (6) VCS column C & D breakdown is not provided \u2014 the overall score of 25/32 passes but a column-level analysis would provide more diagnostic specificity. (7) No spike protein test, no cardiolipin antibodies, no thyroid antibodies, and no ANA results are available. Recommend ordering comprehensive labs immediately to refine Layer 2 protocols."
 }

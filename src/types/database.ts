@@ -54,7 +54,7 @@ export interface Database {
           first_name: string
           last_name: string
           date_of_birth: string
-          gender: 'male' | 'female' | 'other'
+          gender: 'male' | 'female'
           email: string | null
           phone: string | null
           chief_complaints: string | null
@@ -71,7 +71,7 @@ export interface Database {
           first_name: string
           last_name: string
           date_of_birth: string
-          gender: 'male' | 'female' | 'other'
+          gender: 'male' | 'female'
           email?: string | null
           phone?: string | null
           chief_complaints?: string | null
@@ -88,7 +88,7 @@ export interface Database {
           first_name?: string
           last_name?: string
           date_of_birth?: string
-          gender?: 'male' | 'female' | 'other'
+          gender?: 'male' | 'female'
           email?: string | null
           phone?: string | null
           chief_complaints?: string | null

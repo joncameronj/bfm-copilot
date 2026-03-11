@@ -37,7 +37,7 @@ export function PatientListRow({ patient }: PatientListRowProps) {
         </div>
 
         <div className="hidden md:block text-sm text-neutral-500 w-20 text-center">
-          {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : 'Other'}
+          {patient.gender === 'male' ? 'Male' : 'Female'}
         </div>
 
         <div className="hidden lg:block text-sm text-neutral-500 w-16 text-center">

@@ -16,7 +16,7 @@ interface PatientLabUploadModalProps {
   patientId: string
   patientName: string
   patientAge: number
-  patientGender: 'male' | 'female' | 'other'
+  patientGender: 'male' | 'female'
   onSuccess?: () => void
 }
 

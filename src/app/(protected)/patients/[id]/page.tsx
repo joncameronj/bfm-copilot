@@ -76,7 +76,7 @@ export default async function PatientPage({ params }: PatientPageProps) {
           />
         </div>
         <p className="text-neutral-500 dark:text-neutral-400 mt-1">
-          {age} years old &bull; {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : 'Other'}
+          {age} years old &bull; {patient.gender === 'male' ? 'Male' : 'Female'}
         </p>
 
         {/* Action Buttons */}

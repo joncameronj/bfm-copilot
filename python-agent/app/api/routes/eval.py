@@ -74,16 +74,37 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
         calm = hrv_raw.get("calm_position") or {}
         stressed = hrv_raw.get("stressed_position") or {}
         recovery = hrv_raw.get("recovery_position") or {}
+
+        calm_pns = calm.get("pns") if calm else None
+        calm_sns = calm.get("sns") if calm else None
+        switched = patterns.get("switched_sympathetics", False)
+
+        # Validate switched_sympathetics against numerical data:
+        # If both calm_sns and calm_pns are negative, this is a lower-left quadrant
+        # (total depletion) pattern — NOT switched sympathetics. The Vision API
+        # sometimes misidentifies this pattern as "switched" because both values
+        # are abnormal, but clinically switched means the red dot crosses to the
+        # wrong side of the blue dot (SNS positive when PNS is negative or vice versa).
+        if switched and calm_sns is not None and calm_pns is not None:
+            if calm_sns < 0 and calm_pns < 0:
+                logger.warning(
+                    "Overriding switched_sympathetics=True → False: "
+                    "both calm_sns=%.1f and calm_pns=%.1f are negative "
+                    "(lower-left quadrant depletion, NOT switched)",
+                    calm_sns, calm_pns,
+                )
+                switched = False
+
         normalized["hrv"] = {
             "system_energy": hrv_raw.get("system_energy"),
             "stress_response": hrv_raw.get("stress_response"),
-            "calm_pns": calm.get("pns") if calm else None,
-            "calm_sns": calm.get("sns") if calm else None,
+            "calm_pns": calm_pns,
+            "calm_sns": calm_sns,
             "stressed_pns": stressed.get("pns") if stressed else None,
             "stressed_sns": stressed.get("sns") if stressed else None,
             "recovery_pns": recovery.get("pns") if recovery else None,
             "recovery_sns": recovery.get("sns") if recovery else None,
-            "switched_sympathetics": patterns.get("switched_sympathetics", False),
+            "switched_sympathetics": switched,
             "pns_negative": patterns.get("pns_negative", False),
             "vagus_dysfunction": patterns.get("vagus_dysfunction", False),
             "ortho_dots_superimposed": False,
@@ -239,8 +260,18 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
                     raw_bundle[file_type] = extracted
 
     if not raw_bundle:
+        # Log diagnostic detail to help debug extraction failures
+        for file_rec in (files_result.data or []):
+            extractions = file_rec.get("diagnostic_extracted_values") or []
+            statuses = [e.get("status") for e in extractions]
+            logger.info(
+                "File %s (%s): %d extractions, statuses=%s",
+                file_rec.get("id"), file_rec.get("file_type"),
+                len(extractions), statuses,
+            )
         raise ValueError(
             f"No extracted diagnostic data found for analysis {diagnostic_analysis_id}. "
+            f"Upload {upload_id} has {len(files_result.data or [])} files but none with complete/needs_review extractions. "
             "Run extraction first."
         )
 
@@ -398,6 +429,51 @@ async def _create_eval_report_inner(request: EvalReportRequest) -> EvalJobRespon
         status="pending",
         message="Eval report queued. Claude Opus is analyzing all diagnostic data (~3 min).",
     )
+
+
+class ForAnalysisRequest(BaseModel):
+    """Request from Next.js generate-analysis route — synchronous eval."""
+    diagnostic_analysis_id: str
+    patient_id: str
+
+
+class ForAnalysisResponse(BaseModel):
+    """Full EvalReport returned synchronously for the analysis pipeline."""
+    eval_report: dict
+    patient_name: str
+
+
+@router.post("/eval/for-analysis", response_model=ForAnalysisResponse)
+async def eval_for_analysis(request: ForAnalysisRequest):
+    """
+    Synchronous eval endpoint for the diagnostic analysis pipeline.
+
+    Called by Next.js generate-analysis route. Fetches diagnostic bundle,
+    runs Claude Opus eval, and returns the full EvalReport JSON.
+    No background job — the caller already has a 5-minute timeout.
+    """
+    try:
+        bundle_dict, patient_name = await _fetch_diagnostic_bundle(
+            request.diagnostic_analysis_id
+        )
+
+        runner = get_eval_runner()
+        report: EvalReport = await runner.run(bundle_dict, patient_name)
+
+        return ForAnalysisResponse(
+            eval_report=report.model_dump(),
+            patient_name=patient_name,
+        )
+
+    except ValueError as exc:
+        logger.error("eval_for_analysis validation error: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("eval_for_analysis failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Eval agent failed: {exc}",
+        ) from exc
 
 
 @router.post("/eval/batch", response_model=BatchEvalJobResponse)

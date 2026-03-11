@@ -8,7 +8,7 @@ export interface ValidationResult {
   frequencyName: string
   matchedApprovedName: string | null
   error: string | null
-  matchType: 'exact' | 'alias' | 'fuzzy' | 'none'
+  matchType: 'exact' | 'alias' | 'fuzzy' | 'unverified' | 'none'
   rejectionReason?: 'hz_value' | 'not_in_approved_list' | null
 }
 
@@ -149,13 +149,18 @@ export async function validateFrequencyName(
     }
   }
 
-  // No match found
+  // No match found — keep as unverified (soft pass) instead of hard-rejecting.
+  // Hz values are still hard-rejected above. This prevents valid protocols
+  // from being dropped just because they're not yet in the approved_frequency_names table.
+  console.warn(
+    `[Frequency Validation] "${frequencyName}" not in approved list — keeping as unverified`
+  )
   return {
-    valid: false,
+    valid: true,
     frequencyName,
-    matchedApprovedName: null,
-    error: `Frequency "${frequencyName}" not found in approved list`,
-    matchType: 'none',
+    matchedApprovedName: frequencyName, // Use original name as-is
+    error: `Frequency "${frequencyName}" not found in approved list (kept as unverified)`,
+    matchType: 'unverified',
     rejectionReason: 'not_in_approved_list',
   }
 }

@@ -51,7 +51,7 @@ export function PatientCard({ patient, selectable = false, selected = false, onS
               {fullName}
             </h3>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              {age} years old &bull; {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : 'Other'}
+              {age} years old &bull; {patient.gender === 'male' ? 'Male' : 'Female'}
             </p>
           </div>
         </div>

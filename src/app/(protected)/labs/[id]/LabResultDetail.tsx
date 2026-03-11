@@ -27,7 +27,7 @@ interface Patient {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  gender: 'male' | 'female' | 'other';
+  gender: 'male' | 'female';
 }
 
 interface LabResult {

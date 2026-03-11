@@ -12,7 +12,7 @@ interface Patient {
   firstName: string
   lastName: string
   dateOfBirth: string | Date
-  gender: 'male' | 'female' | 'other'
+  gender: 'male' | 'female'
 }
 
 interface PatientSearchSelectorProps {

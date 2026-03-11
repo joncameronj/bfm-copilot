@@ -130,6 +130,8 @@ class UAData:
     specific_gravity: float | None = None
     glucose_positive: bool = False
     heavy_metals: list[str] = field(default_factory=list)
+    uric_acid: float | None = None
+    uric_acid_status: str = ""  # "high", "normal", "low"
 
 
 @dataclass
@@ -189,9 +191,7 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
         bw = bundle.brainwave
         if bw.theta > 0 and bw.alpha > 0 and bw.theta > bw.alpha:
             ratio = bw.theta / bw.alpha if bw.alpha > 0 else 999
-            result.deal_breakers_found.append(
-                f"Theta ({bw.theta}%) > Alpha ({bw.alpha}%) — ratio {ratio:.1f}:1"
-            )
+            result.deal_breakers_found.append("Alpha/Theta Imbalance")
             result.protocols.append(ProtocolRecommendation(
                 name="Alpha Theta",
                 priority=1,
@@ -221,6 +221,16 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             category="autonomic",
             notes="Deal Breaker #3 — longest to resolve (several months)",
         ))
+        # PNS negative also triggers Sacral Plexus (sacral parasympathetic weakness)
+        calm_pns = bundle.hrv.calm_pns
+        if calm_pns is not None and calm_pns < -1.0:
+            result.protocols.append(ProtocolRecommendation(
+                name="Sacral Plexus",
+                priority=3,
+                trigger=f"PNS negative (calm PNS {calm_pns}) — sacral parasympathetic weakness",
+                category="autonomic",
+                notes="Sacral plexus is the parasympathetic hub; PNS collapse indicates sacral weakness",
+            ))
 
     # Deal Breaker 4: Vagus Nerve Dysfunction
     if bundle.hrv and bundle.hrv.vagus_dysfunction:
@@ -241,10 +251,9 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
                 category="autonomic",
             ))
         result.supplements.append(SupplementRecommendation(
-            name="Vagus Nerve form code",
+            name="Innovita Vagus Nerve",
             trigger="Vagus nerve dysfunction",
             timing="At night",
-            notes="Innovita Vagus Nerve form code",
         ))
 
     # Freeze Response: Locus Coeruleus (Ortho blue+red dots perfectly superimposed)
@@ -310,9 +319,18 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             result.protocols.append(ProtocolRecommendation(
                 name="Terrain",
                 priority=1,
-                trigger=f"pH {bundle.ua.ph} (if supplements don't move pH)",
+                trigger=f"pH {bundle.ua.ph} — urgent, supplements may not be enough alone",
                 category="metabolic",
                 notes="Deal Breaker #6 — use if Cell Synergy + Tri-Salts insufficient",
+            ))
+        else:
+            # pH 6.2-6.5: Terrain conditional — add if supplements alone don't move pH
+            result.protocols.append(ProtocolRecommendation(
+                name="Terrain",
+                priority=1,
+                trigger=f"pH {bundle.ua.ph} below 6.5 — add Terrain if Cell Synergy alone doesn't improve pH within 2-4 weeks",
+                category="metabolic",
+                notes="Conditional: begin Cell Synergy first, add Terrain if pH does not improve",
             ))
 
     # Deal Breaker 7: VCS Failed
@@ -351,6 +369,48 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             name="X-39",
             trigger=f"Protein in urine ({bundle.ua.protein_value})",
             notes="LifeWave X-39 patches for UB rates",
+        ))
+        # Protein in urine may also indicate RBC destruction / heme protein damage
+        result.protocols.append(ProtocolRecommendation(
+            name="Blood Support",
+            priority=2,
+            trigger=f"Protein in urine ({bundle.ua.protein_value}) — possible RBC/heme protein damage",
+            category="metabolic",
+            notes="Check for KPU markers (zinc, B6 + bilirubin together)",
+        ))
+
+    # Low specific gravity → Deuterium Drops (cell not making metabolic water)
+    if bundle.ua and bundle.ua.specific_gravity is not None and bundle.ua.specific_gravity <= 1.005:
+        result.supplements.append(SupplementRecommendation(
+            name="Deuterium Drops",
+            trigger=f"Low specific gravity ({bundle.ua.specific_gravity}) — cell not making metabolic water",
+        ))
+
+    # UA: High uric acid → Aldehyde Detox
+    # Check both UA strip data and lab markers for uric acid
+    ua_uric_high = (
+        bundle.ua is not None
+        and (
+            bundle.ua.uric_acid_status == 'high'
+            or (bundle.ua.uric_acid is not None and bundle.ua.uric_acid > 60)
+        )
+    )
+    if not ua_uric_high and bundle.labs:
+        for lab in bundle.labs:
+            if "uric acid" in lab.name.lower() and lab.status == "high":
+                ua_uric_high = True
+                break
+
+    if ua_uric_high:
+        result.protocols.append(ProtocolRecommendation(
+            name="Aldehyde Detox",
+            priority=2,
+            trigger="High uric acid — indicates ammonia/acetaldehyde burden",
+            category="detox",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="L-Ornithine L-Aspartate",
+            trigger="High uric acid — ammonia detoxification pathway",
         ))
 
 
@@ -404,6 +464,20 @@ def _apply_brainwave_rules(bundle: DiagnosticBundle, result: EngineResult) -> No
             f"Alpha {bw.alpha}% (under 10%) — pain indicator, disconnection from Schumann resonance"
         )
 
+    # Lower-left quadrant: both SNS and PNS negative/depleted → Midbrain Support (NOT SNS Balance)
+    if bundle.hrv:
+        calm_sns = bundle.hrv.calm_sns
+        calm_pns = bundle.hrv.calm_pns
+        if (calm_sns is not None and calm_pns is not None
+                and calm_sns < 0 and calm_pns < 0
+                and not bundle.hrv.switched_sympathetics):
+            result.protocols.append(ProtocolRecommendation(
+                name="Midbrain Support", priority=3,
+                trigger=f"Lower-left quadrant depletion (SNS {calm_sns}, PNS {calm_pns}) — total energy collapse",
+                category="autonomic",
+                notes="Lower-left quadrant = Midbrain Support, NOT SNS Balance",
+            ))
+
 
 # =============================================================================
 # D-PULSE ORGAN RULES (Priority 2-3)
@@ -423,6 +497,8 @@ def _apply_dpulse_organ_rules(bundle: DiagnosticBundle, result: EngineResult) ->
         "kidney": [("Kidney Support", ""), ("Kidney Vitality", "if chronic")],
         "kidneys": [("Kidney Support", ""), ("Kidney Vitality", "if chronic")],
         "bladder": [("Bladder Support", "")],
+        "the urinary bladder": [("Bladder Support", "")],
+        "urinary bladder": [("Bladder Support", "")],
         "lung": [("Lung Support", "")],
         "lungs": [("Lung Support", "")],
         "sacrum": [("Sacral Plexus", "sacral parasympathetic weakness")],
@@ -456,12 +532,16 @@ def _apply_dpulse_organ_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             if organ_key in ("heart",):
                 continue  # Already handled in deal breakers
 
+            # <30% = critical anchor point (priority 1), 30-40% = RED (priority 2)
+            organ_priority = 1 if pct < 30 else 2
+            zone_label = "critical anchor point" if pct < 30 else "RED zone"
+
             protocols = organ_protocol_map.get(organ_key, [])
             for proto_name, notes in protocols:
                 result.protocols.append(ProtocolRecommendation(
                     name=proto_name,
-                    priority=2,
-                    trigger=f"{organ.name} {pct}% on D-Pulse (RED, <40%)",
+                    priority=organ_priority,
+                    trigger=f"{organ.name} {pct}% on D-Pulse ({zone_label})",
                     category="organ",
                     notes=notes,
                 ))
@@ -686,14 +766,68 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
             ))
 
     # High Glucose
-    high, m = is_high("Glucose")
-    if high and m:
+    high_glucose, glucose_m = is_high("Glucose")
+    if high_glucose and glucose_m:
         result.protocols.append(ProtocolRecommendation(
             name="Sacral Plexus",
             priority=2,
-            trigger=f"Glucose {m.value} (elevated — diabetic pattern)",
+            trigger=f"Glucose {glucose_m.value} (elevated — diabetic pattern)",
             category="lab",
         ))
+
+    # Diabetes pattern: High Glucose + High A1c (or glucose in urine)
+    high_a1c, a1c_m = is_high("Hemoglobin A1c")
+    if not high_a1c:
+        high_a1c, a1c_m = is_high("A1c")
+
+    if high_glucose or high_a1c or (bundle.ua and bundle.ua.glucose_positive):
+        trigger_parts = []
+        if glucose_m:
+            trigger_parts.append(f"Glucose {glucose_m.value}")
+        if a1c_m:
+            trigger_parts.append(f"A1c {a1c_m.value}%")
+        if bundle.ua and bundle.ua.glucose_positive:
+            trigger_parts.append("glucose in urine")
+        trigger_str = "Diabetes pattern — " + ", ".join(trigger_parts)
+
+        result.protocols.append(ProtocolRecommendation(
+            name="Insulin Resist", priority=2,
+            trigger=trigger_str,
+            category="metabolic",
+        ))
+        result.protocols.append(ProtocolRecommendation(
+            name="Pancreas T2D", priority=2,
+            trigger="Type 2 Diabetes confirmed",
+            category="metabolic",
+        ))
+        result.protocols.append(ProtocolRecommendation(
+            name="SIBO", priority=2,
+            trigger="Part of T2D protocol stack — SIBO runs nightly for 4-6 weeks",
+            category="gut",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="Pancreos", trigger="Type 2 Diabetes pattern",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="Rejuvenation", trigger="Diabetes — 11% insulin sensitivity gain in 28 days at 3 tabs/day",
+            dosage="3 tabs/day (diabetes dose)",
+        ))
+
+    # Spike protein / Virus Recovery
+    for spike_name in ("SARS-CoV-2 Spike Ab", "Spike Ab", "Spike Antibody"):
+        high_spike, spike_m = is_high(spike_name)
+        if high_spike and spike_m:
+            result.protocols.append(ProtocolRecommendation(
+                name="Virus Recovery", priority=1,
+                trigger=f"SARS-CoV-2 Spike Ab {spike_m.value} U/mL — active spike protein load",
+                category="immune",
+            ))
+            result.supplements.append(SupplementRecommendation(
+                name="Augmented NAC",
+                trigger=f"Spike Ab {spike_m.value} — 99% spike protein denaturalization",
+                dosage="3 pills/day for 5-6 months",
+            ))
+            break
 
 
 # =============================================================================
@@ -755,6 +889,115 @@ def _apply_cross_correlations(bundle: DiagnosticBundle, result: EngineResult) ->
 
 
 # =============================================================================
+# FIVE LEVERS FRAMEWORK
+# =============================================================================
+
+def _apply_five_levers_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
+    """Five Levers assessment — always evaluate for every patient."""
+
+    # Lever 1: Melatonin — Pineal Support if brainwave disruption or low system energy
+    if (bundle.brainwave and bundle.hrv and
+        (bundle.brainwave.theta > bundle.brainwave.alpha or
+         (bundle.hrv.system_energy is not None and bundle.hrv.system_energy < 30))):
+        if not any(p.name == "Pineal Support" for p in result.protocols):
+            result.protocols.append(ProtocolRecommendation(
+                name="Pineal Support",
+                priority=2,
+                trigger="Five Levers Lever 1 — melatonin/circadian assessment needed",
+                category="hormone",
+                notes="Disrupted brainwave pattern and/or low system energy warrants circadian evaluation",
+            ))
+            result.supplements.append(SupplementRecommendation(
+                name="Epi Pineal",
+                trigger="Pineal Support protocol — circadian/melatonin support",
+                timing="Nighttime",
+            ))
+
+    # Lever 2: Leptin — if VCS borderline or failed, recommend Leptin Resist
+    if bundle.vcs and bundle.vcs.score_correct is not None:
+        if not bundle.vcs.passed:
+            # VCS failed — ensure Leptin Resist is present (may only have Biotoxin from deal breakers)
+            if not any(p.name == "Leptin Resist" for p in result.protocols):
+                result.protocols.append(ProtocolRecommendation(
+                    name="Leptin Resist",
+                    priority=1,
+                    trigger="VCS failed — biotoxin → leptin cascade",
+                    category="metabolic",
+                ))
+        elif bundle.vcs.score_correct <= 28:
+            # Borderline VCS — recommend Leptin assessment
+            if not any(p.name == "Leptin Resist" for p in result.protocols):
+                result.protocols.append(ProtocolRecommendation(
+                    name="Leptin Resist",
+                    priority=2,
+                    trigger=f"VCS borderline ({bundle.vcs.score_correct}/32) — leptin assessment needed",
+                    category="metabolic",
+                    notes="Order leptin lab. If elevated, this becomes Layer 1 priority",
+                ))
+
+    # Lever 3: MSH — Pit A Support + Pars Intermedia (gated by leptin)
+    # Only add if VCS failed or borderline (suggesting leptin pathway is involved)
+    if bundle.vcs and bundle.vcs.score_correct is not None and bundle.vcs.score_correct <= 28:
+        if not any(p.name == "Pit A Support" for p in result.protocols):
+            result.protocols.append(ProtocolRecommendation(
+                name="Pit A Support",
+                priority=3,
+                trigger="Five Levers Lever 3 — MSH assessment, gated by leptin resolution",
+                category="hormone",
+                notes="NEVER run before leptin is trending down. VCS → Leptin → MSH cascade.",
+            ))
+            result.supplements.append(SupplementRecommendation(
+                name="Hypothala",
+                trigger="MSH assessment — hypothalamus/pituitary support",
+                notes="Gated by leptin resolution; part of VCS → Leptin → MSH cascade",
+            ))
+        if not any(p.name == "Pars Intermedia" for p in result.protocols):
+            result.protocols.append(ProtocolRecommendation(
+                name="Pars Intermedia",
+                priority=3,
+                trigger="Paired with Pit A Support for MSH restoration",
+                category="hormone",
+                notes="Same gating as Pit A — only after leptin addressed",
+            ))
+
+    # Ensure Adipothin supplement whenever Leptin Resist is recommended
+    if any(p.name == "Leptin Resist" for p in result.protocols):
+        if not any(s.name == "Adipothin" for s in result.supplements):
+            result.supplements.append(SupplementRecommendation(
+                name="Adipothin",
+                trigger="Leptin Resist protocol — leptin resistance support",
+            ))
+
+
+# =============================================================================
+# GALLBLADDER + LIVER CROSS-CORRELATION
+# =============================================================================
+
+def _apply_gallbladder_liver_correlation(bundle: DiagnosticBundle, result: EngineResult) -> None:
+    """When Liver is RED and Gallbladder is also low, pair them."""
+    if not bundle.dpulse:
+        return
+
+    dp = bundle.dpulse
+    liver_score = dp.get_organ("Liver") or dp.get_organ("liver")
+    gb_score = (dp.get_organ("Gallbladder") or dp.get_organ("gallbladder")
+                or dp.get_organ("Gall bladder") or dp.get_organ("gall bladder"))
+
+    if liver_score is not None and gb_score is not None:
+        if liver_score < 40 and gb_score < 60:
+            if not any(p.name == "Gallbladder Support" for p in result.protocols):
+                result.protocols.append(ProtocolRecommendation(
+                    name="Gallbladder Support",
+                    priority=2,
+                    trigger=f"Gallbladder {gb_score}% paired with low liver ({liver_score}%)",
+                    category="detox",
+                ))
+            result.cross_correlations.append(
+                f"Liver ({liver_score}%) + Gallbladder ({gb_score}%) — paired detox support"
+            )
+
+
+# =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
 
@@ -778,6 +1021,8 @@ def run_protocol_engine(bundle: DiagnosticBundle) -> EngineResult:
     _apply_dpulse_organ_rules(bundle, result)
     _apply_lab_rules(bundle, result)
     _apply_cross_correlations(bundle, result)
+    _apply_five_levers_rules(bundle, result)
+    _apply_gallbladder_liver_correlation(bundle, result)
 
     # Deduplicate
     result.protocols = result.deduplicated_protocols()
@@ -822,12 +1067,18 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
         # Brainwave from HRV
         bw = hrv_data.get("brainwave")
         if bw:
+            def _bw_val(key: str) -> float:
+                v = bw.get(key, 0)
+                if isinstance(v, dict):
+                    return v.get("value", 0)
+                return v or 0
+
             bundle.brainwave = BrainwaveData(
-                alpha=bw.get("alpha", 0),
-                beta=bw.get("beta", 0),
-                delta=bw.get("delta", 0),
-                gamma=bw.get("gamma", 0),
-                theta=bw.get("theta", 0),
+                alpha=_bw_val("alpha"),
+                beta=_bw_val("beta"),
+                delta=_bw_val("delta"),
+                gamma=_bw_val("gamma"),
+                theta=_bw_val("theta"),
             )
 
     # Standalone brainwave (if not already set from HRV)
@@ -868,6 +1119,11 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
         protein_val = protein_obj.get("value", "") if isinstance(protein_obj, dict) else str(protein_obj or "")
         sg_obj = ua_data.get("specific_gravity", {})
 
+        # Uric acid
+        ua_obj = ua_data.get("uric_acid", {})
+        ua_val = ua_obj.get("value") if isinstance(ua_obj, dict) else ua_obj
+        ua_status = ua_obj.get("status", "") if isinstance(ua_obj, dict) else ""
+
         bundle.ua = UAData(
             ph=ph_val,
             protein_positive=protein_status in ("trace", "positive"),
@@ -876,6 +1132,8 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
             glucose_positive=(ua_data.get("glucose", {}).get("status") == "positive"
                               if isinstance(ua_data.get("glucose"), dict) else False),
             heavy_metals=ua_data.get("heavy_metals") or [],
+            uric_acid=ua_val if isinstance(ua_val, (int, float)) else None,
+            uric_acid_status=ua_status,
         )
 
         # VCS from UA
