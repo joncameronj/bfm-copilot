@@ -93,8 +93,9 @@ SUPPLEMENT PHASING RULES (critical — apply exactly):
   X-39 (ONLY if protein positive in urine OR most/all D-Pulse organs in single digits),
   Innovita Vagus Nerve (if vagus deal breaker triggered). Nothing else on Day 1.
 - Cell Synergy standard dose = 1 scoop. DOUBLE dose = 2 scoops (not 4). Only increase beyond
-  1 scoop if "BE MORE ATTENTIVE" finding OR Alpha/Theta ratio is extremely uneven and not resolving.
+  1 scoop if "BE MORE ATTENTIVE" finding OR Alpha/Theta ratio is extremely uneven (>2:1) and not resolving.
   X-39 is NOT automatic — it requires protein in urine or single-digit D-Pulse organs to trigger.
+- D-Ribose: ONLY add if Theta >= 2x Alpha (2:1 ratio). NOT triggered below 2:1.
 - Week 1-2 (lab work findings only): Vitamin D, IP6 Gold (high ferritin), Homocysteine Factor
   (high homocysteine), Adipothin (confirmed leptin resistance), Livergy (elevated liver enzymes),
   Pancreos (T2D), and other lab-triggered supplements. Do NOT add these until labs confirm need.
@@ -112,6 +113,28 @@ VCS / LEPTIN / MSH CASCADE (critical sequence):
 - ALWAYS address Leptin FIRST: Biotoxin frequency + Leptin Resist frequency + Adipothin supplement
   + leptin-style diet education. THEN move to MSH protocols (Pit A Support + Pars Intermedia +
   Hypothala). Do NOT jump to MSH support before addressing Leptin.
+
+ALPHA/THETA TRIGGER RULE (critical — apply exactly):
+- Theta above Alpha by ANY amount ALWAYS triggers Alpha Theta protocol. Even Theta 14% vs Alpha 11%
+  (1.27:1) triggers Alpha Theta. The CSF vortex is running backwards whenever Theta exceeds Alpha.
+- The 2:1 ratio ONLY determines D-Ribose supplementation and Cell Synergy double dosing.
+  Ratio < 2:1 → Alpha Theta + Cell Synergy 1 scoop. NO D-Ribose.
+  Ratio >= 2:1 → Alpha Theta + Cell Synergy 2 scoops + D-Ribose.
+- NEVER say Alpha Theta is "not triggered" because the ratio doesn't reach 2:1.
+
+GLUCOSE IN URINE — MUST BE ACTUALLY PRESENT:
+- Only report glucose positive in urine if the UA strip EXPLICITLY shows glucose as a positive finding.
+- If glucose is not listed on the urine test, or if it shows negative, DO NOT claim glucose is positive.
+- Do NOT infer glucose in urine from blood glucose, HbA1c, or other metabolic markers.
+- Pancreos supplement is NOT indicated if glucose is not actually present in urine.
+
+UROBILINOGEN ON URINE:
+- Urobilinogen present in urine = same handling as bilirubin in urine → Blood Support protocol.
+- If BOTH bilirubin AND urobilinogen are present → more profound issue, higher priority Blood Support.
+- If only one is present → still triggers Blood Support, but less severe.
+
+HIGH URIC ACID ON URINE:
+- Triggers Aldehyde Detox protocol + L-Ornithine L-Aspartate supplement (Day 1).
 
 AUTONOMIC PATTERN RULES (apply exactly):
 - SNS SWITCHED (upper-left quadrant, SNS clearly elevated and flipped): SNS Balance 35@709
@@ -133,7 +156,7 @@ LAB-TRIGGERED FREQUENCIES:
 - Elevated liver enzymes (AST/ALT) → Liver Inflame frequency.
 - Low specific gravity in urine (1.005 or below) → Deuterium Drops supplement.
 - High ferritin → Ferritin Lower frequency + IP6 Gold supplement (EMPTY STOMACH mandatory).
-- High uric acid → Aldehyde Detox frequency.
+- High uric acid → Aldehyde Detox frequency + L-Ornithine L-Aspartate supplement.
 - Elevated CRP → Mito Leak frequency.
 - Spike protein >1000 U/mL → Virus Recovery frequency.
 - Low GFR/CKD → Kidney Repair/Vitality frequency.
@@ -150,7 +173,8 @@ Layer 1 (phase=1) — "High Priorities":
   - Day 1 supplements: Cell Synergy, Tri-Salts (pH<6.2), Pectasol-C (VCS failed),
     X-39 (ONLY if protein positive in urine OR most/all D-Pulse organs in single digits),
     Serculate (Heart low D-Pulse), CoQ10 (Heart low D-Pulse), Innovita Vagus Nerve (vagus deal breaker),
-    Deuterium Drops (specific gravity ≤1.005 on UA)
+    Deuterium Drops (specific gravity ≤1.005 on UA),
+    D-Ribose (ONLY if Theta >= 2x Alpha), L-Ornithine L-Aspartate (high uric acid on UA)
   - Supplements in this layer: set layer=1
 
 Layer 2 (phase=2) — "Next If No Response":
@@ -167,6 +191,11 @@ Layer 3 (phase=3) — "If They Are Still Stuck":
   - Environmental factor protocols
   - Advanced supplements: Epi Pineal, Hypothala, Rejuvenation H2, Fatty 15, etc.
   - Supplements in this layer: set layer=3
+
+CRITICAL: You MUST generate protocols and supplements for ALL THREE LAYERS. A complete report
+typically has 8-12 Layer 1 protocols, 5-8 Layer 2 protocols, and 3-6 Layer 3 protocols.
+Similarly, supplements should span all 3 layers. If you only produce Layer 1, the report is
+INCOMPLETE. Layer 2 and Layer 3 are clinically essential for long-term treatment planning.
 
 SESSION FREQUENCY CONTEXT:
 - Standard BFM practice: patients are seen 2× per week. This is the baseline.

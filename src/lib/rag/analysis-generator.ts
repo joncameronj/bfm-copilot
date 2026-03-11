@@ -208,7 +208,7 @@ export async function generateDiagnosticAnalysis(
     throw new Error('No diagnostic analysis record found for this upload')
   }
 
-  // 8. Call the Python eval agent (synchronous — ~3 min)
+  // 8. Call the Python eval agent (synchronous — ~3-5 min)
   const pythonAgentUrl = getPythonAgentUrl()
   console.log(`[Eval Agent] Calling POST ${pythonAgentUrl}/agent/eval/for-analysis`)
 

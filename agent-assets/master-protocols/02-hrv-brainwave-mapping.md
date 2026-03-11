@@ -153,11 +153,13 @@ Use this to determine the correct frequency based on HRV or D-Pulse brainwave re
 
 **Section:** BRAINWAVE PATTERNS
 
-**Diagnostic Detail:** D-Pulse brainwave: Theta exceeds alpha (gap >2:1)
+**Diagnostic Detail:** D-Pulse brainwave: Theta exceeds alpha (ANY amount — even 1% above alpha triggers this)
 
 **Primary Frequency:** Alpha Theta
 
-**Supplementation / Notes:** Cell Synergy (double scoop if gap greater than 2:1); D-Ribose ONLY if Theta >= 2.5x Alpha (e.g., Theta 25%+ / Alpha 10% = 2.5:1). If ratio is below 2.5:1, D-Ribose is NOT indicated.
+**Supplementation / Notes:** ALWAYS triggers Alpha Theta protocol when Theta is above Alpha, regardless of the ratio. The ratio determines supplementation:
+- Cell Synergy (1 scoop standard; double scoop if gap greater than 2:1)
+- D-Ribose ONLY if Theta >= 2:1 ratio over Alpha (e.g., Theta 22%+ / Alpha 11% = 2:1). D-Ribose helps move things along faster. If ratio is below 2:1, D-Ribose is NOT indicated.
 
 **Source Module(s):** All 4 modules
 

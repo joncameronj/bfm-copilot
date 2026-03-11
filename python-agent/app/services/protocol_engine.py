@@ -132,6 +132,8 @@ class UAData:
     heavy_metals: list[str] = field(default_factory=list)
     uric_acid: float | None = None
     uric_acid_status: str = ""  # "high", "normal", "low"
+    bilirubin_positive: bool = False
+    urobilinogen_positive: bool = False
 
 
 @dataclass
@@ -204,11 +206,11 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
                 trigger=f"Theta/Alpha imbalance (ratio {ratio:.1f}:1)",
                 dosage="Double scoop if gap >2:1" if ratio > 2 else "1 scoop",
             ))
-            # D-Ribose only if Theta >= 2.5x Alpha
-            if ratio >= 2.5:
+            # D-Ribose only if Theta >= 2x Alpha
+            if ratio >= 2.0:
                 result.supplements.append(SupplementRecommendation(
                     name="D-Ribose",
-                    trigger=f"Theta >= 2.5x Alpha (ratio {ratio:.1f}:1)",
+                    trigger=f"Theta >= 2x Alpha (ratio {ratio:.1f}:1)",
                 ))
 
     # Deal Breaker 3: PNS Negative Zone
@@ -411,6 +413,25 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
         result.supplements.append(SupplementRecommendation(
             name="L-Ornithine L-Aspartate",
             trigger="High uric acid — ammonia detoxification pathway",
+        ))
+
+    # UA: Bilirubin and/or Urobilinogen → Blood Support
+    # Urobilinogen is treated the same as bilirubin in urine; both together = more profound
+    bili = bundle.ua and bundle.ua.bilirubin_positive
+    urobi = bundle.ua and bundle.ua.urobilinogen_positive
+    if bili or urobi:
+        findings = []
+        if bili:
+            findings.append("bilirubin")
+        if urobi:
+            findings.append("urobilinogen")
+        severity = "Both bilirubin AND urobilinogen — more profound issue" if (bili and urobi) else f"{findings[0]} present"
+        result.protocols.append(ProtocolRecommendation(
+            name="Blood Support",
+            priority=2 if not (bili and urobi) else 1,
+            trigger=f"{severity} in urine — RBC destruction / heme protein damage",
+            category="metabolic",
+            notes="Check for KPU markers (zinc, B6 + bilirubin together)",
         ))
 
 

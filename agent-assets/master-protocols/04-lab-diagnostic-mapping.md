@@ -550,7 +550,23 @@ Augmented NAC (spike protein)
 
 **Supplementation:** Check for KPU (zinc, B6 + bilirubin together)
 
-**Notes:** Blue light toxicity correlation
+**Notes:** Blue light toxicity correlation. If Urobilinogen is ALSO present, the issue is more profound.
+
+**Source Module(s):** Hormones, Diabetes
+
+---
+
+### Lab Marker: Urobilinogen present
+
+**Category:** URINALYSIS
+
+**Clinical Significance:** Same clinical significance as Bilirubin in urine — RBC destruction, heme protein damage, liver overwhelm. However, if BOTH Bilirubin AND Urobilinogen are present, the issue is more profound and warrants more urgent attention.
+
+**Frequency Protocol:** Blood Support
+
+**Supplementation:** Check for KPU (zinc, B6 + bilirubin together); liver support evaluation
+
+**Notes:** Urobilinogen alone = same handling as bilirubin. Both present together = more severe.
 
 **Source Module(s):** Hormones, Diabetes
 

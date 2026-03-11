@@ -627,7 +627,7 @@ class TestAccuracyReport:
         case_studies = [
             ("Hormones CS2", _hormones_cs2_bundle(), {
                 "protocols": {"Alpha Theta", "Biotoxin", "Midbrain Support"},
-                "supplements": {"Cell Synergy", "X-39", "D-Ribose"},
+                "supplements": {"Cell Synergy", "X-39"},  # D-Ribose not indicated: Theta/Alpha ratio 1.71:1 < 2:1
             }),
             ("Diabetes CS4", _diabetes_cs4_bundle(), {
                 "protocols": {"Alpha Theta", "Heart Health", "Kidney Support"},

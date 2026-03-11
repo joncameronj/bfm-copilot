@@ -94,7 +94,7 @@ export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps
   return (
     <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
       <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
-        Typical analysis takes 2-3 minutes
+        Typical analysis takes 3-5 minutes
       </p>
 
       {/* Progress bar */}

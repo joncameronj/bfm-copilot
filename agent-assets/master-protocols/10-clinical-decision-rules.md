@@ -101,7 +101,7 @@ These supplements are triggered by in-office diagnostic findings. Recommend on D
 - **CoQ10** — ONLY if Heart low on D-Pulse (<40%)
 - **X-39** — ONLY if protein positive in urine OR most/all D-Pulse organs are in single digits (stem cell support + UB rate). NOT automatic for every patient.
 - **Innovita Vagus Nerve** — ONLY if vagus deal breaker triggered
-- **D-Ribose** — ONLY if Theta >= 2.5x Alpha (e.g., Theta 25% / Alpha 10% = 2.5:1). NOT triggered by mild Theta > Alpha imbalance.
+- **D-Ribose** — ONLY if Theta >= 2x Alpha (e.g., Theta 22% / Alpha 11% = 2:1). D-Ribose helps move things along faster. NOT triggered when ratio is below 2:1.
 - **Deuterium Drops** — ONLY if specific gravity ≤ 1.005 on UA
 
 ### Week 1-2 (Lab Work Findings ONLY)
@@ -234,3 +234,60 @@ Categories that consistently score 5/5:
 - Diagnostic interpretation
 - Clinical concerns identification
 - Safety/contraindication awareness
+
+---
+
+## SECTION 13: ALPHA/THETA PROTOCOL TRIGGER (Critical Correction)
+
+**Theta above Alpha ALWAYS triggers the Alpha Theta protocol — regardless of the ratio.**
+Even if Theta is only 1% above Alpha (e.g., Theta 14% vs Alpha 11% = 1.27:1), the Alpha Theta
+protocol is triggered. The CSF vortex is running backwards whenever Theta exceeds Alpha by any amount.
+
+The 2:1 ratio ONLY determines whether to add D-Ribose as a supplement:
+- Ratio < 2:1 → Alpha Theta protocol + Cell Synergy (1 scoop). NO D-Ribose.
+- Ratio >= 2:1 → Alpha Theta protocol + Cell Synergy (double scoop) + D-Ribose.
+
+**Common mistake:** Saying the Alpha Theta protocol is "not triggered" because the ratio doesn't
+reach 2:1. This is WRONG. The ratio gates D-Ribose supplementation, NOT the protocol itself.
+
+---
+
+## SECTION 14: GLUCOSE IN URINE — MUST BE ACTUALLY PRESENT
+
+**Only report glucose positive in urine if glucose is ACTUALLY listed as a finding on the urine test.**
+If the urine test does not include glucose as a measured analyte, or if glucose is listed as negative,
+DO NOT report glucose positive. DO NOT assume glucose is present based on other metabolic findings.
+
+When glucose is NOT present in urine:
+- Do NOT recommend Pancreos as a Day 1 supplement
+- Do NOT trigger Insulin Resist / Pancreas T2D / SIBO from urine findings alone
+- These protocols should only trigger from confirmed lab glucose/HbA1c elevation
+
+**Common mistake:** Inferring glucose in urine from other metabolic markers or lab findings.
+Only trigger glucose-in-urine protocols if the UA strip explicitly shows glucose positive.
+
+---
+
+## SECTION 15: UROBILINOGEN ON URINE (New Finding)
+
+**Urobilinogen in urine = same handling as Bilirubin in urine.**
+- Protocol: Blood Support
+- Check for KPU markers (zinc, B6 + bilirubin together)
+
+If BOTH Bilirubin AND Urobilinogen are present together, the issue is MORE PROFOUND
+and warrants more urgent attention (higher priority Blood Support).
+
+If only one is present (either bilirubin OR urobilinogen alone), it is still problematic
+but less severe than both together.
+
+---
+
+## SECTION 16: HIGH URIC ACID ON URINE
+
+When uric acid is elevated on the UA strip:
+- **Protocol:** Aldehyde Detox
+- **Supplement:** L-Ornithine L-Aspartate (ammonia detoxification)
+
+This is a Day 1 finding (in-office test). Do not wait for lab confirmation.
+
+**Common mistake:** Missing uric acid on the urine strip. Always check for it.

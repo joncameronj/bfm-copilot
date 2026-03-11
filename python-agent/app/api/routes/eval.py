@@ -155,12 +155,16 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
         protein_data = ua_raw.get("protein", {})
         sg_data = ua_raw.get("specific_gravity", {})
         glucose_data = ua_raw.get("glucose", {})
+        bilirubin_data = ua_raw.get("bilirubin", {})
+        urobilinogen_data = ua_raw.get("urobilinogen", {})
         normalized["ua"] = {
             "ph": ph_data.get("value") if isinstance(ph_data, dict) else ph_data,
             "protein_positive": _is_positive(protein_data),
             "protein_value": str(protein_data.get("value", "")) if isinstance(protein_data, dict) else str(protein_data),
             "specific_gravity": sg_data.get("value") if isinstance(sg_data, dict) else sg_data,
             "glucose_positive": _is_positive(glucose_data),
+            "bilirubin_positive": _is_positive(bilirubin_data),
+            "urobilinogen_positive": _is_positive(urobilinogen_data),
         }
 
     # ----- VCS normalization — standalone VCS file OR UA-embedded vcs_score -----
@@ -385,7 +389,7 @@ async def create_eval_report(request: EvalReportRequest):
     Trigger a full clinical eval report for a single patient.
 
     Uses Claude Opus 4.6 with all 9 master protocol files inline.
-    The eval runs as a background task (~3 minutes).
+    The eval runs as a background task (~3-5 minutes).
 
     Returns the report_id immediately; poll GET /agent/eval/{report_id} for status.
     """
@@ -427,7 +431,7 @@ async def _create_eval_report_inner(request: EvalReportRequest) -> EvalJobRespon
         diagnostic_analysis_id=request.diagnostic_analysis_id,
         patient_id=request.patient_id,
         status="pending",
-        message="Eval report queued. Claude Opus is analyzing all diagnostic data (~3 min).",
+        message="Eval report queued. Claude Opus is analyzing all diagnostic data (~3-5 min).",
     )
 
 
@@ -482,7 +486,7 @@ async def create_batch_eval_reports(request: BatchEvalRequest):
     Trigger full clinical eval reports for 1-5 patients simultaneously.
 
     All patient evals start in parallel via asyncio.gather(). Each report
-    takes ~3 minutes; all finish in ~3 minutes regardless of patient count.
+    takes ~3-5 minutes; all finish in ~3-5 minutes regardless of patient count.
 
     Enforces max 5 concurrent to control Claude Opus API costs.
     """
@@ -535,7 +539,7 @@ async def create_batch_eval_reports(request: BatchEvalRequest):
     return BatchEvalJobResponse(
         jobs=jobs,
         total=len(jobs),
-        message=f"Queued {new_count} eval report(s). All running in parallel (~3 min each).",
+        message=f"Queued {new_count} eval report(s). All running in parallel (~3-5 min each).",
     )
 
 
