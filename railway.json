@@ -4,8 +4,7 @@
     "builder": "DOCKERFILE",
     "dockerfilePath": "python-agent/Dockerfile",
     "watchPatterns": [
-      "python-agent/**",
-      "agent-assets/**"
+      "python-agent/**"
     ]
   },
   "deploy": {
