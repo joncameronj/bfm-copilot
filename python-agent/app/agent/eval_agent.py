@@ -84,6 +84,12 @@ CLINICAL REASONING RULES:
    the master key (e.g. "Brain Activity Support", "Stress Index Regulation", "Cervical Support"
    do not exist — do not use them).
 5. The Five Levers (Section 06) must be assessed for EVERY patient.
+5a. PROTOCOL PRIORITY ORDER — always follow this sequence when building the report:
+    (1) Deal breakers (Section 01) — absolute first, all 7 must be evaluated.
+    (2) Five Levers (Section 06) — assessed for every patient, placed before condition-specific work.
+    (3) Condition-specific protocols (Section 05) — fine-tuning after the foundational work.
+    The patient's documented diagnosis informs what to address at step 3, but NEVER
+    elevates condition protocols above deal breakers or levers.
 6. Supplement names must use BFM branded names (Innovita line, LifeWave, etc.) as specified.
 7. If data is missing for a diagnostic category, note it explicitly — do not infer or assume.
 8. If the diagnostic bundle includes a `patient_context` section, that charted history is authoritative.
@@ -136,15 +142,24 @@ GLUCOSE IN URINE — MUST BE ACTUALLY PRESENT:
 
 UROBILINOGEN ON URINE:
 - Urobilinogen present in urine = same handling as bilirubin in urine → Blood Support protocol.
+  Clinical significance: RBC destruction; heme protein damage; correlate liver overwhelm, gall bladder
+  issues on other testing. Check for KPU (zinc, B6 + bilirubin together). Blue light toxicity correlation.
 - If BOTH bilirubin AND urobilinogen are present → more profound issue, higher priority Blood Support.
+  Correlate with gall bladder and liver findings on other testing (D-Pulse, labs).
 - If only one is present → still triggers Blood Support, but less severe.
+- Source modules: Hormones, Diabetes.
 
 HIGH URIC ACID ON URINE:
 - Triggers Aldehyde Detox protocol + L-Ornithine L-Aspartate supplement (Day 1).
 
 DOCUMENTED CONDITION RULES:
+- Documented diagnoses in patient_context ARE clinically significant and MUST be accounted for,
+  but they are fine-tuning — they run AFTER deal breakers and Five Levers are addressed.
+- A documented condition (e.g. Parkinson's, fibromyalgia) does NOT become the dominant treatment
+  priority. The BFM system treats the energetic debt first (deal breakers + levers). The condition
+  protocol provides targeted fine-tuning at the end.
 - If patient_context explicitly documents fibromyalgia / fibro in chief complaints or medical history,
-  assess the Fibromyalgia condition protocol entry from Section 05.
+  assess the Fibromyalgia condition protocol entry from Section 05 as Layer 2 fine-tuning after levers.
 - Fibromyalgia chart context should trigger the condition protocol stack when clinically compatible:
   Nerve Pain, Sympathetic Calm, Copper Balance support, and CPP/Cyto Lower selection based on the
   current pattern and gating rules.
@@ -194,7 +209,11 @@ Layer 1 (phase=1) — "High Priorities":
 
 Layer 2 (phase=2) — "Next If No Response":
   layer_label="Next If No Response", layer_description="Secondary protocols if no response after 4-6 weeks."
-  - Condition-specific protocols (Thyroid, Hormone, Gut, Liver, etc.)
+  - FIRST within Layer 2: Five Levers assessment (Melatonin, Leptin, MSH, Vitamin D, UB Rates).
+    These come before condition-specific protocols — the levers govern the patient's energy debt
+    which is 80-90% of the clinical picture.
+  - THEN: Condition-specific protocols (Thyroid, Hormone, Gut, Liver, etc.) from Section 05.
+    These are fine-tuning based on the documented diagnosis — addressed after levers are evaluated.
   - Lab-triggered frequencies (Liver Inflame, Ferritin Lower, etc.)
   - Lab-triggered supplements: Vitamin D, IP6 Gold, Homocysteine Factor, Adipothin, Livergy, Pancreos
   - Supplements in this layer: set layer=2

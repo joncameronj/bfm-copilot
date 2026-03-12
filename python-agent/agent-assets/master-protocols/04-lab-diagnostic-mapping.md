@@ -556,6 +556,25 @@ Augmented NAC (spike protein)
 
 ---
 
+### Lab Marker: Bilirubin present, urobilinogen present
+
+**Category:** URINALYSIS
+
+**Clinical Significance:** RBC destruction; heme protein damage; correlate liver overwhelm, gall bladder
+issues on other testing
+
+**Frequency Protocol:** Blood Support
+
+**Supplementation:** Check for KPU (zinc, B6 + bilirubin together)
+
+**Notes:** Blue light toxicity correlation. Both markers together indicate a more profound issue than
+either alone — higher priority Blood Support. Always correlate with gall bladder and liver findings on
+D-Pulse and labs.
+
+**Source Module(s):** Hormones, Diabetes
+
+---
+
 ## Lab Category: EMF / ENVIRONMENTAL
 
 ### Lab Marker: EMF skin issues (hands/feet)
