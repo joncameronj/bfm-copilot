@@ -134,6 +134,16 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
     fetchData()
   }, [patientId])
 
+  // Poll every 10s while any analysis is processing/pending
+  useEffect(() => {
+    const hasInProgress = analyses.some(
+      (a) => a.status === 'processing' || a.status === 'pending'
+    )
+    if (!hasInProgress) return
+    const interval = setInterval(fetchData, 10000)
+    return () => clearInterval(interval)
+  }, [analyses])
+
   const transformToAnalysisWithRecommendations = (data: AnalysisData): DiagnosticAnalysisWithRecommendations => {
     return {
       id: data.id,

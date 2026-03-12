@@ -8,7 +8,7 @@ All clients now go through ai_client.py.
 from app.services.ai_client import get_async_client, reset_clients
 
 EVAL_MODEL = "claude-opus-4-6"
-EVAL_MAX_TOKENS = 32000
+EVAL_MAX_TOKENS = 12288
 
 
 def get_claude_client():
