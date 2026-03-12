@@ -264,19 +264,21 @@ class EvalAgentRunner:
             len(json.dumps(bundle_dict)),
         )
 
-        response = await client.messages.create(
+        async with client.messages.stream(
             model=EVAL_MODEL,
             max_tokens=EVAL_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
-        )
+        ) as stream:
+            raw_text = await stream.get_final_text()
+            final_message = await stream.get_final_message()
 
-        raw_text = response.content[0].text.strip()
+        raw_text = raw_text.strip()
         logger.info(
             "Claude Opus eval complete for '%s': %d output chars, stop_reason=%s",
             patient_name,
             len(raw_text),
-            response.stop_reason,
+            final_message.stop_reason,
         )
 
         # Parse and validate
