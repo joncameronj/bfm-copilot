@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -23,6 +24,7 @@ from app.models.eval_models import (
     BatchEvalJobResponse,
     EvalReport,
 )
+from app.services.protocol_engine import bundle_from_extracted_data, run_protocol_engine
 from app.services.supabase import get_supabase_client
 from app.utils.logger import get_logger
 
@@ -54,6 +56,18 @@ def _check_exact_match(a: dict, b: dict) -> bool:
         a.get(k) is not None and b.get(k) is not None and a[k] == b[k]
         for k in keys
     )
+
+
+def _coerce_float(value):
+    """Coerce a raw extracted value to float when possible."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _normalize_bundle(raw_bundle: dict) -> dict:
@@ -155,14 +169,34 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
         protein_data = ua_raw.get("protein", {})
         sg_data = ua_raw.get("specific_gravity", {})
         glucose_data = ua_raw.get("glucose", {})
+        uric_acid_data = ua_raw.get("uric_acid", {})
         bilirubin_data = ua_raw.get("bilirubin", {})
         urobilinogen_data = ua_raw.get("urobilinogen", {})
+        uric_acid_value = (
+            uric_acid_data.get("value") if isinstance(uric_acid_data, dict) else uric_acid_data
+        )
+        uric_acid_status = (
+            str(uric_acid_data.get("status", "")).lower()
+            if isinstance(uric_acid_data, dict)
+            else ""
+        )
+        if uric_acid_value is None:
+            for finding in ua_raw.get("findings") or []:
+                if not isinstance(finding, str):
+                    continue
+                match = re.search(r"uric acid\s+(\d+(?:\.\d+)?)", finding, re.IGNORECASE)
+                if match:
+                    uric_acid_value = match.group(1)
+                    uric_acid_status = uric_acid_status or ("high" if "high" in finding.lower() else "")
+                    break
         normalized["ua"] = {
             "ph": ph_data.get("value") if isinstance(ph_data, dict) else ph_data,
             "protein_positive": _is_positive(protein_data),
             "protein_value": str(protein_data.get("value", "")) if isinstance(protein_data, dict) else str(protein_data),
             "specific_gravity": sg_data.get("value") if isinstance(sg_data, dict) else sg_data,
             "glucose_positive": _is_positive(glucose_data),
+            "uric_acid": _coerce_float(uric_acid_value),
+            "uric_acid_status": uric_acid_status,
             "bilirubin_positive": _is_positive(bilirubin_data),
             "urobilinogen_positive": _is_positive(urobilinogen_data),
         }
@@ -236,7 +270,8 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
 
     # Get the analysis → upload → extracted values chain
     analysis_result = client.table("diagnostic_analyses").select(
-        "id, patient_id, diagnostic_upload_id, patients(first_name, last_name)"
+        "id, patient_id, diagnostic_upload_id, "
+        "patients(first_name, last_name, chief_complaints, medical_history, current_medications, allergies)"
     ).eq("id", diagnostic_analysis_id).single().execute()
 
     if not analysis_result.data:
@@ -282,6 +317,13 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
     # Normalize vision extraction format → DiagnosticBundle format
     bundle = _normalize_bundle(raw_bundle)
 
+    bundle["patient_context"] = {
+        "chief_complaints": patient.get("chief_complaints"),
+        "medical_history": patient.get("medical_history"),
+        "current_medications": patient.get("current_medications") or [],
+        "allergies": patient.get("allergies") or [],
+    }
+
     # Phase 2: Override vision-extracted labs with structured DB data if available
     patient_id = analysis.get("patient_id")
     if patient_id:
@@ -307,6 +349,40 @@ async def _fetch_diagnostic_bundle(diagnostic_analysis_id: str) -> tuple[dict, s
                     bundle["labs"] = lab_markers
         except Exception as exc:
             logger.warning("Failed to fetch structured lab data for patient %s: %s", patient_id, exc)
+
+    try:
+        deterministic_bundle = bundle_from_extracted_data(bundle)
+        engine_result = run_protocol_engine(deterministic_bundle)
+        bundle["deterministic_engine"] = {
+            "protocols": [
+                {
+                    "name": p.name,
+                    "priority": p.priority,
+                    "trigger": p.trigger,
+                    "category": p.category,
+                    "notes": p.notes,
+                }
+                for p in engine_result.protocols
+            ],
+            "supplements": [
+                {
+                    "name": s.name,
+                    "trigger": s.trigger,
+                    "dosage": s.dosage,
+                    "timing": s.timing,
+                    "notes": s.notes,
+                }
+                for s in engine_result.supplements
+            ],
+            "deal_breakers": engine_result.deal_breakers_found,
+            "cross_correlations": engine_result.cross_correlations,
+        }
+    except Exception as exc:
+        logger.warning(
+            "Failed to build deterministic engine grounding for analysis %s: %s",
+            diagnostic_analysis_id,
+            exc,
+        )
 
     return bundle, patient_name
 

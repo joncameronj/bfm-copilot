@@ -141,10 +141,20 @@ export async function generateDiagnosticAnalysis(
   let engineResult: ProtocolEngineResult | null = null
   if (extractedData) {
     try {
+      const engineInput = {
+        ...extractedData,
+        patient_context: {
+          chief_complaints: patientContext.chiefComplaints,
+          medical_history: patientContext.medicalHistory,
+          current_medications: patientContext.currentMedications ?? [],
+          allergies: patientContext.allergies ?? [],
+        },
+      }
+
       const engineResponse = await fetch(`${getPythonAgentUrl()}/agent/protocols/engine`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extracted_data: extractedData }),
+        body: JSON.stringify({ extracted_data: engineInput }),
       })
       if (engineResponse.ok) {
         engineResult = await engineResponse.json() as ProtocolEngineResult

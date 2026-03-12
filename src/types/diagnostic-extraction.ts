@@ -131,6 +131,11 @@ export interface UAExtractedData {
     status: 'low' | 'normal' | 'high'
   }
 
+  uric_acid?: {
+    value: number | string          // e.g., 700
+    status: 'low' | 'normal' | 'high'
+  }
+
   protein: {
     value: string                   // "Negative", "Trace", "1+", "2+", "3+"
     status: 'negative' | 'trace' | 'positive'

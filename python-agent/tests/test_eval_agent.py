@@ -271,6 +271,17 @@ class TestPromptBuilding:
         assert "cite" in system.lower()
         assert "patient data point" in system.lower()
 
+    def test_prompt_uses_patient_context_and_deterministic_grounding(self):
+        from app.agent.eval_agent import _MASTER_PROTOCOLS_DIR, _build_system_prompt
+        if not _MASTER_PROTOCOLS_DIR.exists():
+            pytest.skip("Master protocols directory not found")
+
+        from app.agent.eval_agent import _load_master_protocols
+        system = _build_system_prompt(_load_master_protocols())
+        assert "patient_context" in system
+        assert "deterministic_engine" in system
+        assert "fibromyalgia" in system.lower()
+
 
 # ============================================================================
 # ACCURACY HARNESS (requires answer key JSON files + running agent)

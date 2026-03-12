@@ -24,6 +24,7 @@ from app.services.protocol_engine import (
     UAData,
     VCSData,
     LabMarker,
+    PatientContextData,
     bundle_from_extracted_data,
 )
 
@@ -239,6 +240,26 @@ def _thyroid_cs1_bundle() -> DiagnosticBundle:
             score_correct=32,
             score_total=32,
             passed=True,
+        ),
+    )
+
+
+def _fibromyalgia_context_bundle() -> DiagnosticBundle:
+    """
+    Fibromyalgia case driven by charted diagnosis context.
+    Beta-dominant pattern should allow CPP alongside the condition stack.
+    """
+    return DiagnosticBundle(
+        brainwave=BrainwaveData(
+            alpha=12,
+            beta=30,
+            delta=8,
+            gamma=9,
+            theta=10,
+        ),
+        patient_context=PatientContextData(
+            chief_complaints="Fibromyalgia flare, widespread pain, poor sleep",
+            medical_history="Previously diagnosed fibromyalgia with chronic pain",
         ),
     )
 
@@ -611,6 +632,57 @@ class TestBundleFromExtractedData:
         assert any(p.name == "Heart Health" for p in result.protocols)
         # Should find X-39
         assert any(s.name == "X-39" for s in result.supplements)
+
+    def test_bridge_maps_uric_acid_urobilinogen_and_patient_context(self):
+        data = {
+            "ua": {
+                "ph": {"value": 6.1, "status": "low"},
+                "protein": {"value": "Trace", "status": "trace"},
+                "glucose": {"value": "Neg", "status": "negative"},
+                "uric_acid": {"value": "700", "status": "high"},
+                "bilirubin": {"value": "1+", "status": "positive"},
+                "urobilinogen": {"value": "2.0", "status": "positive"},
+            },
+            "patient_context": {
+                "chief_complaints": "fibromyalgia pain flare",
+                "medical_history": "Fibromyalgia diagnosis",
+                "current_medications": ["Magnesium"],
+                "allergies": ["Penicillin"],
+            },
+        }
+
+        bundle = bundle_from_extracted_data(data)
+
+        assert bundle.ua is not None
+        assert bundle.ua.uric_acid == 700.0
+        assert bundle.ua.uric_acid_status == "high"
+        assert bundle.ua.bilirubin_positive is True
+        assert bundle.ua.urobilinogen_positive is True
+        assert bundle.ua.glucose_positive is False
+        assert bundle.patient_context is not None
+        assert bundle.patient_context.medical_history == "Fibromyalgia diagnosis"
+
+
+class TestConditionProtocolsFromPatientContext:
+    """Condition protocols should trigger from charted diagnoses, not just diagnostics."""
+
+    @pytest.fixture
+    def result(self):
+        return run_protocol_engine(_fibromyalgia_context_bundle())
+
+    def test_fibromyalgia_condition_protocols_present(self, result):
+        protocols = _protocol_names(result)
+        assert "Nerve Pain" in protocols, f"Missing Nerve Pain. Got: {protocols}"
+        assert "Sympathetic Calm" in protocols, f"Missing Sympathetic Calm. Got: {protocols}"
+        assert "CPP" in protocols, f"Missing CPP for beta-dominant fibro case. Got: {protocols}"
+
+    def test_fibromyalgia_support_supplement_present(self, result):
+        supps = _supplement_names(result)
+        assert "Copper Balance" in supps, f"Missing Copper Balance. Got: {supps}"
+
+    def test_condition_context_recorded(self, result):
+        assert any("fibromyalgia" in c.lower() for c in result.cross_correlations), \
+            f"Missing fibromyalgia condition correlation. Got: {result.cross_correlations}"
 
 
 # ============================================================================

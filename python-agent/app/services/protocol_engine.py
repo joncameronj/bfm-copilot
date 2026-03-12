@@ -16,6 +16,7 @@ Rules compiled from:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,25 @@ class LabMarker:
 
 
 @dataclass
+class PatientContextData:
+    """Patient chart context that can trigger condition protocols."""
+    chief_complaints: str | None = None
+    medical_history: str | None = None
+    current_medications: list[str] = field(default_factory=list)
+    allergies: list[str] = field(default_factory=list)
+
+    @property
+    def combined_text(self) -> str:
+        parts = [
+            self.chief_complaints or "",
+            self.medical_history or "",
+            " ".join(self.current_medications),
+            " ".join(self.allergies),
+        ]
+        return " ".join(part for part in parts if part).lower()
+
+
+@dataclass
 class DiagnosticBundle:
     """All diagnostic data for a patient, used as input to the protocol engine."""
     hrv: HRVData | None = None
@@ -160,6 +180,7 @@ class DiagnosticBundle:
     ua: UAData | None = None
     vcs: VCSData | None = None
     labs: list[LabMarker] = field(default_factory=list)
+    patient_context: PatientContextData | None = None
 
     def get_lab(self, name: str) -> LabMarker | None:
         """Get a lab marker by name (case-insensitive)."""
@@ -851,6 +872,64 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
             break
 
 
+def _contains_documented_condition(text: str, *terms: str) -> bool:
+    """Match documented condition terms with simple word boundaries."""
+    for term in terms:
+        pattern = rf"(?<![a-z]){re.escape(term.lower())}(?![a-z])"
+        if re.search(pattern, text):
+            return True
+    return False
+
+
+def _apply_condition_protocol_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
+    """Apply condition-driven protocol rules from charted diagnoses/history."""
+    if not bundle.patient_context:
+        return
+
+    context_text = bundle.patient_context.combined_text
+    if not context_text:
+        return
+
+    if _contains_documented_condition(context_text, "fibromyalgia", "fibro"):
+        trigger = "Documented fibromyalgia diagnosis/history in patient chart"
+
+        result.protocols.append(ProtocolRecommendation(
+            name="Nerve Pain",
+            priority=2,
+            trigger=trigger,
+            category="condition",
+            notes="Condition protocol from fibromyalgia diagnosis",
+        ))
+        result.protocols.append(ProtocolRecommendation(
+            name="Sympathetic Calm",
+            priority=2,
+            trigger=trigger,
+            category="condition",
+            notes="Condition protocol from fibromyalgia diagnosis",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="Copper Balance",
+            trigger="Documented fibromyalgia — excess copper is a common hallmark",
+            notes="Condition protocol support; check copper levels",
+        ))
+
+        if bundle.brainwave and bundle.brainwave.beta > bundle.brainwave.alpha:
+            result.protocols.append(ProtocolRecommendation(
+                name="CPP",
+                priority=2,
+                trigger=(
+                    f"{trigger}; Beta {bundle.brainwave.beta}% > Alpha {bundle.brainwave.alpha}% "
+                    "(central pain pattern)"
+                ),
+                category="condition",
+                notes="Fibromyalgia condition protocol selected via beta-dominant pain pattern",
+            ))
+
+        result.cross_correlations.append(
+            "Charted fibromyalgia diagnosis present — evaluate copper excess and central pain protocols"
+        )
+
+
 # =============================================================================
 # CROSS-DIAGNOSTIC CORRELATION
 # =============================================================================
@@ -1041,6 +1120,7 @@ def run_protocol_engine(bundle: DiagnosticBundle) -> EngineResult:
     _apply_brainwave_rules(bundle, result)
     _apply_dpulse_organ_rules(bundle, result)
     _apply_lab_rules(bundle, result)
+    _apply_condition_protocol_rules(bundle, result)
     _apply_cross_correlations(bundle, result)
     _apply_five_levers_rules(bundle, result)
     _apply_gallbladder_liver_correlation(bundle, result)
@@ -1060,6 +1140,16 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
     This bridges the frontend extraction → Python engine.
     """
     bundle = DiagnosticBundle()
+
+    # Patient context
+    patient_context = data.get("patient_context")
+    if patient_context:
+        bundle.patient_context = PatientContextData(
+            chief_complaints=patient_context.get("chief_complaints"),
+            medical_history=patient_context.get("medical_history"),
+            current_medications=patient_context.get("current_medications") or [],
+            allergies=patient_context.get("allergies") or [],
+        )
 
     # HRV
     hrv_data = data.get("hrv")
@@ -1133,6 +1223,25 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
     # UA
     ua_data = data.get("ua")
     if ua_data:
+        def _marker_is_positive(marker: object) -> bool:
+            if isinstance(marker, dict):
+                status = str(marker.get("status", "")).lower()
+                value = str(marker.get("value", "")).strip().lower()
+                if status in {"positive", "trace", "abnormal", "high"}:
+                    return True
+                return value not in {"", "neg", "negative", "normal", "0"}
+            return False
+
+        def _coerce_float(value: object) -> float | None:
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                try:
+                    return float(value)
+                except ValueError:
+                    return None
+            return None
+
         ph_obj = ua_data.get("ph", {})
         ph_val = ph_obj.get("value") if isinstance(ph_obj, dict) else ph_obj
         protein_obj = ua_data.get("protein", {})
@@ -1144,17 +1253,27 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
         ua_obj = ua_data.get("uric_acid", {})
         ua_val = ua_obj.get("value") if isinstance(ua_obj, dict) else ua_obj
         ua_status = ua_obj.get("status", "") if isinstance(ua_obj, dict) else ""
+        if ua_val is None:
+            for finding in ua_data.get("findings") or []:
+                if not isinstance(finding, str):
+                    continue
+                match = re.search(r"uric acid\s+(\d+(?:\.\d+)?)", finding, re.IGNORECASE)
+                if match:
+                    ua_val = match.group(1)
+                    ua_status = ua_status or ("high" if "high" in finding.lower() else "")
+                    break
 
         bundle.ua = UAData(
             ph=ph_val,
             protein_positive=protein_status in ("trace", "positive"),
             protein_value=str(protein_val),
             specific_gravity=sg_obj.get("value") if isinstance(sg_obj, dict) else sg_obj,
-            glucose_positive=(ua_data.get("glucose", {}).get("status") == "positive"
-                              if isinstance(ua_data.get("glucose"), dict) else False),
+            glucose_positive=_marker_is_positive(ua_data.get("glucose")),
             heavy_metals=ua_data.get("heavy_metals") or [],
-            uric_acid=ua_val if isinstance(ua_val, (int, float)) else None,
+            uric_acid=_coerce_float(ua_val),
             uric_acid_status=ua_status,
+            bilirubin_positive=_marker_is_positive(ua_data.get("bilirubin")),
+            urobilinogen_positive=_marker_is_positive(ua_data.get("urobilinogen")),
         )
 
         # VCS from UA

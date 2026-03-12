@@ -20,8 +20,9 @@ KEY MARKERS AND BFM THRESHOLDS:
    - Even a numeric value > 0 (like "5" or "15") counts as positive
 
 3. **Specific Gravity**:
+   - Low (<=1.005): Triggers Deuterium Drops
    - Normal: 1.010-1.020
-   - High (>1.025): May indicate dehydration → Deuterium Drops
+   - High (>1.025): May indicate dehydration
 
 4. **Visual Contrast Scale (VCS)** (often on same page):
    - Format: "XX/32" (e.g., "31/32" or "21/32")
@@ -31,14 +32,16 @@ KEY MARKERS AND BFM THRESHOLDS:
 5. **Heavy Metals** (sometimes listed):
    - If present, note which metals (e.g., Cadmium, Copper, Lead)
 
-6. **Other markers**: Leukocytes, Nitrite, Urobilinogen, Blood, Ketones, Bilirubin, Glucose
+6. **Other markers**: Leukocytes, Nitrite, Urobilinogen, Blood, Ketones, Bilirubin, Glucose, Uric Acid
 
 PROTOCOL TRIGGERS:
 - pH < 6.5 → Cell Synergy or Tri-Salts (supplement)
 - Protein positive → X-39 patches (supplement)
 - VCS < 24/32 → Biotoxin, Pectasol-C, Leptin Resist
-- Glucose positive → consider diabetic protocols
-- Specific Gravity > 1.025 → Deuterium Drops`
+- Glucose positive ONLY if the UA explicitly lists glucose as positive
+- Urobilinogen positive → same handling as bilirubin in urine
+- Uric acid high → Aldehyde Detox + L-Ornithine L-Aspartate
+- Specific Gravity <= 1.005 → Deuterium Drops`
 
 export const UA_USER_PROMPT = `Analyze this urinalysis (UA) test result image.
 
@@ -53,6 +56,10 @@ Return a JSON object with this EXACT structure:
   },
   "specific_gravity": {
     "value": <exact numeric value, e.g. 1.015>,
+    "status": "low" | "normal" | "high"
+  },
+  "uric_acid": {
+    "value": <exact numeric or text value if shown, e.g. 700>,
     "status": "low" | "normal" | "high"
   },
   "protein": {
@@ -84,6 +91,7 @@ Return a JSON object with this EXACT structure:
   "findings": [
     "pH 6.47 is LOW (under BFM threshold of 6.5) - deal breaker",
     "Protein 15 is POSITIVE - cellular debris, MSH/UB rate issue",
+    "Uric Acid 700 is HIGH - triggers Aldehyde Detox",
     "VCS 31/32 - passing but borderline"
   ],
   "recommended_protocols": {
@@ -109,6 +117,22 @@ VCS SCORE:
 - Format is typically "XX/32" or "XX / 32"
 - 24+ identified = passing
 - Below 24 = FAILING (biotoxin illness indicator)
+
+GLUCOSE RULE:
+- Only mark glucose as "positive" if the UA strip explicitly lists glucose and shows it as positive
+- If glucose is absent from the report, do NOT invent it or infer it from other markers
+
+URIC ACID:
+- If uric acid is shown, extract the exact value/status
+- Mark "high" when the strip explicitly shows it elevated or flagged high
+
+UROBILINOGEN:
+- Extract it whenever shown
+- It has the same clinical significance as bilirubin in urine
+
+SPECIFIC GRAVITY:
+- Mark "low" when it is 1.005 or lower
+- Low specific gravity is clinically important for Deuterium Drops
 
 HEAVY METALS:
 - Look for "Heavy Metals" section

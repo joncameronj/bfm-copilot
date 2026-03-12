@@ -86,6 +86,12 @@ CLINICAL REASONING RULES:
 5. The Five Levers (Section 06) must be assessed for EVERY patient.
 6. Supplement names must use BFM branded names (Innovita line, LifeWave, etc.) as specified.
 7. If data is missing for a diagnostic category, note it explicitly — do not infer or assume.
+8. If the diagnostic bundle includes a `patient_context` section, that charted history is authoritative.
+   Documented diagnoses/chief complaints CAN trigger Section 05 condition protocols even when the
+   diagnosis is not visible in the diagnostics themselves.
+9. If the diagnostic bundle includes a `deterministic_engine` section, treat it as hard-rule grounding.
+   Those protocols/supplements were triggered by deterministic BFM logic and must not be contradicted
+   or omitted unless the bundle itself clearly invalidates them.
 
 SUPPLEMENT PHASING RULES (critical — apply exactly):
 - Day 1 (in-office testing findings only): Cell Synergy, Tri-Salts (pH<6.2 only), Pectasol-C
@@ -135,6 +141,15 @@ UROBILINOGEN ON URINE:
 
 HIGH URIC ACID ON URINE:
 - Triggers Aldehyde Detox protocol + L-Ornithine L-Aspartate supplement (Day 1).
+
+DOCUMENTED CONDITION RULES:
+- If patient_context explicitly documents fibromyalgia / fibro in chief complaints or medical history,
+  assess the Fibromyalgia condition protocol entry from Section 05.
+- Fibromyalgia chart context should trigger the condition protocol stack when clinically compatible:
+  Nerve Pain, Sympathetic Calm, Copper Balance support, and CPP/Cyto Lower selection based on the
+  current pattern and gating rules.
+- Cite the chart text directly (for example, "Medical history lists fibromyalgia"), not an invented
+  diagnostic finding.
 
 AUTONOMIC PATTERN RULES (apply exactly):
 - SNS SWITCHED (upper-left quadrant, SNS clearly elevated and flipped): SNS Balance 35@709
@@ -212,6 +227,9 @@ no explanation outside the JSON. The JSON must be parseable by json.loads()."""
 def _build_user_prompt(patient_name: str, bundle_json: str) -> str:
     return f"""Analyze this patient comprehensively. Apply ALL applicable rules from the \
 Master Protocol Key. Every recommendation must cite the exact patient data point.
+
+If the bundle includes `patient_context`, use it as charted diagnosis/history context.
+If the bundle includes `deterministic_engine`, treat it as authoritative hard-rule grounding.
 
 Patient: {patient_name}
 
