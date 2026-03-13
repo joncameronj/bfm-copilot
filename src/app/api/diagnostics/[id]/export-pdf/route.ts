@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { DiagnosticEvalReportPdf } from '@/components/diagnostics/DiagnosticEvalReportPdf'
 import type { EvalReportData } from '@/components/diagnostics/DiagnosticEvalReportPdf'
+import { getPythonAgentUrl } from '@/lib/agent/url'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!reportData) {
       // Fetch stored report from Python agent
-      const agentUrl = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
+      const agentUrl = getPythonAgentUrl()
       const agentRes = await fetch(`${agentUrl}/agent/eval/by-analysis/${analysisId}`)
 
       if (!agentRes.ok) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getPythonAgentUrl } from '@/lib/agent/url'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch from Python agent (which reads from diagnostic_eval_reports)
-    const agentUrl = process.env.PYTHON_AGENT_URL || 'http://localhost:8000'
+    const agentUrl = getPythonAgentUrl()
     const agentRes = await fetch(
       `${agentUrl}/agent/eval/by-analysis/${analysisId}`,
       { cache: 'no-store' }
