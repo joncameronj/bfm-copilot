@@ -68,6 +68,26 @@ def _get_thinking_config(reasoning_effort: str | None) -> dict | None:
     return {"type": "enabled", "budget_tokens": 10000}
 
 
+def _strip_thinking_blocks(content):
+    """
+    Strip thinking blocks from assistant message content.
+
+    When extended thinking is enabled, assistant messages in conversation history
+    must include 'signature' on thinking blocks. Rather than tracking signatures
+    through interrupted responses and DB round-trips, we simply strip thinking
+    blocks — the model doesn't need its previous reasoning to continue.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        filtered = [block for block in content if not (
+            isinstance(block, dict) and block.get("type") == "thinking"
+        )]
+        # If only thinking blocks were present, return empty text
+        return filtered if filtered else [{"type": "text", "text": ""}]
+    return content
+
+
 class AgentRunner:
     """Custom agent runner with tool-calling loop over Anthropic streaming."""
 
@@ -105,8 +125,10 @@ class AgentRunner:
         thinking = _get_thinking_config(self.reasoning_effort)
 
         # Build messages for Anthropic (stateless - full history each call)
+        # Strip thinking blocks from history — they require signatures that we
+        # don't persist through DB round-trips or interrupted responses.
         conversation: list[dict] = [
-            {"role": m["role"], "content": m["content"]}
+            {"role": m["role"], "content": _strip_thinking_blocks(m["content"])}
             for m in messages
         ]
 
@@ -128,6 +150,7 @@ class AgentRunner:
             current_tool_input_json = ""
             current_tool_block: dict | None = None
 
+            final_message = None
             try:
                 async with self.client.messages.stream(**create_params) as stream:
                     async for event in stream:
@@ -167,19 +190,13 @@ class AgentRunner:
                         elif event_type == "content_block_delta":
                             delta = event.delta
                             if delta.type == "thinking_delta":
-                                # Update the thinking block
+                                # Update the thinking block (for streaming to frontend)
                                 if assistant_content_blocks and assistant_content_blocks[-1]["type"] == "thinking":
                                     assistant_content_blocks[-1]["thinking"] += delta.thinking
                                 yield StreamEvent(
                                     type="reasoning_delta",
                                     data={"delta": delta.thinking},
                                 )
-                            elif delta.type == "signature_delta":
-                                # Capture the signature — required when passing thinking blocks back in history
-                                if assistant_content_blocks and assistant_content_blocks[-1]["type"] == "thinking":
-                                    assistant_content_blocks[-1]["signature"] = (
-                                        assistant_content_blocks[-1].get("signature", "") + delta.signature
-                                    )
                             elif delta.type == "text_delta":
                                 accumulated_text += delta.text
                                 if assistant_content_blocks and assistant_content_blocks[-1]["type"] == "text":
@@ -218,6 +235,10 @@ class AgentRunner:
                                 current_tool_block = None
                                 current_tool_input_json = ""
 
+                    # Get the final message — its content blocks include signatures
+                    # on thinking blocks, which the API requires when passing them back.
+                    final_message = await stream.get_final_message()
+
             except anthropic.APIError as e:
                 # If thinking is not supported by this model, retry without it
                 if thinking and "thinking" in str(e).lower():
@@ -229,8 +250,19 @@ class AgentRunner:
                 yield StreamEvent(type="error", data={"error": str(e)})
                 return
 
-            # Append assistant response to conversation
-            conversation.append({"role": "assistant", "content": assistant_content_blocks})
+            # Build conversation history from the final message (includes signatures)
+            # or fall back to manually accumulated blocks. Either way, strip thinking
+            # blocks to avoid signature issues on the next iteration.
+            if final_message:
+                history_blocks = [
+                    block.model_dump() for block in final_message.content
+                ]
+            else:
+                history_blocks = assistant_content_blocks
+            conversation.append({
+                "role": "assistant",
+                "content": _strip_thinking_blocks(history_blocks),
+            })
 
             # Execute tool calls if any
             if tool_uses and self.tool_registry:

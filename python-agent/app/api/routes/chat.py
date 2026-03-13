@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from app.models.requests import ChatRequest
 from app.agent.system_prompts import get_system_prompt
 from app.agent import create_base_agent, determine_reasoning_effort, SSEEventMapper
-from app.agent.runner import AgentRunner
+from app.agent.runner import AgentRunner, _strip_thinking_blocks
 from app.services.output_validator import validate_output, check_for_clinical_leakage
 from app.services.model_settings import get_model_settings_service
 from app.services.query_complexity import analyze_query_complexity
@@ -530,9 +530,10 @@ async def chat_sync(
         )
 
     # Build messages array (stateless)
+    # Strip thinking blocks from history to avoid signature requirement issues
     api_messages = []
     for msg in request.history:
-        api_messages.append({"role": msg.role, "content": msg.content})
+        api_messages.append({"role": msg.role, "content": _strip_thinking_blocks(msg.content)})
     api_messages.append({"role": "user", "content": request.message})
 
     # Build thinking config
