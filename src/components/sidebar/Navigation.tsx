@@ -14,6 +14,8 @@ import {
   SlidersHorizontalIcon,
   Settings01Icon,
   StarIcon,
+  HealthIcon,
+  ChartHistogramIcon,
 } from '@hugeicons/core-free-icons'
 import { UnreadBadge } from './UnreadBadge'
 
@@ -35,8 +37,10 @@ const PRACTITIONER_NAV_ITEMS: NavItem[] = [
 
 // Navigation items for members - uses softer, non-clinical language
 const MEMBER_NAV_ITEMS: NavItem[] = [
-  { label: 'Chat', href: '/', icon: 'Chats' },
+  { label: 'Chats', href: '/chats', icon: 'Chats' },
   { label: 'Labs', href: '/my-labs', icon: 'Labs' },
+  { label: 'Progress', href: '/my-progress', icon: 'Progress' },
+  { label: 'myHealth', href: '/my-health', icon: 'myHealth' },
   { label: 'Suggestions', href: '/suggestions', icon: 'Suggestions' },
   { label: 'Settings', href: '/settings', icon: 'Settings' },
 ]
@@ -62,6 +66,8 @@ const NAV_ICONS: Record<string, typeof BubbleChatIcon> = {
   Admin: SlidersHorizontalIcon,
   Settings: Settings01Icon,
   Suggestions: StarIcon,
+  myHealth: HealthIcon,
+  Progress: ChartHistogramIcon,
 }
 
 function NavIcon({ iconKey }: { iconKey: string }) {

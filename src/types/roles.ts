@@ -54,7 +54,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessPatients: false,
     canAccessAdmin: false,
     canAccessDashboard: false,
-    canAccessMyHealth: false,
+    canAccessMyHealth: true,
     canAccessSuggestions: true, // Members see "suggestions" - softer, non-clinical language
     canAccessProtocols: false, // Members don't have clinical protocol access
     canAccessSettings: true,
@@ -78,7 +78,9 @@ export const ROUTE_RULES: Record<string, UserRole[]> = {
   '/diagnostics': ['admin', 'practitioner'],
   '/dashboard': ['admin', 'practitioner'],
   '/protocols': ['admin', 'practitioner'], // Clinical protocols for practitioners
+  '/my-health': ['admin', 'member'],
   '/my-labs': ['admin', 'member'],
+  '/my-progress': ['admin', 'member'],
   '/suggestions': ['admin', 'member'], // Softer language for member wellness suggestions
   '/': ['admin', 'practitioner', 'member'],
   '/labs': ['admin', 'practitioner', 'member'],
