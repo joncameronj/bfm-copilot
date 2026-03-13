@@ -1,6 +1,12 @@
 // Diagnostic Analysis Generator
-// Runs Protocol Engine (deterministic) → Eval Agent (Claude Opus) → frequency validation → save
+// Runs Protocol Engine (deterministic) → Eval Agent (Claude Sonnet) → frequency validation → save
 // The eval agent replaces the previous RAG + TypeScript AI call pipeline.
+//
+// ASYNC ARCHITECTURE (2026-03-13):
+// The eval agent takes 2-5 minutes. To avoid Vercel serverless timeout (60s),
+// the flow is split into two phases:
+//   Phase 1 (POST): extraction + fire eval as background job → return immediately
+//   Phase 2 (GET polling): detect eval completion → finalize (validate + save) → mark complete
 
 import { createClient } from '@/lib/supabase/server'
 import { getPythonAgentUrl } from '@/lib/agent/url'
@@ -218,38 +224,110 @@ export async function generateDiagnosticAnalysis(
     throw new Error('No diagnostic analysis record found for this upload')
   }
 
-  // 8. Call the Python eval agent (synchronous — ~3-5 min)
-  const pythonAgentUrl = getPythonAgentUrl()
-  console.log(`[Eval Agent] Calling POST ${pythonAgentUrl}/agent/eval/for-analysis`)
+  // 8. Fire the eval agent as a BACKGROUND JOB (async — returns immediately)
+  // The eval takes 2-5 min; we cannot block the Vercel serverless function.
+  // The GET polling handler will finalize when the eval report is ready.
+  await startEvalBackgroundJob(analysisRecord.id, patientId)
 
-  const evalResponse = await fetch(`${pythonAgentUrl}/agent/eval/for-analysis`, {
+  // Return partial result — the eval will complete in the background.
+  // Finalization (frequency validation, protocol save) happens in finalizeAnalysisFromEvalReport().
+  return {
+    summary: '',
+    protocols: [],
+    supplementation: [],
+    ragContext: [],
+    reasoningChain: [],
+    extractedData,
+  }
+}
+
+
+// ============================================
+// ASYNC EVAL: START BACKGROUND JOB
+// ============================================
+
+/**
+ * Fire the eval agent as a background job on the Python backend.
+ * Returns immediately — the eval runs async and stores results in diagnostic_eval_reports.
+ */
+export async function startEvalBackgroundJob(
+  diagnosticAnalysisId: string,
+  patientId: string,
+): Promise<{ jobId: string }> {
+  const pythonAgentUrl = getPythonAgentUrl()
+  console.log(`[Eval Agent] Firing background job: POST ${pythonAgentUrl}/agent/eval`)
+
+  const evalResponse = await fetch(`${pythonAgentUrl}/agent/eval`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      diagnostic_analysis_id: analysisRecord.id,
+      diagnostic_analysis_id: diagnosticAnalysisId,
       patient_id: patientId,
     }),
   })
 
   if (!evalResponse.ok) {
     const errorBody = await evalResponse.text()
-    throw new Error(`Eval agent failed (${evalResponse.status}): ${errorBody}`)
+    throw new Error(`Eval agent background job failed (${evalResponse.status}): ${errorBody}`)
   }
 
-  const evalData = await evalResponse.json() as { eval_report: EvalReport; patient_name: string }
-  const evalReport = evalData.eval_report as EvalReport
+  const jobData = await evalResponse.json() as { job_id: string; status: string }
+  console.log(`[Eval Agent] Background job started: job_id=${jobData.job_id}, status=${jobData.status}`)
+  return { jobId: jobData.job_id }
+}
 
+
+// ============================================
+// ASYNC EVAL: CHECK & FINALIZE
+// ============================================
+
+/**
+ * Check if the eval report is ready and finalize the analysis.
+ * Called during GET polling. Returns null if eval is still processing.
+ */
+export async function finalizeAnalysisFromEvalReport(
+  diagnosticAnalysisId: string,
+  diagnosticUploadId: string,
+  patientId: string,
+): Promise<GeneratedAnalysis | null> {
+  const supabase = await createClient()
+
+  // Check if eval report exists and is complete
+  const { data: evalReport } = await supabase
+    .from('diagnostic_eval_reports')
+    .select('id, status, report_json, error_message')
+    .eq('diagnostic_analysis_id', diagnosticAnalysisId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!evalReport) {
+    console.log(`[Finalize] No eval report found for analysis ${diagnosticAnalysisId}`)
+    return null
+  }
+
+  if (evalReport.status === 'error') {
+    throw new Error(`Eval agent failed: ${evalReport.error_message || 'Unknown error'}`)
+  }
+
+  if (evalReport.status !== 'complete') {
+    // Still processing
+    return null
+  }
+
+  // Eval is complete — finalize the analysis
+  const evalReportData = evalReport.report_json as EvalReport
   console.log(
-    `[Eval Agent] Complete: urgency=${evalReport.urgency?.score}, ` +
-    `frequencies=${evalReport.frequency_phases?.length}, ` +
-    `supplements=${evalReport.supplementation?.length}, ` +
-    `deal_breakers=${evalReport.deal_breakers?.length}`
+    `[Finalize] Eval report ready: urgency=${evalReportData.urgency?.score}, ` +
+    `frequencies=${evalReportData.frequency_phases?.length}, ` +
+    `supplements=${evalReportData.supplementation?.length}, ` +
+    `deal_breakers=${evalReportData.deal_breakers?.length}`
   )
 
-  // 9. Map EvalReport → GeneratedAnalysis shape
-  const mapped = mapEvalReportToGeneratedAnalysis(evalReport)
+  // Map EvalReport → GeneratedAnalysis shape
+  const mapped = mapEvalReportToGeneratedAnalysis(evalReportData)
 
-  // 10. Validate ALL frequencies against approved list
+  // Validate ALL frequencies against approved list
   const validatedProtocols: Array<{
     title: string
     description: string
@@ -315,7 +393,7 @@ export async function generateDiagnosticAnalysis(
     }
   }
 
-  // 11. Deduplicate frequencies across all protocols
+  // Deduplicate frequencies across all protocols
   const {
     deduplicatedProtocols,
     deduplicationLog,
@@ -333,12 +411,8 @@ export async function generateDiagnosticAnalysis(
     )
   }
 
-  // 12. Engine reconciliation DISABLED — the eval agent with all 9 master protocols
-  // inline is the ground truth. The deterministic engine was injecting incorrect
-  // protocols (e.g., SNS Balance when switched_sympathetics=false) because it trusts
-  // Vision extraction booleans without clinical context. The eval agent (Claude Opus)
-  // interprets data holistically and produces more accurate results.
-  // Engine results are still logged above (step 4) for debugging/telemetry.
+  // Get extracted data for the response
+  const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
 
   return {
     summary: mapped.summary,
@@ -347,7 +421,7 @@ export async function generateDiagnosticAnalysis(
     ragContext: [],
     reasoningChain: mapped.reasoningChain,
     extractedData,
-    evalReport,
+    evalReport: evalReportData,
   }
 }
 

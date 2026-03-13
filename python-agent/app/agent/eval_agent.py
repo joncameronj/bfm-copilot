@@ -1,11 +1,12 @@
 """
-BFM Eval Agent - Claude Opus 4.6 full clinical evaluation.
+BFM Eval Agent - Claude Sonnet 4.6 full clinical evaluation.
 
-Architecture decision: ONE Claude Opus call per patient with all 9 master protocol
+Architecture decision: ONE Claude call per patient with all 9 master protocol
 files injected verbatim. This is what produced near-perfect accuracy in testing.
 - 200K context window handles ~50KB protocols + ~5KB patient data comfortably
 - Single call eliminates round-trip latency of sub-agent approaches
 - Inline protocols (not RAG) are ground truth — no retrieval errors
+- Switched from Opus to Sonnet 4.6 for faster generation (Opus was 10-12 min)
 
 Do NOT use RAG for this flow. The master protocols ARE the context.
 """
@@ -263,7 +264,7 @@ Return ONLY the JSON object. Begin with {{ and end with }}."""
 
 class EvalAgentRunner:
     """
-    Runs the Claude Opus full clinical evaluation for a single patient.
+    Runs the Claude Sonnet full clinical evaluation for a single patient.
 
     Usage:
         runner = EvalAgentRunner()
@@ -276,7 +277,7 @@ class EvalAgentRunner:
 
     async def run(self, bundle_dict: dict, patient_name: str) -> EvalReport:
         """
-        Run one full Claude Opus eval for a patient.
+        Run one full Claude Sonnet eval for a patient.
 
         Args:
             bundle_dict: DiagnosticBundle as a plain dict (all available extracted data)
@@ -295,7 +296,7 @@ class EvalAgentRunner:
         user_prompt = _build_user_prompt(patient_name, json.dumps(bundle_dict, indent=2))
 
         logger.info(
-            "Starting Claude Opus eval for patient '%s' (~%d protocol chars + %d bundle chars)",
+            "Starting Claude Sonnet eval for patient '%s' (~%d protocol chars + %d bundle chars)",
             patient_name,
             len(self._protocols),
             len(json.dumps(bundle_dict)),
@@ -312,7 +313,7 @@ class EvalAgentRunner:
 
         raw_text = raw_text.strip()
         logger.info(
-            "Claude Opus eval complete for '%s': %d output chars, stop_reason=%s",
+            "Claude Sonnet eval complete for '%s': %d output chars, stop_reason=%s",
             patient_name,
             len(raw_text),
             final_message.stop_reason,
@@ -331,13 +332,13 @@ class EvalAgentRunner:
 
         except (json.JSONDecodeError, ValueError) as exc:
             logger.error(
-                "Failed to parse Claude Opus response for '%s': %s\nRaw (first 500 chars): %s",
+                "Failed to parse Claude Sonnet response for '%s': %s\nRaw (first 500 chars): %s",
                 patient_name,
                 exc,
                 raw_text[:500],
             )
             raise ValueError(
-                f"Claude Opus returned unparseable output for patient '{patient_name}': {exc}"
+                f"Claude Sonnet returned unparseable output for patient '{patient_name}': {exc}"
             ) from exc
 
 

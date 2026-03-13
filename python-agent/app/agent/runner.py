@@ -174,6 +174,12 @@ class AgentRunner:
                                     type="reasoning_delta",
                                     data={"delta": delta.thinking},
                                 )
+                            elif delta.type == "signature_delta":
+                                # Capture the signature — required when passing thinking blocks back in history
+                                if assistant_content_blocks and assistant_content_blocks[-1]["type"] == "thinking":
+                                    assistant_content_blocks[-1]["signature"] = (
+                                        assistant_content_blocks[-1].get("signature", "") + delta.signature
+                                    )
                             elif delta.type == "text_delta":
                                 accumulated_text += delta.text
                                 if assistant_content_blocks and assistant_content_blocks[-1]["type"] == "text":

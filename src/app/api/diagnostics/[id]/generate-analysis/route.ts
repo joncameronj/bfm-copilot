@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateDiagnosticAnalysis } from '@/lib/rag'
+import { generateDiagnosticAnalysis, finalizeAnalysisFromEvalReport } from '@/lib/rag'
 import { createReasoningRecords } from '@/lib/rag/reasoning-generator'
 import { extractDiagnosticValues } from '@/lib/vision'
 import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
@@ -9,7 +9,7 @@ import type { DiagnosticType } from '@/types/shared'
 import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // Allow up to 5 minutes for multi-file extraction + AI generation
+export const maxDuration = 60 // Extraction + fire background job — no longer waits for eval
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -78,7 +78,7 @@ async function resolveDiagnosticUpload(
 }
 
 // POST /api/diagnostics/[id]/generate-analysis
-// Triggers RAG-powered analysis and protocol recommendation generation
+// Phase 1: Extract files + fire eval background job → returns immediately
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { id: inputId } = await params
@@ -127,13 +127,14 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (existingAnalysis) {
       return NextResponse.json({
-        message: 'Analysis already exists',
+        message: existingAnalysis.status === 'processing'
+          ? 'Analysis is being generated'
+          : 'Analysis already exists',
         data: { analysisId: existingAnalysis.id, status: existingAnalysis.status }
       })
     }
 
     // AUTO-EXTRACT: Ensure all files are extracted before generating analysis
-    // This bridges the gap between upload and analysis, ensuring blood panels get persisted to lab tables
     const { data: files, error: filesError } = await supabase
       .from('diagnostic_files')
       .select(`
@@ -237,7 +238,6 @@ export async function POST(request: Request, { params }: RouteParams) {
           await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', file.id)
 
           // CRITICAL: Persist blood panel to lab tables
-          // This ensures labs uploaded via diagnostics appear in patient Lab Results section
           if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
             const labPersistResult = await persistBloodPanelToLabTables(
               supabase,
@@ -261,7 +261,6 @@ export async function POST(request: Request, { params }: RouteParams) {
         } catch (extractError) {
           console.error(`[Auto-Extract] Failed to extract file ${file.id}:`, extractError)
           extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: extractError instanceof Error ? extractError.message : 'Unknown error' })
-          // Continue with other files - don't fail the whole analysis
         }
       }
     }
@@ -305,84 +304,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       .eq('id', diagnosticUploadId)
 
     try {
-      // Generate the analysis with RAG
+      // Fire eval background job (returns immediately — does NOT block)
       const userRole = profile?.role === 'member' ? 'member' : 'practitioner'
-      const analysis = await generateDiagnosticAnalysis(
+      await generateDiagnosticAnalysis(
         diagnosticUploadId,
         upload.patient_id,
         user.id,
         userRole
       )
-
-      // Update the analysis record with results
-      const { error: updateError } = await supabase
-        .from('diagnostic_analyses')
-        .update({
-          summary: analysis.summary,
-          raw_analysis: {
-            protocols: analysis.protocols,
-            supplementation: analysis.supplementation,
-            eval_report: analysis.evalReport || null,
-          },
-          supplementation: analysis.supplementation,
-          status: 'complete',
-          rag_context: {},
-        })
-        .eq('id', pendingAnalysis.id)
-
-      if (updateError) {
-        throw new Error(`Failed to update analysis: ${updateError.message}`)
-      }
-
-      // Create protocol recommendations with reasoning records
-      const recommendationIds: string[] = []
-      console.log(`[Demo Mode Debug] Creating ${analysis.protocols.length} protocol recommendations`)
-      for (const protocol of analysis.protocols) {
-        console.log(`[Demo Mode Debug] Saving protocol: "${protocol.title}" (category: ${protocol.category}, frequencies: ${protocol.frequencies.length})`)
-        const { data: recRecord, error: recError } = await supabase
-          .from('protocol_recommendations')
-          .insert({
-            diagnostic_analysis_id: pendingAnalysis.id,
-            patient_id: upload.patient_id,
-            title: protocol.title,
-            description: protocol.description,
-            category: protocol.category,
-            recommended_frequencies: protocol.frequencies,
-            supplementation: analysis.supplementation,
-            priority: protocol.priority,
-            status: 'recommended',
-          })
-          .select('id')
-          .single()
-
-        if (recError) {
-          console.error(`[Demo Mode Debug] Failed to save protocol "${protocol.title}":`, recError)
-        }
-
-        if (!recError && recRecord) {
-          recommendationIds.push(recRecord.id)
-
-          // Create reasoning records for explainability
-          await createReasoningRecords({
-            recommendationId: recRecord.id,
-            frequencies: protocol.frequencies.map(f => ({
-              name: f.name,
-              rationale: f.rationale,
-              source_reference: f.source_reference,
-              diagnostic_trigger: f.diagnostic_trigger,
-            })),
-            ragChunks: [],
-            diagnosticData: analysis.extractedData,
-            reasoningChain: analysis.reasoningChain || [],
-          })
-        }
-      }
-
-      // Update diagnostic upload status to complete
-      await supabase
-        .from('diagnostic_uploads')
-        .update({ status: 'complete' })
-        .eq('id', diagnosticUploadId)
 
       // Log usage event
       await supabase.from('usage_events').insert({
@@ -392,17 +321,15 @@ export async function POST(request: Request, { params }: RouteParams) {
           diagnostic_upload_id: diagnosticUploadId,
           analysis_id: pendingAnalysis.id,
           patient_id: upload.patient_id,
-          protocol_count: analysis.protocols.length,
         },
       })
 
+      // Return immediately — analysis is processing in background
       return NextResponse.json({
-        message: 'Analysis generated successfully',
+        message: 'Analysis started — eval agent is processing',
         data: {
           analysisId: pendingAnalysis.id,
-          status: 'complete',
-          protocolCount: analysis.protocols.length,
-          recommendationIds,
+          status: 'processing',
         }
       })
 
@@ -435,7 +362,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 }
 
 // GET /api/diagnostics/[id]/generate-analysis
-// Get the analysis status/results for a diagnostic upload
+// Phase 2: Check eval status → finalize if ready → return current status
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { id: inputId } = await params
@@ -477,6 +404,131 @@ export async function GET(request: Request, { params }: RouteParams) {
         return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
       }
       throw analysisError
+    }
+
+    // ASYNC FINALIZATION: If analysis is still processing, check if eval is done
+    if (analysis.status === 'processing' && analysis.patient_id) {
+      try {
+        const finalized = await finalizeAnalysisFromEvalReport(
+          analysis.id,
+          diagnosticUploadId,
+          analysis.patient_id,
+        )
+
+        if (finalized) {
+          // Eval is done — save protocols and update analysis to complete
+          console.log(`[Finalize] Completing analysis ${analysis.id} with ${finalized.protocols.length} protocols`)
+
+          // Update the analysis record with results
+          const { error: updateError } = await supabase
+            .from('diagnostic_analyses')
+            .update({
+              summary: finalized.summary,
+              raw_analysis: {
+                protocols: finalized.protocols,
+                supplementation: finalized.supplementation,
+                eval_report: finalized.evalReport || null,
+              },
+              supplementation: finalized.supplementation,
+              status: 'complete',
+              rag_context: {},
+            })
+            .eq('id', analysis.id)
+
+          if (updateError) {
+            throw new Error(`Failed to update analysis: ${updateError.message}`)
+          }
+
+          // Create protocol recommendations with reasoning records
+          const recommendationIds: string[] = []
+          for (const protocol of finalized.protocols) {
+            const { data: recRecord, error: recError } = await supabase
+              .from('protocol_recommendations')
+              .insert({
+                diagnostic_analysis_id: analysis.id,
+                patient_id: analysis.patient_id,
+                title: protocol.title,
+                description: protocol.description,
+                category: protocol.category,
+                recommended_frequencies: protocol.frequencies,
+                supplementation: finalized.supplementation,
+                priority: protocol.priority,
+                status: 'recommended',
+              })
+              .select('id')
+              .single()
+
+            if (!recError && recRecord) {
+              recommendationIds.push(recRecord.id)
+
+              await createReasoningRecords({
+                recommendationId: recRecord.id,
+                frequencies: protocol.frequencies.map(f => ({
+                  name: f.name,
+                  rationale: f.rationale,
+                  source_reference: f.source_reference,
+                  diagnostic_trigger: f.diagnostic_trigger,
+                })),
+                ragChunks: [],
+                diagnosticData: finalized.extractedData,
+                reasoningChain: finalized.reasoningChain || [],
+              })
+            }
+          }
+
+          // Update diagnostic upload status to complete
+          await supabase
+            .from('diagnostic_uploads')
+            .update({ status: 'complete' })
+            .eq('id', diagnosticUploadId)
+
+          // Re-fetch the completed analysis with recommendations
+          const { data: completedAnalysis } = await supabase
+            .from('diagnostic_analyses')
+            .select(`
+              *,
+              protocol_recommendations (
+                id, title, description, category,
+                recommended_frequencies, supplementation,
+                priority, status, created_at
+              )
+            `)
+            .eq('id', analysis.id)
+            .single()
+
+          if (completedAnalysis) {
+            return NextResponse.json({
+              data: {
+                id: completedAnalysis.id,
+                diagnosticUploadId: completedAnalysis.diagnostic_upload_id,
+                patientId: completedAnalysis.patient_id,
+                summary: completedAnalysis.summary,
+                status: completedAnalysis.status,
+                errorMessage: completedAnalysis.error_message,
+                recommendations: completedAnalysis.protocol_recommendations || [],
+                createdAt: completedAnalysis.created_at,
+                updatedAt: completedAnalysis.updated_at,
+              }
+            })
+          }
+        }
+        // If finalized is null, eval is still processing — fall through to return current status
+      } catch (finalizeError) {
+        console.error(`[Finalize] Error finalizing analysis ${analysis.id}:`, finalizeError)
+        // Update analysis to error state
+        await supabase
+          .from('diagnostic_analyses')
+          .update({
+            status: 'error',
+            error_message: finalizeError instanceof Error ? finalizeError.message : 'Finalization failed',
+          })
+          .eq('id', analysis.id)
+
+        await supabase
+          .from('diagnostic_uploads')
+          .update({ status: 'error' })
+          .eq('id', diagnosticUploadId)
+      }
     }
 
     return NextResponse.json({

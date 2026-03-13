@@ -1,5 +1,5 @@
 """
-Eval Report API Routes - Full clinical evaluation via Claude Opus 4.6.
+Eval Report API Routes - Full clinical evaluation via Claude Sonnet 4.6.
 
 POST /agent/eval        - Single patient eval (queues background job)
 POST /agent/eval/batch  - 1-5 patients in parallel (queues N background jobs)
@@ -32,7 +32,7 @@ logger = get_logger("eval_routes")
 
 router = APIRouter()
 
-# Max concurrent eval jobs per user (each costs ~$2-4 in Claude Opus tokens)
+# Max concurrent eval jobs per user (each costs ~$2-4 in Claude Sonnet tokens)
 MAX_CONCURRENT_EVAL_JOBS = 5
 
 
@@ -406,7 +406,7 @@ async def _run_eval_and_store(
         # Fetch data
         bundle_dict, patient_name = await _fetch_diagnostic_bundle(diagnostic_analysis_id)
 
-        # Run Claude Opus
+        # Run Claude Sonnet
         runner = get_eval_runner()
         report: EvalReport = await runner.run(bundle_dict, patient_name)
 
@@ -464,7 +464,7 @@ async def create_eval_report(request: EvalReportRequest):
     """
     Trigger a full clinical eval report for a single patient.
 
-    Uses Claude Opus 4.6 with all 9 master protocol files inline.
+    Uses Claude Sonnet 4.6 with all 9 master protocol files inline.
     The eval runs as a background task (~3-5 minutes).
 
     Returns the report_id immediately; poll GET /agent/eval/{report_id} for status.
@@ -507,7 +507,7 @@ async def _create_eval_report_inner(request: EvalReportRequest) -> EvalJobRespon
         diagnostic_analysis_id=request.diagnostic_analysis_id,
         patient_id=request.patient_id,
         status="pending",
-        message="Eval report queued. Claude Opus is analyzing all diagnostic data (~3-5 min).",
+        message="Eval report queued. Claude Sonnet is analyzing all diagnostic data (~3-5 min).",
     )
 
 
@@ -529,7 +529,7 @@ async def eval_for_analysis(request: ForAnalysisRequest):
     Synchronous eval endpoint for the diagnostic analysis pipeline.
 
     Called by Next.js generate-analysis route. Fetches diagnostic bundle,
-    runs Claude Opus eval, and returns the full EvalReport JSON.
+    runs Claude Sonnet eval, and returns the full EvalReport JSON.
     No background job — the caller already has a 5-minute timeout.
     """
     try:
@@ -564,7 +564,7 @@ async def create_batch_eval_reports(request: BatchEvalRequest):
     All patient evals start in parallel via asyncio.gather(). Each report
     takes ~3-5 minutes; all finish in ~3-5 minutes regardless of patient count.
 
-    Enforces max 5 concurrent to control Claude Opus API costs.
+    Enforces max 5 concurrent to control Claude Sonnet API costs.
     """
     if len(request.patients) > MAX_CONCURRENT_EVAL_JOBS:
         raise HTTPException(

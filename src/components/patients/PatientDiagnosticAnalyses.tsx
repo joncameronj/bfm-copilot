@@ -120,7 +120,14 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
         throw new Error(message)
       }
 
-      toast.success('Analysis generated successfully')
+      const result = await response.json()
+      const status = result?.data?.status
+
+      if (status === 'processing') {
+        toast.success('Analysis started — generating report (2-3 min)')
+      } else {
+        toast.success('Analysis generated successfully')
+      }
       fetchData() // Refresh the data
     } catch (error) {
       console.error('Analysis generation failed:', error)
