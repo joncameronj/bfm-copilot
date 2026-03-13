@@ -14,7 +14,7 @@ const CHAT_HISTORY_MESSAGE_LIMIT = Number.parseInt(
   10
 )
 const CHAT_HISTORY_CHAR_BUDGET = Number.parseInt(
-  process.env.CHAT_HISTORY_CHAR_BUDGET || '1800000',
+  process.env.CHAT_HISTORY_CHAR_BUDGET || '400000',
   10
 )
 
@@ -297,9 +297,9 @@ async function buildAttachmentContext(
 function trimHistoryByCharBudget(
   history: ConversationMessage[],
   charBudget: number
-): ConversationMessage[] {
+): { messages: ConversationMessage[]; wasTrimmed: boolean } {
   if (!Number.isFinite(charBudget) || charBudget <= 0) {
-    return history
+    return { messages: history, wasTrimmed: false }
   }
 
   let total = 0
@@ -317,7 +317,28 @@ function trimHistoryByCharBudget(
     total += size
   }
 
-  return kept.reverse()
+  const wasTrimmed = kept.length < history.length
+  const result = kept.reverse()
+
+  // If history was trimmed, prepend a system context note so the model
+  // knows earlier conversation context is missing
+  if (wasTrimmed) {
+    const droppedCount = history.length - result.length
+    console.log(
+      `[Chat History] Trimmed ${droppedCount} older messages (${history.length} → ${result.length}) to fit ${charBudget} char budget`
+    )
+    result.unshift({
+      role: 'user',
+      content: '[SYSTEM NOTE: Earlier messages in this conversation were truncated due to length. The most recent messages are preserved below. If the user references something from earlier that you cannot see, let them know the earlier context is no longer available and suggest starting a new thread.]',
+    })
+    // Need a placeholder assistant acknowledgment for valid message alternation
+    result.splice(1, 0, {
+      role: 'assistant',
+      content: 'Understood. I have context from the most recent messages in this conversation.',
+    })
+  }
+
+  return { messages: result, wasTrimmed }
 }
 
 function calculateAge(dateOfBirth: string): number {
@@ -438,14 +459,14 @@ export async function POST(request: Request) {
       messages = (historyRows || []).reverse()
     }
 
-    const trimmedHistory = trimHistoryByCharBudget(
+    const { messages: trimmedHistory } = trimHistoryByCharBudget(
       messages.map((m) => ({
         role: m.role as ConversationMessage['role'],
         content: m.content || '',
       })),
       Number.isFinite(CHAT_HISTORY_CHAR_BUDGET) && CHAT_HISTORY_CHAR_BUDGET > 0
         ? CHAT_HISTORY_CHAR_BUDGET
-        : 1800000
+        : 400000
     )
 
     const attachmentContext = await buildAttachmentContext(
