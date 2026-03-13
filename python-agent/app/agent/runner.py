@@ -150,7 +150,6 @@ class AgentRunner:
             current_tool_input_json = ""
             current_tool_block: dict | None = None
 
-            final_message = None
             try:
                 async with self.client.messages.stream(**create_params) as stream:
                     async for event in stream:
@@ -235,10 +234,6 @@ class AgentRunner:
                                 current_tool_block = None
                                 current_tool_input_json = ""
 
-                    # Get the final message — its content blocks include signatures
-                    # on thinking blocks, which the API requires when passing them back.
-                    final_message = await stream.get_final_message()
-
             except anthropic.APIError as e:
                 # If thinking is not supported by this model, retry without it
                 if thinking and "thinking" in str(e).lower():
@@ -250,18 +245,12 @@ class AgentRunner:
                 yield StreamEvent(type="error", data={"error": str(e)})
                 return
 
-            # Build conversation history from the final message (includes signatures)
-            # or fall back to manually accumulated blocks. Either way, strip thinking
-            # blocks to avoid signature issues on the next iteration.
-            if final_message:
-                history_blocks = [
-                    block.model_dump() for block in final_message.content
-                ]
-            else:
-                history_blocks = assistant_content_blocks
+            # Append assistant response to conversation history.
+            # Strip thinking blocks (avoids signature requirement) and ensure
+            # only API-accepted fields are present (no 'parsed_output' etc).
             conversation.append({
                 "role": "assistant",
-                "content": _strip_thinking_blocks(history_blocks),
+                "content": _strip_thinking_blocks(assistant_content_blocks),
             })
 
             # Execute tool calls if any
