@@ -7,6 +7,7 @@ import { useRoleView } from '@/providers/RoleViewProvider'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BubbleChatIcon,
+  Add01Icon,
   Pulse01Icon,
   TestTubeIcon,
   UserGroupIcon,
@@ -27,6 +28,7 @@ interface NavItem {
 
 // Navigation items for practitioners
 const PRACTITIONER_NAV_ITEMS: NavItem[] = [
+  { label: 'New Chat', href: '/', icon: 'NewChat' },
   { label: 'Chats', href: '/chats', icon: 'Chats' },
   { label: 'Diagnostics', href: '/diagnostics', icon: 'Diagnostics' },
   { label: 'Labs', href: '/labs', icon: 'Labs' },
@@ -35,8 +37,9 @@ const PRACTITIONER_NAV_ITEMS: NavItem[] = [
   { label: 'Settings', href: '/settings', icon: 'Settings' },
 ]
 
-// Navigation items for members - uses softer, non-clinical language
+// Navigation items for members - same as practitioner except no clinical protocols
 const MEMBER_NAV_ITEMS: NavItem[] = [
+  { label: 'New Chat', href: '/', icon: 'NewChat' },
   { label: 'Chats', href: '/chats', icon: 'Chats' },
   { label: 'Labs', href: '/my-labs', icon: 'Labs' },
   { label: 'Progress', href: '/my-progress', icon: 'Progress' },
@@ -58,6 +61,7 @@ const TRANSITION_DURATION = '300ms'
 
 // Icon mapping for navigation items using Hugeicons
 const NAV_ICONS: Record<string, typeof BubbleChatIcon> = {
+  NewChat: Add01Icon,
   Chats: BubbleChatIcon,
   Diagnostics: Pulse01Icon,
   Labs: TestTubeIcon,
