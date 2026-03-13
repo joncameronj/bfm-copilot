@@ -14,7 +14,7 @@ export default async function MyLabsPage() {
   // Verify member role and get profile details
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, self_patient_id, date_of_birth')
+    .select('role, self_patient_id')
     .eq('id', user.id)
     .single()
 

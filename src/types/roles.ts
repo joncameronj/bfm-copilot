@@ -73,7 +73,7 @@ export const ROUTE_RULES: Record<string, UserRole[]> = {
   '/admin/rag': ['admin'],
   '/admin/rag/logs': ['admin'],
   '/admin/rag/telemetry': ['admin'],
-  '/chats': ['admin', 'practitioner'],
+  '/chats': ['admin', 'practitioner', 'member'],
   '/patients': ['admin', 'practitioner'],
   '/diagnostics': ['admin', 'practitioner'],
   '/dashboard': ['admin', 'practitioner'],
