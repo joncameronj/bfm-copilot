@@ -17,7 +17,7 @@ export default async function SuggestionsPage() {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'member') {
+  if (!profile || (profile.role !== 'member' && profile.role !== 'admin')) {
     redirect('/')
   }
 
@@ -59,7 +59,16 @@ export default async function SuggestionsPage() {
           Your Suggestions
         </h1>
         <p className="text-neutral-600 mt-1">
-          Personalized wellness suggestions based on your health profile
+          Educational wellness suggestions based on Dr. Rob DeMartino&apos;s BFM Foundations course
+        </p>
+      </div>
+
+      {/* Educational Disclaimer */}
+      <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+        <p className="text-sm text-amber-800">
+          All suggestions are for <strong>educational purposes only</strong> and are not medical advice.
+          They reference content from the BFM Foundations course. Please consult with your healthcare
+          practitioner for personalized recommendations.
         </p>
       </div>
 

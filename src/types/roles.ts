@@ -54,7 +54,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessPatients: false,
     canAccessAdmin: false,
     canAccessDashboard: false,
-    canAccessMyHealth: true,
+    canAccessMyHealth: false,
     canAccessSuggestions: true, // Members see "suggestions" - softer, non-clinical language
     canAccessProtocols: false, // Members don't have clinical protocol access
     canAccessSettings: true,
@@ -78,10 +78,8 @@ export const ROUTE_RULES: Record<string, UserRole[]> = {
   '/diagnostics': ['admin', 'practitioner'],
   '/dashboard': ['admin', 'practitioner'],
   '/protocols': ['admin', 'practitioner'], // Clinical protocols for practitioners
-  '/my-health': ['member'],
-  '/my-labs': ['member'],
-  '/my-progress': ['member'],
-  '/suggestions': ['member'], // Softer language for member wellness suggestions
+  '/my-labs': ['admin', 'member'],
+  '/suggestions': ['admin', 'member'], // Softer language for member wellness suggestions
   '/': ['admin', 'practitioner', 'member'],
   '/labs': ['admin', 'practitioner', 'member'],
 }
@@ -106,7 +104,7 @@ export function getHomeRoute(role: UserRole): string {
     case 'practitioner':
       return '/'
     case 'member':
-      return '/my-health'
+      return '/'
     default:
       return '/'
   }

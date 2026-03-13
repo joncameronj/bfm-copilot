@@ -33,9 +33,10 @@ interface LabCalculatorProps {
   onSave?: (_results: LabCalculationResult, _values: LabFormValues, _options?: LabSaveOptions) => Promise<void>;
   patientId?: string;
   patient?: Patient | null;
+  saveButtonLabel?: string;
 }
 
-export function LabCalculator({ onSave, patientId: _patientId, patient }: LabCalculatorProps) {
+export function LabCalculator({ onSave, patientId: _patientId, patient, saveButtonLabel = 'Save to Patient' }: LabCalculatorProps) {
   const [patientContext, setPatientContext] = useState<PatientContext>({
     gender: 'male',
     age: 45,
@@ -208,7 +209,7 @@ export function LabCalculator({ onSave, patientId: _patientId, patient }: LabCal
             {onSave && (
               <Button onClick={handleSave} isLoading={isSaving}>
                 <HugeiconsIcon icon={FloppyDiskIcon} size={16} className="mr-2" />
-                Save to Patient
+                {saveButtonLabel}
               </Button>
             )}
           </div>

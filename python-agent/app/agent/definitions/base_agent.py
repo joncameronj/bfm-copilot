@@ -21,6 +21,11 @@ from app.tools.web_search import (
     WEB_SEARCH_TOOL_DESCRIPTION,
     create_web_search_handler,
 )
+from app.tools.save_suggestion import (
+    SAVE_SUGGESTION_TOOL_SCHEMA,
+    SAVE_SUGGESTION_TOOL_DESCRIPTION,
+    create_save_suggestion_handler,
+)
 from app.services.ai_client import get_chat_model
 
 
@@ -102,6 +107,18 @@ def create_base_agent(
         parameters=WEB_SEARCH_TOOL_SCHEMA,
         handler=create_web_search_handler(),
     )
+
+    # Register member-only wellness suggestion tool
+    if user_role == "member":
+        tool_registry.register(
+            name="save_wellness_suggestion",
+            description=SAVE_SUGGESTION_TOOL_DESCRIPTION,
+            parameters=SAVE_SUGGESTION_TOOL_SCHEMA,
+            handler=create_save_suggestion_handler(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            ),
+        )
 
     return AgentConfig(
         name="bfm_copilot",

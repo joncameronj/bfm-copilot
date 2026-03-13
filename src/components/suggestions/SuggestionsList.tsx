@@ -54,8 +54,9 @@ export function SuggestionsList({ initialSuggestions }: SuggestionsListProps) {
         <h3 className="text-lg font-medium text-neutral-900 mb-2">
           No suggestions yet
         </h3>
-        <p className="text-neutral-600">
-          Chat with Copilot about your health to receive personalized wellness suggestions.
+        <p className="text-neutral-600 max-w-md mx-auto">
+          Enter your lab results or chat with Copilot to receive educational wellness suggestions
+          based on Dr. Rob DeMartino&apos;s BFM Foundations course.
         </p>
       </div>
     )

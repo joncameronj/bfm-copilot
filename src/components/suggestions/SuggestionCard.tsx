@@ -10,6 +10,7 @@ interface Suggestion {
   content: string
   category?: string | null
   status: 'pending' | 'accepted' | 'rejected' | 'superseded'
+  sourceContext?: string | null
   iterationCount: number
   createdAt: Date
 }
@@ -81,9 +82,22 @@ export function SuggestionCard({ suggestion, onStatusChange }: SuggestionCardPro
     exercise: 'Exercise',
     supplement: 'Supplement',
     sleep: 'Sleep',
+    light: 'Light Exposure',
+    environment: 'Environment',
     stress: 'Stress Management',
     general: 'General Wellness',
   }
+
+  // Parse module reference from sourceContext JSON
+  const moduleRef = (() => {
+    if (!suggestion.sourceContext) return null
+    try {
+      const parsed = JSON.parse(suggestion.sourceContext)
+      return parsed.module as string | undefined
+    } catch {
+      return null
+    }
+  })()
 
   return (
     <div className="bg-white border border-neutral-200 rounded-2xl p-6">
@@ -96,6 +110,11 @@ export function SuggestionCard({ suggestion, onStatusChange }: SuggestionCardPro
           {suggestion.category && (
             <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               {categoryLabels[suggestion.category] || suggestion.category}
+            </span>
+          )}
+          {moduleRef && (
+            <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              {moduleRef}
             </span>
           )}
           {suggestion.iterationCount > 0 && (

@@ -18,7 +18,7 @@ export default async function MyLabsPage() {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'member') {
+  if (!profile || (profile.role !== 'member' && profile.role !== 'admin')) {
     redirect('/')
   }
 

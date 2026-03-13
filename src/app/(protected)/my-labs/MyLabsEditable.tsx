@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Calendar03Icon, Alert01Icon, AddCircleIcon, ChartHistogramIcon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { Calendar03Icon, Alert01Icon, AddCircleIcon, ChartHistogramIcon, Tick02Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { LabCalculator, LabSaveOptions } from '@/components/labs/LabCalculator'
 import { LabHistoryChart } from '@/components/labs/LabHistoryChart'
 import { TrendIndicator } from '@/components/labs/TrendIndicator'
@@ -44,6 +45,7 @@ interface MyLabsEditableProps {
 }
 
 export function MyLabsEditable({ initialValues, markers, memberProfile }: MyLabsEditableProps) {
+  const router = useRouter()
   const [labValues, setLabValues] = useState<MemberLabValue[]>(initialValues)
   const [activeTab, setActiveTab] = useState('add')
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null)
@@ -128,6 +130,43 @@ export function MyLabsEditable({ initialValues, markers, memberProfile }: MyLabs
 
       toast.success(`Saved ${savedValues.length} lab values successfully!`)
 
+      // Generate educational suggestions based on flagged markers
+      const flaggedMarkers = results.results
+        .filter(r => r.isFlagged && r.value != null)
+        .map(r => {
+          const marker = markers.find(m => m.id === r.markerId)
+          return {
+            name: marker?.display_name || marker?.name || r.markerId,
+            value: r.value!,
+            unit: marker?.unit || '',
+            evaluation: r.evaluation,
+            isOminous: r.isOminous || false,
+          }
+        })
+
+      if (flaggedMarkers.length > 0) {
+        try {
+          const suggestResponse = await fetch('/api/member/generate-suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              flaggedMarkers,
+              totalMarkers: results.results.length,
+              ominousCount: results.ominousCount || 0,
+            }),
+          })
+
+          if (suggestResponse.ok) {
+            const { suggestions } = await suggestResponse.json()
+            if (suggestions?.length > 0) {
+              toast.success(`${suggestions.length} educational suggestions generated — check your Suggestions page`)
+            }
+          }
+        } catch {
+          // Suggestion generation is non-critical — don't block the save flow
+        }
+      }
+
       // Switch to history tab to show new results
       setActiveTab('history')
     } catch (error) {
@@ -184,6 +223,7 @@ export function MyLabsEditable({ initialValues, markers, memberProfile }: MyLabs
           <CardContent>
             <LabCalculator
               onSave={handleSave}
+              saveButtonLabel="Save My Results"
               patient={memberProfile ? {
                 id: 'self',
                 userId: 'self',
@@ -247,6 +287,13 @@ export function MyLabsEditable({ initialValues, markers, memberProfile }: MyLabs
                             {stats.ominousCount} critical
                           </span>
                         )}
+                        <button
+                          onClick={() => router.push(`/my-labs/${date}`)}
+                          className="flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-900 transition-colors ml-2"
+                        >
+                          View Details
+                          <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+                        </button>
                       </div>
                     </div>
                   </CardHeader>
