@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/health
  *
  * Public health check — no auth required.
- * Tests Vercel→Railway connectivity and reports env var status.
+ * Tests Vercel→Railway connectivity and imports used by /api/agent/chat.
  */
 export async function GET() {
   const agentUrl = getPythonAgentUrl()
@@ -24,6 +24,7 @@ export async function GET() {
     hasSupabaseAnon: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   }
 
+  // Test Railway connectivity
   try {
     const start = Date.now()
     const res = await fetch(`${agentUrl}/health`, { cache: 'no-store' })
@@ -35,6 +36,42 @@ export async function GET() {
   } catch (err) {
     checks.railwayStatus = 'error'
     checks.railwayError = err instanceof Error ? err.message : String(err)
+  }
+
+  // Test imports used by /api/agent/chat to isolate cold-start crashes
+  try {
+    const { createClient } = await import('@/lib/supabase/server')
+    checks.importSupabase = 'ok'
+  } catch (err) {
+    checks.importSupabase = err instanceof Error ? err.message : String(err)
+  }
+
+  try {
+    const { extractDiagnosticValues } = await import('@/lib/vision')
+    checks.importVision = 'ok'
+  } catch (err) {
+    checks.importVision = err instanceof Error ? err.message : String(err)
+  }
+
+  try {
+    const { parseLabPdf } = await import('@/lib/labs/pdf-parser')
+    checks.importPdfParser = 'ok'
+  } catch (err) {
+    checks.importPdfParser = err instanceof Error ? err.message : String(err)
+  }
+
+  try {
+    const pdfParse = require('pdf-parse')
+    checks.importPdfParse = 'ok'
+  } catch (err) {
+    checks.importPdfParse = err instanceof Error ? err.message : String(err)
+  }
+
+  try {
+    const { parseSSELines, parseSSEData } = await import('@/lib/utils/sse-parser')
+    checks.importSSEParser = 'ok'
+  } catch (err) {
+    checks.importSSEParser = err instanceof Error ? err.message : String(err)
   }
 
   return NextResponse.json(checks)
