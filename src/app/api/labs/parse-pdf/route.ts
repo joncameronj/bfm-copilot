@@ -3,8 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import { parseLabPdf } from '@/lib/labs/pdf-parser';
 import { extractLabPanelVision } from '@/lib/labs/vision-extractor';
 export const dynamic = 'force-dynamic'
-// eslint-disable-next-line
-const pdf = require('pdf-parse');
 
 // Accepted file types
 const ACCEPTED_TYPES = {
@@ -86,6 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (fileType === 'pdf') {
       // PDF: Use text extraction
+      const pdf = require('pdf-parse');
       const pdfData = await pdf(buffer);
       parseResult = await parseLabPdf(pdfData.text);
       pageCount = pdfData.numpages;

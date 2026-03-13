@@ -4,7 +4,6 @@ import { getPythonAgentUrl } from '@/lib/agent/url'
 import { extractDiagnosticValues } from '@/lib/vision'
 import { parseLabPdf } from '@/lib/labs/pdf-parser'
 import type { DiagnosticType } from '@/types/shared'
-const pdfParse = require('pdf-parse')
 
 export const dynamic = 'force-dynamic'
 const CHAT_UPLOAD_BUCKET = 'diagnostics'
@@ -161,6 +160,7 @@ async function summarizePdfAttachment(
   let pageCount: number | undefined
   try {
     const buffer = Buffer.from(await data.arrayBuffer())
+    const pdfParse = require('pdf-parse')
     const parsedPdf = await pdfParse(buffer)
     extractedText = (parsedPdf.text || '').trim()
     pageCount = parsedPdf.numpages
