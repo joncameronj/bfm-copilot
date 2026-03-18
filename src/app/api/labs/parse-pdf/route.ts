@@ -84,18 +84,47 @@ export async function POST(request: NextRequest) {
 
     if (fileType === 'pdf') {
       // PDF: Use text extraction
-      const pdf = require('pdf-parse');
-      const pdfData = await pdf(buffer);
-      parseResult = await parseLabPdf(pdfData.text);
-      pageCount = pdfData.numpages;
+      try {
+        const pdf = require('pdf-parse');
+        const pdfData = await pdf(buffer);
+        parseResult = await parseLabPdf(pdfData.text);
+        pageCount = pdfData.numpages;
+      } catch (pdfError) {
+        console.error('PDF parsing failed:', pdfError);
+        const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
+        // DOMMatrix / canvas errors are environment issues with pdf-parse
+        if (errorMsg.includes('DOMMatrix') || errorMsg.includes('canvas') || errorMsg.includes('is not defined')) {
+          return NextResponse.json(
+            { error: 'PDF text extraction is not available in this environment. Please upload your lab report as a JPG or PNG image instead.' },
+            { status: 422 }
+          );
+        }
+        return NextResponse.json(
+          { error: `Failed to parse PDF: ${errorMsg}` },
+          { status: 422 }
+        );
+      }
     } else {
       // Image: Use Vision API extraction
-      // Convert to base64 data URL for Vision API
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return NextResponse.json(
+          { error: 'Vision API is not configured. Please contact support.' },
+          { status: 503 }
+        );
+      }
+
       const base64 = buffer.toString('base64');
       const mimeType = file.type || 'image/jpeg';
       const dataUrl = `data:${mimeType};base64,${base64}`;
 
       parseResult = await extractLabPanelVision(dataUrl);
+
+      if (!parseResult.success) {
+        return NextResponse.json(
+          { error: parseResult.warnings?.[0] || 'Could not extract lab values from this image. Please ensure the image is clear and contains lab results.' },
+          { status: 422 }
+        );
+      }
     }
 
     // Return parsed values
@@ -108,9 +137,14 @@ export async function POST(request: NextRequest) {
       extractionMethod: fileType === 'pdf' ? 'text' : 'vision',
     });
   } catch (error) {
-    console.error('Lab file parse error:', error);
+    const errorName = error instanceof Error ? error.constructor.name : 'Unknown';
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`Lab file parse error [${errorName}]:`, errorMsg);
+    if (error instanceof Error && error.stack) {
+      console.error('Stack:', error.stack);
+    }
     return NextResponse.json(
-      { error: 'Failed to parse lab file' },
+      { error: `Failed to parse lab file: ${errorMsg}` },
       { status: 500 }
     );
   }

@@ -145,6 +145,15 @@ function findMatchingMarker(testName: string): { id: string; name: string } | nu
  * Returns data in the same format as parseLabPdf() for compatibility
  */
 export async function extractLabPanelVision(imageDataUrl: string): Promise<LabParseResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return {
+      success: false,
+      values: [],
+      rawText: '',
+      warnings: ['Vision API is not configured (missing ANTHROPIC_API_KEY)'],
+    }
+  }
+
   try {
     const visionResult = await extractLabPanel(imageDataUrl)
 
