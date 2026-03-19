@@ -67,8 +67,8 @@ Return a JSON object with this EXACT structure:
     "status": "negative" | "trace" | "positive"
   },
   "glucose": {
-    "value": "<value as shown>",
-    "status": "negative" | "positive"
+    "value": "<value as shown, or null if glucose is not on the strip>",
+    "status": "negative" | "positive" | null
   },
   "ketones": {
     "value": "<value as shown>",
@@ -118,9 +118,11 @@ VCS SCORE:
 - 24+ identified = passing
 - Below 24 = FAILING (biotoxin illness indicator)
 
-GLUCOSE RULE:
+GLUCOSE RULE (CRITICAL — DO NOT HALLUCINATE):
 - Only mark glucose as "positive" if the UA strip explicitly lists glucose and shows it as positive
-- If glucose is absent from the report, do NOT invent it or infer it from other markers
+- If glucose is absent from the report, set value and status to null — do NOT invent it
+- If glucose shows "Neg" or "Negative", set status to "negative"
+- Do NOT infer glucose in urine from blood glucose, HbA1c, or other metabolic markers
 
 URIC ACID:
 - If uric acid is shown, extract the exact value/status

@@ -49,6 +49,24 @@ def _is_positive(data) -> bool:
     return bool(data)
 
 
+def _is_glucose_positive(data) -> bool:
+    """Glucose requires EXPLICIT positive evidence — never infer from ambiguous values.
+
+    Unlike _is_positive() which uses denylist logic (anything not negative = positive),
+    this uses allowlist logic: only return True when status or value is explicitly positive.
+    This prevents hallucinated or ambiguous vision extractions from triggering Diabetes protocols.
+    """
+    if not data or not isinstance(data, dict):
+        return False
+    status = str(data.get("status", "")).lower().strip()
+    if status == "positive":
+        return True
+    val = str(data.get("value", "")).lower().strip()
+    if val in ("positive", "+", "1+", "2+", "3+", "++", "+++"):
+        return True
+    return False
+
+
 def _check_exact_match(a: dict, b: dict) -> bool:
     """All 4 NervExpress values must match exactly (Locus Coeruleus / NS Tox test)."""
     keys = ["hr", "r_hf", "r_lf1", "r_lf2"]
@@ -194,7 +212,7 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
             "protein_positive": _is_positive(protein_data),
             "protein_value": str(protein_data.get("value", "")) if isinstance(protein_data, dict) else str(protein_data),
             "specific_gravity": sg_data.get("value") if isinstance(sg_data, dict) else sg_data,
-            "glucose_positive": _is_positive(glucose_data),
+            "glucose_positive": _is_glucose_positive(glucose_data),
             "uric_acid": _coerce_float(uric_acid_value),
             "uric_acid_status": uric_acid_status,
             "bilirubin_positive": _is_positive(bilirubin_data),
