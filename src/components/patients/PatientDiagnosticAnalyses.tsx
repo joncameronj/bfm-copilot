@@ -137,6 +137,18 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
     }
   }
 
+  const handleDeleteAnalysis = async (uploadId: string) => {
+    if (!confirm('Delete this upload and its analysis?')) return
+    try {
+      const res = await fetch(`/api/diagnostics/${uploadId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      toast.success('Analysis deleted')
+      fetchData()
+    } catch {
+      toast.error('Failed to delete analysis')
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [patientId])
@@ -302,6 +314,17 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                   }`}>
                     {analysis.status}
                   </span>
+                  {(analysis.status === 'processing' || analysis.status === 'error') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteAnalysis(analysis.diagnostic_upload_id)
+                      }}
+                      className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 font-medium px-2 py-1"
+                    >
+                      Delete
+                    </button>
+                  )}
                   <svg
                     className={`w-5 h-5 text-neutral-400 transition-transform ${expandedId === analysis.id ? 'rotate-180' : ''}`}
                     fill="none"

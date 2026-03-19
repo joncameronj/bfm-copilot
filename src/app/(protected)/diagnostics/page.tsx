@@ -136,6 +136,35 @@ export default function DiagnosticsPage() {
 
       const result = await response.json()
       setGeneratedAnalysisId(result.data?.analysisId)
+
+      if (result.data?.status === 'processing') {
+        // Poll GET endpoint until analysis completes
+        const pollInterval = 5000
+        const maxPolls = 120 // 10 minutes max
+        let polls = 0
+
+        while (polls < maxPolls) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval))
+          polls++
+
+          if (controller.signal.aborted) return
+
+          const statusRes = await fetch(
+            `/api/diagnostics/${uploadId}/generate-analysis`,
+            { signal: controller.signal }
+          )
+          if (!statusRes.ok) continue
+
+          const statusData = await statusRes.json()
+          if (statusData.data?.status === 'complete') {
+            break
+          }
+          if (statusData.data?.status === 'error') {
+            throw new Error(statusData.data?.errorMessage || 'Analysis failed')
+          }
+        }
+      }
+
       setAnalysisComplete(true)
 
       const name = selectedPatientName || 'patient'
@@ -181,6 +210,18 @@ export default function DiagnosticsPage() {
   const handleCancelAnalysis = () => {
     if (abortController) {
       abortController.abort()
+    }
+  }
+
+  const handleDeleteUpload = async (uploadId: string) => {
+    if (!confirm('Delete this upload and any associated analysis?')) return
+    try {
+      const res = await fetch(`/api/diagnostics/${uploadId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      toast.success('Upload deleted')
+      await fetchPatientUploads()
+    } catch {
+      toast.error('Failed to delete upload')
     }
   }
 
@@ -375,6 +416,13 @@ export default function DiagnosticsPage() {
                         >
                           View Results
                         </Link>
+                      ) : (upload.status === 'processing' || upload.status === 'error') ? (
+                        <button
+                          onClick={() => handleDeleteUpload(upload.id)}
+                          className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 font-medium"
+                        >
+                          Delete
+                        </button>
                       ) : null}
                     </td>
                   </tr>
