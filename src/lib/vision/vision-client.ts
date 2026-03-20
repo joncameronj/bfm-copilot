@@ -5,6 +5,21 @@ import { getAnthropicClient, extractJSON, JSON_SYSTEM_SUFFIX } from '@/lib/anthr
 import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { ExtractionResult } from '@/types/diagnostic-extraction'
 
+const MAX_RETRIES = 3
+const INITIAL_BACKOFF_MS = 2000
+
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message || ''
+    return msg.includes('overloaded') || msg.includes('Overloaded') || msg.includes('529') || msg.includes('rate_limit')
+  }
+  return false
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
 type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number]
 
@@ -45,60 +60,76 @@ export async function extractFromImage<T>(
   const client = getAnthropicClient()
   const model = getDefaultVisionModel()
 
-  try {
-    const { data, mediaType, isPdf } = await fetchImageAsBase64(imageUrl)
+  const { data, mediaType, isPdf } = await fetchImageAsBase64(imageUrl)
 
-    const fileContent = isPdf
-      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
-      : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
+  const fileContent = isPdf
+    ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
+    : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
 
-    // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
-    const stream = client.messages.stream({
-      model,
-      max_tokens: maxTokens,
-      temperature: 0.1,
-      system: systemPrompt + JSON_SYSTEM_SUFFIX,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: userPrompt },
-            fileContent,
-          ],
-        },
-      ],
-    })
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
+      const stream = client.messages.stream({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.1,
+        system: systemPrompt + JSON_SYSTEM_SUFFIX,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userPrompt },
+              fileContent,
+            ],
+          },
+        ],
+      })
 
-    const response = await stream.finalMessage()
+      const response = await stream.finalMessage()
 
-    const textBlock = response.content.find((b) => b.type === 'text')
-    const content = textBlock && 'text' in textBlock ? textBlock.text : null
-    if (!content) {
+      const textBlock = response.content.find((b) => b.type === 'text')
+      const content = textBlock && 'text' in textBlock ? textBlock.text : null
+      if (!content) {
+        return {
+          success: false,
+          data: {} as T,
+          confidence: 0,
+          rawResponse: '',
+          error: 'No response from Vision API',
+        }
+      }
+
+      const parsed = extractJSON<T & { confidence?: number }>(content)
+      return {
+        success: true,
+        data: parsed,
+        confidence: parsed.confidence ?? 0.8,
+        rawResponse: content,
+      }
+    } catch (error) {
+      if (isRetryableError(error) && attempt < MAX_RETRIES) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt)
+        console.warn(`[Vision] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${backoff}ms...`)
+        await sleep(backoff)
+        continue
+      }
+      console.error('Vision extraction error:', error)
       return {
         success: false,
         data: {} as T,
         confidence: 0,
         rawResponse: '',
-        error: 'No response from Vision API',
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
+  }
 
-    const parsed = extractJSON<T & { confidence?: number }>(content)
-    return {
-      success: true,
-      data: parsed,
-      confidence: parsed.confidence ?? 0.8,
-      rawResponse: content,
-    }
-  } catch (error) {
-    console.error('Vision extraction error:', error)
-    return {
-      success: false,
-      data: {} as T,
-      confidence: 0,
-      rawResponse: '',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+  return {
+    success: false,
+    data: {} as T,
+    confidence: 0,
+    rawResponse: '',
+    error: 'Max retries exceeded',
   }
 }
 
@@ -114,58 +145,74 @@ export async function extractFromMultipleImages<T>(
   const client = getAnthropicClient()
   const model = getDefaultVisionModel()
 
-  try {
-    const fetched = await Promise.all(imageUrls.map(fetchImageAsBase64))
-    const imageContent = fetched.map(({ data, mediaType, isPdf }) =>
-      isPdf
-        ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
-        : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
-    )
+  const fetched = await Promise.all(imageUrls.map(fetchImageAsBase64))
+  const imageContent = fetched.map(({ data, mediaType, isPdf }) =>
+    isPdf
+      ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data } }
+      : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as SupportedImageType, data } }
+  )
 
-    // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
-    const stream = client.messages.stream({
-      model,
-      max_tokens: maxTokens,
-      temperature: 0.1,
-      system: systemPrompt + JSON_SYSTEM_SUFFIX,
-      messages: [
-        {
-          role: 'user',
-          content: [{ type: 'text' as const, text: userPrompt }, ...imageContent],
-        },
-      ],
-    })
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Use streaming to avoid Anthropic SDK timeout on long-running vision calls
+      const stream = client.messages.stream({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.1,
+        system: systemPrompt + JSON_SYSTEM_SUFFIX,
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text' as const, text: userPrompt }, ...imageContent],
+          },
+        ],
+      })
 
-    const response = await stream.finalMessage()
+      const response = await stream.finalMessage()
 
-    const textBlock = response.content.find((b) => b.type === 'text')
-    const content = textBlock && 'text' in textBlock ? textBlock.text : null
-    if (!content) {
+      const textBlock = response.content.find((b) => b.type === 'text')
+      const content = textBlock && 'text' in textBlock ? textBlock.text : null
+      if (!content) {
+        return {
+          success: false,
+          data: {} as T,
+          confidence: 0,
+          rawResponse: '',
+          error: 'No response from Vision API',
+        }
+      }
+
+      const parsed = extractJSON<T & { confidence?: number }>(content)
+      return {
+        success: true,
+        data: parsed,
+        confidence: parsed.confidence ?? 0.8,
+        rawResponse: content,
+      }
+    } catch (error) {
+      if (isRetryableError(error) && attempt < MAX_RETRIES) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt)
+        console.warn(`[Vision] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${backoff}ms...`)
+        await sleep(backoff)
+        continue
+      }
+      console.error('Vision extraction error:', error)
       return {
         success: false,
         data: {} as T,
         confidence: 0,
         rawResponse: '',
-        error: 'No response from Vision API',
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
+  }
 
-    const parsed = extractJSON<T & { confidence?: number }>(content)
-    return {
-      success: true,
-      data: parsed,
-      confidence: parsed.confidence ?? 0.8,
-      rawResponse: content,
-    }
-  } catch (error) {
-    console.error('Vision extraction error:', error)
-    return {
-      success: false,
-      data: {} as T,
-      confidence: 0,
-      rawResponse: '',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+  return {
+    success: false,
+    data: {} as T,
+    confidence: 0,
+    rawResponse: '',
+    error: 'Max retries exceeded',
   }
 }
 

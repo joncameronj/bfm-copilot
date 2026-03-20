@@ -137,11 +137,15 @@ export default function DiagnosticsPage() {
       const result = await response.json()
       setGeneratedAnalysisId(result.data?.analysisId)
 
+      // Always refresh uploads after POST so history table reflects current status
+      await fetchPatientUploads()
+
       if (result.data?.status === 'processing') {
         // Poll GET endpoint until analysis completes
         const pollInterval = 5000
         const maxPolls = 120 // 10 minutes max
         let polls = 0
+        let analysisSucceeded = false
 
         while (polls < maxPolls) {
           await new Promise(resolve => setTimeout(resolve, pollInterval))
@@ -153,15 +157,23 @@ export default function DiagnosticsPage() {
             `/api/diagnostics/${uploadId}/generate-analysis`,
             { signal: controller.signal }
           )
+          if (statusRes.status === 404) {
+            throw new Error('Diagnostic was deleted')
+          }
           if (!statusRes.ok) continue
 
           const statusData = await statusRes.json()
           if (statusData.data?.status === 'complete') {
+            analysisSucceeded = true
             break
           }
           if (statusData.data?.status === 'error') {
             throw new Error(statusData.data?.errorMessage || 'Analysis failed')
           }
+        }
+
+        if (!analysisSucceeded) {
+          throw new Error('Analysis timed out after 10 minutes — please try again')
         }
       }
 

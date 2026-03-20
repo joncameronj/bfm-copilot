@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Loading03Icon, FileSearchIcon, Add01Icon, AiMagicIcon, File01Icon } from '@hugeicons/core-free-icons'
 import Link from 'next/link'
@@ -70,7 +70,7 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [generatingId, setGeneratingId] = useState<string | null>(null)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       // Fetch analyses and pending uploads in parallel
       const [analysesRes, uploadsRes] = await Promise.all([
@@ -80,27 +80,58 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
 
       if (analysesRes.ok) {
         const data = await analysesRes.json()
-        setAnalyses(data.data || [])
-        if (data.data?.length === 1) {
-          setExpandedId(data.data[0].id)
+        const nextAnalyses = data.data || []
+        setAnalyses(nextAnalyses)
+        if (nextAnalyses.length === 1) {
+          setExpandedId(nextAnalyses[0].id)
         }
-      }
 
-      if (uploadsRes.ok) {
-        const data = await uploadsRes.json()
-        // Filter to only show uploads that don't have an analysis yet
-        const analysisUploadIds = new Set(analyses.map(a => a.diagnostic_upload_id))
-        const pending = (data.data || []).filter(
-          (upload: PendingUpload) => !analysisUploadIds.has(upload.id) && upload.status === 'uploaded'
-        )
-        setPendingUploads(pending)
+        if (uploadsRes.ok) {
+          const uploadsData = await uploadsRes.json()
+          // Filter to only show uploads that don't have an analysis yet
+          const analysisUploadIds = new Set(
+            nextAnalyses.map((analysis: AnalysisData) => analysis.diagnostic_upload_id)
+          )
+          const pending = (uploadsData.data || []).filter(
+            (upload: PendingUpload) => !analysisUploadIds.has(upload.id) && upload.status === 'uploaded'
+          )
+          setPendingUploads(pending)
+        } else {
+          setPendingUploads([])
+        }
+      } else {
+        setAnalyses([])
+        setPendingUploads([])
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [patientId])
+
+  const pollInProgressAnalyses = useCallback(async (inProgressAnalyses: AnalysisData[]) => {
+    const results = await Promise.allSettled(
+      inProgressAnalyses.map(async (analysis) => {
+        const response = await fetch(`/api/diagnostics/${analysis.id}/generate-analysis`)
+        if (response.status === 404) {
+          // Analysis was deleted — skip silently, fetchData will clean up state
+          return null
+        }
+        if (!response.ok) {
+          throw new Error(`Status poll failed for analysis ${analysis.id}`)
+        }
+        return response.json()
+      })
+    )
+
+    const failedPoll = results.find((result) => result.status === 'rejected')
+    if (failedPoll) {
+      console.error('Failed to poll in-progress analyses:', (failedPoll as PromiseRejectedResult).reason)
+    }
+
+    await fetchData()
+  }, [fetchData])
 
   const handleGenerateAnalysis = async (uploadId: string) => {
     setGeneratingId(uploadId)
@@ -151,17 +182,22 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
 
   useEffect(() => {
     fetchData()
-  }, [patientId])
+  }, [fetchData])
 
-  // Poll every 10s while any analysis is processing/pending
+  // Poll every 10s while any analysis is processing/pending.
+  // Hitting the finalize endpoint is what transitions completed evals out of "processing".
   useEffect(() => {
-    const hasInProgress = analyses.some(
-      (a) => a.status === 'processing' || a.status === 'pending'
+    const inProgressAnalyses = analyses.filter(
+      (analysis) => analysis.status === 'processing' || analysis.status === 'pending'
     )
-    if (!hasInProgress) return
-    const interval = setInterval(fetchData, 10000)
+    if (inProgressAnalyses.length === 0) return
+
+    const interval = setInterval(() => {
+      void pollInProgressAnalyses(inProgressAnalyses)
+    }, 10000)
+
     return () => clearInterval(interval)
-  }, [analyses])
+  }, [analyses, pollInProgressAnalyses])
 
   const transformToAnalysisWithRecommendations = (data: AnalysisData): DiagnosticAnalysisWithRecommendations => {
     return {
@@ -290,9 +326,12 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
           {analyses.map((analysis) => (
             <div key={analysis.id}>
               {/* Analysis Header */}
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setExpandedId(expandedId === analysis.id ? null : analysis.id)}
-                className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(expandedId === analysis.id ? null : analysis.id) } }}
+                className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-4">
                   <div>
@@ -334,7 +373,7 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
-              </button>
+              </div>
 
               {/* Expanded Content */}
               {expandedId === analysis.id && (
@@ -342,6 +381,7 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                   <DiagnosticAnalysisPanel
                     analysis={transformToAnalysisWithRecommendations(analysis)}
                     onRefresh={fetchData}
+                    onCancel={() => handleDeleteAnalysis(analysis.diagnostic_upload_id)}
                   />
                 </div>
               )}
