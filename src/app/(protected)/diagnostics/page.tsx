@@ -143,7 +143,7 @@ export default function DiagnosticsPage() {
       }
 
       const result = await response.json()
-      setGeneratedAnalysisId(result.data?.analysisId)
+      const pendingAnalysisId = result.data?.analysisId
 
       // POST completed extraction + fired eval — skip to 'queued' stage
       setAnalysisStage('queued')
@@ -192,6 +192,7 @@ export default function DiagnosticsPage() {
       }
 
       setAnalysisComplete(true)
+      setGeneratedAnalysisId(pendingAnalysisId || null)
 
       const name = selectedPatientName || 'patient'
       toast((t) => (
@@ -228,7 +229,7 @@ export default function DiagnosticsPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to generate analysis')
     } finally {
       setIsGenerating(false)
-      setAnalysisComplete(false)
+      setAnalysisStage(undefined)
       setAbortController(null)
     }
   }
