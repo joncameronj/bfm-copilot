@@ -40,6 +40,7 @@ export default function DiagnosticsPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedAnalysisId, setGeneratedAnalysisId] = useState<string | null>(null)
   const [analysisComplete, setAnalysisComplete] = useState(false)
+  const [analysisStage, setAnalysisStage] = useState<string | undefined>()
   const [uploadKey, setUploadKey] = useState(0) // To reset upload component
   const [abortController, setAbortController] = useState<AbortController | null>(null)
 
@@ -123,6 +124,7 @@ export default function DiagnosticsPage() {
     setAbortController(controller)
     setIsGenerating(true)
     setAnalysisComplete(false)
+    setAnalysisStage(undefined)
     try {
       const response = await fetch(`/api/diagnostics/${uploadId}/generate-analysis`, {
         method: 'POST',
@@ -130,8 +132,14 @@ export default function DiagnosticsPage() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to generate analysis')
+        let message = 'Failed to generate analysis'
+        try {
+          const error = await response.json()
+          message = error.error || message
+        } catch {
+          // 504/502 gateway errors return HTML, not JSON
+        }
+        throw new Error(message)
       }
 
       const result = await response.json()
@@ -143,7 +151,7 @@ export default function DiagnosticsPage() {
       if (result.data?.status === 'processing') {
         // Poll GET endpoint until analysis completes
         const pollInterval = 5000
-        const maxPolls = 120 // 10 minutes max
+        const maxPolls = 180 // 15 minutes max
         let polls = 0
         let analysisSucceeded = false
 
@@ -163,6 +171,9 @@ export default function DiagnosticsPage() {
           if (!statusRes.ok) continue
 
           const statusData = await statusRes.json()
+          if (statusData.data?.stage) {
+            setAnalysisStage(statusData.data.stage)
+          }
           if (statusData.data?.status === 'complete') {
             analysisSucceeded = true
             break
@@ -173,7 +184,7 @@ export default function DiagnosticsPage() {
         }
 
         if (!analysisSucceeded) {
-          throw new Error('Analysis timed out after 10 minutes — please try again')
+          throw new Error('Analysis timed out after 15 minutes — please try again')
         }
       }
 
@@ -301,7 +312,7 @@ export default function DiagnosticsPage() {
             </h2>
           </div>
           {isGenerating ? (
-            <AnalysisProgress isComplete={analysisComplete} onCancel={handleCancelAnalysis} />
+            <AnalysisProgress isComplete={analysisComplete} stage={analysisStage} onCancel={handleCancelAnalysis} />
           ) : (
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
               <p className="text-blue-800 dark:text-blue-200 mb-4">

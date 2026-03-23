@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 
 interface AnalysisProgressProps {
   isComplete: boolean
+  stage?: string // 'extracting' | 'queued' | 'analyzing' | undefined
   onCancel?: () => void
 }
 
@@ -28,7 +29,14 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps) {
+// Map backend stage to minimum step index so the progress bar jumps ahead
+const STAGE_TO_MIN_STEP: Record<string, number> = {
+  extracting: 0,
+  queued: 1,
+  analyzing: 2,
+}
+
+export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgressProps) {
   const [progress, setProgress] = useState(0)
   const [stuckTimer, setStuckTimer] = useState(0)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
@@ -74,6 +82,13 @@ export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps
         newProgress = rangeEnd
       }
 
+      // If backend reports a stage, ensure progress is at least at that step's start
+      if (stage && STAGE_TO_MIN_STEP[stage] !== undefined) {
+        const minStep = STAGE_TO_MIN_STEP[stage]
+        const minProgress = STEPS[minStep].range[0]
+        newProgress = Math.max(newProgress, minProgress)
+      }
+
       // Cap at 95%
       newProgress = Math.min(newProgress, 95)
       setProgress(newProgress)
@@ -85,7 +100,7 @@ export function AnalysisProgress({ isComplete, onCancel }: AnalysisProgressProps
     }, TICK_MS)
 
     return () => clearInterval(interval)
-  }, [isComplete])
+  }, [isComplete, stage])
 
   const activeStepIndex = isComplete
     ? STEPS.length

@@ -9,7 +9,7 @@ import type { DiagnosticType } from '@/types/shared'
 import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Extraction + fire background job — no longer waits for eval
+export const maxDuration = 120 // Parallel extraction + fire background job
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -121,17 +121,45 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Check if analysis already exists
     const { data: existingAnalysis } = await supabase
       .from('diagnostic_analyses')
-      .select('id, status')
+      .select('id, status, created_at')
       .eq('diagnostic_upload_id', diagnosticUploadId)
       .single()
 
     if (existingAnalysis) {
-      return NextResponse.json({
-        message: existingAnalysis.status === 'processing'
-          ? 'Analysis is being generated'
-          : 'Analysis already exists',
-        data: { analysisId: existingAnalysis.id, status: existingAnalysis.status }
-      })
+      const isComplete = existingAnalysis.status === 'complete'
+      const isError = existingAnalysis.status === 'error'
+      const isStaleProcessing = existingAnalysis.status === 'processing' &&
+        (Date.now() - new Date(existingAnalysis.created_at).getTime()) > 15 * 60 * 1000
+
+      if (isComplete) {
+        return NextResponse.json({
+          message: 'Analysis already exists',
+          data: { analysisId: existingAnalysis.id, status: existingAnalysis.status }
+        })
+      }
+
+      if (!isError && !isStaleProcessing) {
+        // Legitimately processing (< 15 min old) — return current status
+        return NextResponse.json({
+          message: 'Analysis is being generated',
+          data: { analysisId: existingAnalysis.id, status: existingAnalysis.status }
+        })
+      }
+
+      // Stale processing (>15 min) or error — clean up and retry
+      console.log(`[Generate] Cleaning up stale analysis ${existingAnalysis.id} (status=${existingAnalysis.status})`)
+      await supabase
+        .from('diagnostic_eval_reports')
+        .delete()
+        .eq('diagnostic_analysis_id', existingAnalysis.id)
+      await supabase
+        .from('protocol_recommendations')
+        .delete()
+        .eq('diagnostic_analysis_id', existingAnalysis.id)
+      await supabase
+        .from('diagnostic_analyses')
+        .delete()
+        .eq('id', existingAnalysis.id)
     }
 
     // AUTO-EXTRACT: Ensure all files are extracted before generating analysis
@@ -148,30 +176,48 @@ export async function POST(request: Request, { params }: RouteParams) {
       `)
       .eq('upload_id', diagnosticUploadId)
 
-    const extractionResults: Array<{ fileId: string; fileType: string; status: string; error?: string }> = []
+    type ExtractionResult = { fileId: string; fileType: string; status: string; error?: string }
+    const extractionResults: ExtractionResult[] = []
+
+    // Inline concurrency limiter (avoids ESM issues with p-limit package)
+    function pLimit(concurrency: number) {
+      let active = 0
+      const queue: Array<() => void> = []
+      const next = () => { if (queue.length > 0 && active < concurrency) { active++; queue.shift()!() } }
+      return <T>(fn: () => Promise<T>): Promise<T> =>
+        new Promise<T>((resolve, reject) => {
+          queue.push(() => fn().then(resolve, reject).finally(() => { active--; next() }))
+          next()
+        })
+    }
 
     if (!filesError && files) {
+      const limit = pLimit(3) // Max 3 concurrent vision API calls
+
+      // Separate already-extracted files from those needing extraction
+      const filesToExtract: typeof files = []
       for (const file of files) {
-        // Check if file already has usable extraction (complete or needs_review both have data)
         const existingExtraction = (file.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
         if (existingExtraction?.status === 'complete' || existingExtraction?.status === 'needs_review') {
           extractionResults.push({ fileId: file.id, fileType: file.file_type, status: existingExtraction.status })
-          continue // Skip already extracted files
+        } else {
+          filesToExtract.push(file)
         }
+      }
 
-        try {
+      // Extract files in parallel (concurrency 3)
+      const settled = await Promise.allSettled(
+        filesToExtract.map(file => limit(async (): Promise<ExtractionResult> => {
+          const existingExtraction = (file.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
+
           // Generate short-lived signed URL (diagnostics bucket is private).
           const { data: signedUrlData, error: signedUrlError } = await supabase.storage
             .from('diagnostics')
             .createSignedUrl(file.storage_path, 60 * 10)
 
           if (signedUrlError || !signedUrlData?.signedUrl) {
-            console.warn(
-              `[Auto-Extract] Failed to create signed URL for file ${file.id}:`,
-              signedUrlError
-            )
-            extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: `Signed URL failed: ${signedUrlError?.message || 'no URL returned'}` })
-            continue
+            console.warn(`[Auto-Extract] Failed to create signed URL for file ${file.id}:`, signedUrlError)
+            return { fileId: file.id, fileType: file.file_type, status: 'error', error: `Signed URL failed: ${signedUrlError?.message || 'no URL returned'}` }
           }
 
           // Create or update extraction record
@@ -190,8 +236,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
             if (insertError) {
               console.error(`[Auto-Extract] Failed to insert extraction record for file ${file.id}:`, insertError)
-              extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: `DB insert failed: ${insertError.message}` })
-              continue
+              return { fileId: file.id, fileType: file.file_type, status: 'error', error: `DB insert failed: ${insertError.message}` }
             }
             extractionId = newExtraction?.id
           } else {
@@ -256,11 +301,18 @@ export async function POST(request: Request, { params }: RouteParams) {
             }
           }
 
-          extractionResults.push({ fileId: file.id, fileType: file.file_type, status, error: result.error })
           console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
-        } catch (extractError) {
-          console.error(`[Auto-Extract] Failed to extract file ${file.id}:`, extractError)
-          extractionResults.push({ fileId: file.id, fileType: file.file_type, status: 'error', error: extractError instanceof Error ? extractError.message : 'Unknown error' })
+          return { fileId: file.id, fileType: file.file_type, status, error: result.error }
+        }))
+      )
+
+      // Collect results from settled promises
+      for (const result of settled) {
+        if (result.status === 'fulfilled') {
+          extractionResults.push(result.value)
+        } else {
+          console.error('[Auto-Extract] Extraction task failed:', result.reason)
+          extractionResults.push({ fileId: 'unknown', fileType: 'unknown', status: 'error', error: result.reason?.message || 'Unknown error' })
         }
       }
     }
@@ -528,6 +580,41 @@ export async function GET(request: Request, { params }: RouteParams) {
           .from('diagnostic_uploads')
           .update({ status: 'error' })
           .eq('id', diagnosticUploadId)
+
+        const errorMsg = finalizeError instanceof Error ? finalizeError.message : 'Finalization failed'
+        return NextResponse.json({
+          data: {
+            id: analysis.id,
+            diagnosticUploadId: analysis.diagnostic_upload_id,
+            patientId: analysis.patient_id,
+            summary: analysis.summary,
+            status: 'error',
+            errorMessage: errorMsg,
+            recommendations: [],
+            createdAt: analysis.created_at,
+            updatedAt: analysis.updated_at,
+          }
+        })
+      }
+    }
+
+    // Determine pipeline stage for frontend progress display
+    let stage: string | undefined
+    if (analysis.status === 'processing') {
+      const { data: evalReport } = await supabase
+        .from('diagnostic_eval_reports')
+        .select('status')
+        .eq('diagnostic_analysis_id', analysis.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!evalReport) {
+        stage = 'extracting'
+      } else if (evalReport.status === 'pending') {
+        stage = 'queued'
+      } else if (evalReport.status === 'processing') {
+        stage = 'analyzing'
       }
     }
 
@@ -538,6 +625,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         patientId: analysis.patient_id,
         summary: analysis.summary,
         status: analysis.status,
+        stage,
         errorMessage: analysis.error_message,
         recommendations: analysis.protocol_recommendations || [],
         createdAt: analysis.created_at,
