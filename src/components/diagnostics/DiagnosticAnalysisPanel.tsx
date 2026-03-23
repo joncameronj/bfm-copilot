@@ -28,9 +28,10 @@ import { cn } from '@/lib/utils'
 interface DiagnosticAnalysisPanelProps {
   analysis: DiagnosticAnalysisWithRecommendations
   onRefresh?: () => void
+  onCancel?: () => void
 }
 
-export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnalysisPanelProps) {
+export function DiagnosticAnalysisPanel({ analysis, onRefresh, onCancel }: DiagnosticAnalysisPanelProps) {
   const { effectiveRole } = useRoleView()
 
   const [frequencyCards, setFrequencyCards] = useState<FlattenedFrequencyCard[]>(() =>
@@ -150,27 +151,51 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh }: DiagnosticAnaly
 
       {/* Processing State */}
       {analysis.status === 'processing' && (
-        <div className="bg-blue-50 rounded-2xl p-6 flex items-center gap-4">
-          <HugeiconsIcon icon={Loading03Icon} size={24} className="text-blue-600 animate-spin" />
-          <div>
-            <p className="font-medium text-blue-900">Analysis in progress</p>
-            <p className="text-sm text-blue-700">
-              Copilot is analyzing the diagnostic files and generating protocol recommendations...
-            </p>
+        <div className="bg-blue-50 rounded-2xl p-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <HugeiconsIcon icon={Loading03Icon} size={24} className="text-blue-600 animate-spin" />
+            <div>
+              <p className="font-medium text-blue-900">Analysis in progress</p>
+              <p className="text-sm text-blue-700">
+                Copilot is analyzing the diagnostic files and generating protocol recommendations...
+              </p>
+            </div>
           </div>
+          {onCancel && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCancel}
+              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 shrink-0"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       )}
 
       {/* Error State */}
       {analysis.status === 'error' && (
-        <div className="bg-red-50 rounded-2xl p-6 flex items-center gap-4">
-          <HugeiconsIcon icon={Alert01Icon} size={24} className="text-red-600" />
-          <div>
-            <p className="font-medium text-red-900">Analysis failed</p>
-            <p className="text-sm text-red-700">
-              {analysis.errorMessage || 'An error occurred during analysis. Please try again.'}
-            </p>
+        <div className="bg-red-50 rounded-2xl p-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <HugeiconsIcon icon={Alert01Icon} size={24} className="text-red-600" />
+            <div>
+              <p className="font-medium text-red-900">Analysis failed</p>
+              <p className="text-sm text-red-700">
+                {analysis.errorMessage || 'An error occurred during analysis. Please try again.'}
+              </p>
+            </div>
           </div>
+          {onCancel && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCancel}
+              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 shrink-0"
+            >
+              Delete
+            </Button>
+          )}
         </div>
       )}
 

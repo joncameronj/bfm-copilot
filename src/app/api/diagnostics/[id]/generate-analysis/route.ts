@@ -469,10 +469,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         if (finalized) {
           // Eval is done — save protocols and update analysis to complete
-          console.log(`[Finalize] Completing analysis ${analysis.id} with ${finalized.protocols.length} protocols`)
-
-          // Update the analysis record with results
-          const { error: updateError } = await supabase
+          // Use atomic update: only proceed if status is still 'processing' (prevents race condition)
+          const { data: updatedRow, error: updateError } = await supabase
             .from('diagnostic_analyses')
             .update({
               summary: finalized.summary,
@@ -486,53 +484,66 @@ export async function GET(request: Request, { params }: RouteParams) {
               rag_context: {},
             })
             .eq('id', analysis.id)
+            .eq('status', 'processing') // Only update if still processing (atomic guard)
+            .select('id')
+            .maybeSingle()
 
           if (updateError) {
             throw new Error(`Failed to update analysis: ${updateError.message}`)
           }
 
-          // Create protocol recommendations with reasoning records
-          const recommendationIds: string[] = []
-          for (const protocol of finalized.protocols) {
-            const { data: recRecord, error: recError } = await supabase
-              .from('protocol_recommendations')
-              .insert({
-                diagnostic_analysis_id: analysis.id,
-                patient_id: analysis.patient_id,
-                title: protocol.title,
-                description: protocol.description,
-                category: protocol.category,
-                recommended_frequencies: protocol.frequencies,
-                supplementation: finalized.supplementation,
-                priority: protocol.priority,
-                status: 'recommended',
-              })
-              .select('id')
-              .single()
-
-            if (!recError && recRecord) {
-              recommendationIds.push(recRecord.id)
-
-              await createReasoningRecords({
-                recommendationId: recRecord.id,
-                frequencies: protocol.frequencies.map(f => ({
-                  name: f.name,
-                  rationale: f.rationale,
-                  source_reference: f.source_reference,
-                  diagnostic_trigger: f.diagnostic_trigger,
-                })),
-                ragChunks: [],
-                diagnosticData: finalized.extractedData,
-                reasoningChain: finalized.reasoningChain || [],
-              })
-            }
+          if (!updatedRow) {
+            // Another request already finalized — skip duplicate work
+            console.log(`[Finalize] Analysis ${analysis.id} already finalized by another request, skipping`)
+          } else {
+            console.log(`[Finalize] Completing analysis ${analysis.id} with ${finalized.protocols.length} protocols`)
           }
 
-          // Update diagnostic upload status to complete
-          await supabase
-            .from('diagnostic_uploads')
-            .update({ status: 'complete' })
-            .eq('id', diagnosticUploadId)
+          // Create protocol recommendations with reasoning records (only if we won the race)
+          if (updatedRow) {
+            for (const protocol of finalized.protocols) {
+              const { data: recRecord, error: recError } = await supabase
+                .from('protocol_recommendations')
+                .insert({
+                  diagnostic_analysis_id: analysis.id,
+                  patient_id: analysis.patient_id,
+                  title: protocol.title,
+                  description: protocol.description,
+                  category: protocol.category,
+                  recommended_frequencies: protocol.frequencies,
+                  supplementation: finalized.supplementation,
+                  priority: protocol.priority,
+                  status: 'recommended',
+                })
+                .select('id')
+                .single()
+
+              if (recError) {
+                console.error(`Failed to create recommendation for ${protocol.title}:`, recError)
+              }
+
+              if (!recError && recRecord) {
+                await createReasoningRecords({
+                  recommendationId: recRecord.id,
+                  frequencies: protocol.frequencies.map(f => ({
+                    name: f.name,
+                    rationale: f.rationale,
+                    source_reference: f.source_reference,
+                    diagnostic_trigger: f.diagnostic_trigger,
+                  })),
+                  ragChunks: [],
+                  diagnosticData: finalized.extractedData,
+                  reasoningChain: finalized.reasoningChain || [],
+                })
+              }
+            }
+
+            // Update diagnostic upload status to complete
+            await supabase
+              .from('diagnostic_uploads')
+              .update({ status: 'complete' })
+              .eq('id', diagnosticUploadId)
+          }
 
           // Re-fetch the completed analysis with recommendations
           const { data: completedAnalysis } = await supabase
