@@ -145,6 +145,9 @@ export default function DiagnosticsPage() {
       const result = await response.json()
       setGeneratedAnalysisId(result.data?.analysisId)
 
+      // POST completed extraction + fired eval — skip to 'queued' stage
+      setAnalysisStage('queued')
+
       // Always refresh uploads after POST so history table reflects current status
       await fetchPatientUploads()
 

@@ -626,6 +626,8 @@ export async function GET(request: Request, { params }: RouteParams) {
         stage = 'queued'
       } else if (evalReport.status === 'processing') {
         stage = 'analyzing'
+      } else if (evalReport.status === 'complete') {
+        stage = 'finalizing'
       }
     }
 

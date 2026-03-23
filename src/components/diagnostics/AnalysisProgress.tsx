@@ -7,20 +7,36 @@ import { Button } from '@/components/ui/Button'
 
 interface AnalysisProgressProps {
   isComplete: boolean
-  stage?: string // 'extracting' | 'queued' | 'analyzing' | undefined
+  stage?: string // 'extracting' | 'queued' | 'analyzing' | 'finalizing' | undefined
   onCancel?: () => void
 }
 
 const STEPS = [
-  { label: 'Extracting Data', description: 'Reading and parsing uploaded files...', range: [0, 10] },
-  { label: 'Analyzing Biomarkers', description: 'Identifying patterns and relationships...', range: [10, 35] },
-  { label: 'Generating Protocols', description: 'Matching findings to frequency protocols...', range: [35, 65] },
-  { label: 'Supplementation', description: 'Evaluating supplement recommendations...', range: [65, 85] },
-  { label: 'Finalizing', description: 'Compiling final analysis report...', range: [85, 95] },
+  { key: 'extracting', label: 'Extracting Files', description: 'Reading diagnostic images...' },
+  { key: 'queued', label: 'Running Protocol Engine', description: 'Matching biomarkers to protocols...' },
+  { key: 'analyzing', label: 'Evaluating Clinical Data', description: 'AI agent analyzing patient data...' },
+  { key: 'finalizing', label: 'Finalizing Report', description: 'Validating frequencies & compiling report...' },
 ] as const
 
-// Total simulated duration ~150s (2.5 min), weighted per step
-const STEP_DURATIONS = [8, 25, 35, 25, 57] // seconds per step
+// Map stage to step index (which step is currently active)
+const STAGE_TO_STEP: Record<string, number> = {
+  extracting: 1,  // extraction done (POST returned), protocol engine running
+  queued: 2,      // eval queued
+  analyzing: 2,   // eval running
+  finalizing: 3,  // saving protocols
+}
+
+// Progress ranges per step
+const STEP_PROGRESS = [
+  { base: 0, max: 20 },   // Step 0: Extracting
+  { base: 20, max: 35 },  // Step 1: Protocol Engine
+  { base: 35, max: 85 },  // Step 2: Evaluating (longest phase)
+  { base: 85, max: 95 },  // Step 3: Finalizing
+]
+
+// Creep rate per step (% per second) — slow enough to feel natural
+const CREEP_RATES = [0.5, 0.3, 0.15, 0.5]
+
 const TICK_MS = 500
 
 function formatElapsed(seconds: number): string {
@@ -29,19 +45,18 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-// Map backend stage to minimum step index so the progress bar jumps ahead
-const STAGE_TO_MIN_STEP: Record<string, number> = {
-  extracting: 0,
-  queued: 1,
-  analyzing: 2,
-}
-
 export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgressProps) {
   const [progress, setProgress] = useState(0)
-  const [stuckTimer, setStuckTimer] = useState(0)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const startTime = useRef(Date.now())
+  const currentStepRef = useRef(0)
+
+  // Derive current step from stage
+  const stageStep = stage ? (STAGE_TO_STEP[stage] ?? 0) : 0
+  if (stageStep > currentStepRef.current) {
+    currentStepRef.current = stageStep
+  }
+  const currentStep = isComplete ? STEPS.length : currentStepRef.current
 
   // Elapsed timer
   useEffect(() => {
@@ -54,6 +69,7 @@ export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgre
     return () => clearInterval(interval)
   }, [isComplete])
 
+  // Progress animation — jumps to step base, then creeps within the step
   useEffect(() => {
     if (isComplete) {
       setProgress(100)
@@ -61,55 +77,34 @@ export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgre
     }
 
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTime.current) / 1000
+      setProgress(prev => {
+        const step = currentStepRef.current
+        const { base, max } = STEP_PROGRESS[step] || { base: 95, max: 95 }
+        const minProgress = base
+        const creep = CREEP_RATES[step] || 0.1
 
-      // Calculate progress based on elapsed time and step durations
-      let cumulative = 0
-      let newProgress = 0
-      for (let i = 0; i < STEPS.length; i++) {
-        const stepStart = cumulative
-        cumulative += STEP_DURATIONS[i]
-        const [rangeStart, rangeEnd] = STEPS[i].range
-
-        if (elapsed <= cumulative) {
-          const stepElapsed = elapsed - stepStart
-          const stepFraction = Math.min(stepElapsed / STEP_DURATIONS[i], 1)
-          // Ease-out for snappier start
-          const eased = 1 - Math.pow(1 - stepFraction, 2)
-          newProgress = rangeStart + (rangeEnd - rangeStart) * eased
-          break
-        }
-        newProgress = rangeEnd
-      }
-
-      // If backend reports a stage, ensure progress is at least at that step's start
-      if (stage && STAGE_TO_MIN_STEP[stage] !== undefined) {
-        const minStep = STAGE_TO_MIN_STEP[stage]
-        const minProgress = STEPS[minStep].range[0]
-        newProgress = Math.max(newProgress, minProgress)
-      }
-
-      // Cap at 95%
-      newProgress = Math.min(newProgress, 95)
-      setProgress(newProgress)
-
-      // Track time stuck at 95%
-      if (newProgress >= 94.5) {
-        setStuckTimer(prev => prev + TICK_MS / 1000)
-      }
+        // Jump to at least the step's base, then creep within the range
+        const next = Math.max(prev, minProgress) + (creep * TICK_MS / 1000)
+        return Math.min(next, max)
+      })
     }, TICK_MS)
 
     return () => clearInterval(interval)
-  }, [isComplete, stage])
+  }, [isComplete])
 
-  const activeStepIndex = isComplete
-    ? STEPS.length
-    : STEPS.findIndex(s => progress < s.range[1])
+  // Status text based on current stage
+  const statusText = isComplete
+    ? 'Analysis complete!'
+    : elapsedSeconds > 300
+      ? 'Taking longer than expected...'
+      : stage === 'analyzing'
+        ? 'AI agent evaluating — this is the longest step'
+        : 'Processing your diagnostics'
 
   return (
     <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6">
       <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
-        Typical analysis takes 3-5 minutes
+        {statusText}
       </p>
 
       {/* Progress bar */}
@@ -133,12 +128,12 @@ export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgre
       {/* Steps */}
       <div className="space-y-3">
         {STEPS.map((step, i) => {
-          const isCompleted = i < activeStepIndex
-          const isActive = i === activeStepIndex && !isComplete
+          const isCompleted = i < currentStep
+          const isActive = i === currentStep && !isComplete
 
           return (
             <div
-              key={step.label}
+              key={step.key}
               className={`flex items-start gap-3 ${
                 !isCompleted && !isActive ? 'opacity-40' : ''
               }`}
@@ -181,13 +176,6 @@ export function AnalysisProgress({ isComplete, stage, onCancel }: AnalysisProgre
       {isComplete && (
         <p className="text-sm font-medium text-green-600 dark:text-green-400 mt-4">
           Analysis complete! Redirecting...
-        </p>
-      )}
-
-      {/* Stuck message */}
-      {!isComplete && stuckTimer > 30 && (
-        <p className="text-xs text-blue-500 dark:text-blue-400 mt-4">
-          Still working, taking a bit longer than usual...
         </p>
       )}
 
