@@ -83,6 +83,7 @@ describe('POST /api/webhooks/whop', () => {
     vi.unstubAllEnvs()
     vi.stubEnv('WHOP_COPILOT_PRODUCT_IDS', 'prod_copilot')
     vi.stubEnv('WHOP_WEBHOOK_SECRET', 'whsec_test')
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://copilot.example.com')
 
     // Default: verify passes and returns parsed JSON
     mockVerify.mockImplementation((body: string) => JSON.parse(body))
@@ -180,6 +181,14 @@ describe('POST /api/webhooks/whop', () => {
           email_confirm: true,
         })
       )
+      expect(mockAuth.admin.generateLink).toHaveBeenCalledWith({
+        type: 'recovery',
+        email: 'test@example.com',
+        options: {
+          redirectTo:
+            'https://copilot.example.com/api/auth/callback?next=/update-password',
+        },
+      })
     })
 
     it('reactivates inactive user without creating new account', async () => {

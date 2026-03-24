@@ -23,6 +23,14 @@ function isCopilotProduct(productId: string): boolean {
   return allowedIds.includes(productId)
 }
 
+function getRecoveryRedirectTo(): string | undefined {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+
+  if (!appUrl) return undefined
+
+  return `${appUrl.replace(/\/+$/, '')}/api/auth/callback?next=/update-password`
+}
+
 // Retry helper for profile lookup after auth.admin.createUser()
 // The profiles trigger may have a brief delay
 async function waitForProfile(
@@ -195,11 +203,12 @@ async function handleMembershipActivated(
 
     // Send password reset email so user can set their own password
     // Use the Supabase auth admin API to generate a recovery link
-    const { error: resetError } =
-      await supabase.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-      })
+    const redirectTo = getRecoveryRedirectTo()
+    const { error: resetError } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: redirectTo ? { redirectTo } : undefined,
+    })
 
     if (resetError) {
       console.error('Failed to send password reset:', resetError)

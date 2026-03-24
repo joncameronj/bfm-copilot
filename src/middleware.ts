@@ -43,6 +43,12 @@ export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const pathname = request.nextUrl.pathname
   const authCookieNames = getAuthCookieNames(request)
+  const isAuthPage =
+    pathname.startsWith('/login') || pathname.startsWith('/reset-password')
+  const isPublicPage =
+    isAuthPage ||
+    pathname.startsWith('/update-password') ||
+    pathname.startsWith('/purchase-success')
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -88,12 +94,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Check if this is an auth page
-  const isAuthPage =
-    pathname.startsWith('/login') || pathname.startsWith('/reset-password')
-
   // If user is not logged in and trying to access protected route
-  if (!user && !isAuthPage) {
+  if (!user && !isPublicPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
