@@ -327,6 +327,20 @@ export async function finalizeAnalysisFromEvalReport(
   // Map EvalReport → GeneratedAnalysis shape
   const mapped = mapEvalReportToGeneratedAnalysis(evalReportData)
 
+  // --- LAYER DIAGNOSTIC LOGGING ---
+  // Log what Claude generated per phase BEFORE any validation/dedup
+  const phaseCountsBefore: Record<number, string[]> = {}
+  for (const p of mapped.protocols) {
+    phaseCountsBefore[p.priority] = p.frequencies.map(f => f.name)
+  }
+  for (const [phase, names] of Object.entries(phaseCountsBefore)) {
+    console.log(
+      `[Layer Debug] Phase ${phase} BEFORE validation: ${names.length} frequencies:`,
+      names,
+    )
+  }
+  // --- END LAYER DIAGNOSTIC LOGGING ---
+
   // Validate ALL frequencies against approved list
   const validatedProtocols: Array<{
     title: string
@@ -341,6 +355,8 @@ export async function finalizeAnalysisFromEvalReport(
     const rawFrequencies = p.frequencies.map(f => ({
       name: f.name || '',
       rationale: f.rationale,
+      source_reference: f.source_reference,
+      diagnostic_trigger: f.diagnostic_trigger,
     }))
 
     const { filteredProtocol, validationReport } = await filterAndValidateProtocol({
@@ -375,6 +391,20 @@ export async function finalizeAnalysisFromEvalReport(
       )
     }
 
+    // --- LAYER DIAGNOSTIC LOGGING ---
+    console.log(
+      `[Layer Debug] Protocol "${p.title}" (priority=${p.priority}): ` +
+      `${rawFrequencies.length} raw → ${filteredProtocol.frequencies.length} validated ` +
+      `(${validationReport.validCount} valid, ${validationReport.rejectedCount} rejected)`,
+    )
+    if (validationReport.rejectedCount > 0) {
+      console.log(
+        `[Layer Debug] REJECTED from "${p.title}":`,
+        validationReport.rejectedFrequencies.map(f => `${f.frequencyName} (${f.rejectionReason})`),
+      )
+    }
+    // --- END LAYER DIAGNOSTIC LOGGING ---
+
     if (filteredProtocol.frequencies.length > 0) {
       validatedProtocols.push({
         title: p.title,
@@ -384,12 +414,14 @@ export async function finalizeAnalysisFromEvalReport(
           id: crypto.randomUUID(),
           name: f.name,
           rationale: f.rationale,
+          source_reference: (f as Record<string, unknown>).source_reference as string | undefined,
+          diagnostic_trigger: (f as Record<string, unknown>).diagnostic_trigger as string | undefined,
         })),
         priority: p.priority,
         validationReport,
       })
     } else {
-      console.warn(`[Frequency Validation] Protocol "${p.title}" dropped - no valid frequencies`)
+      console.warn(`[Frequency Validation] Protocol "${p.title}" DROPPED - no valid frequencies (ALL ${rawFrequencies.length} rejected)`)
     }
   }
 
@@ -410,6 +442,30 @@ export async function finalizeAnalysisFromEvalReport(
       }))
     )
   }
+
+  // --- LAYER DIAGNOSTIC LOGGING: FINAL STATE ---
+  for (const dp of deduplicatedProtocols) {
+    console.log(
+      `[Layer Debug] FINAL Protocol "${dp.title}" (priority=${dp.priority}): ` +
+      `${dp.frequencies.length} frequencies: [${dp.frequencies.map(f => f.name).join(', ')}]`,
+    )
+  }
+  const finalPhaseCounts = deduplicatedProtocols.reduce<Record<number, number>>((acc, p) => {
+    acc[p.priority] = (acc[p.priority] || 0) + p.frequencies.length
+    return acc
+  }, {})
+  console.log(
+    `[Layer Debug] FINAL SUMMARY: ` +
+    `Layer 1=${finalPhaseCounts[1] || 0}, Layer 2=${finalPhaseCounts[2] || 0}, Layer 3=${finalPhaseCounts[3] || 0}`,
+  )
+  if (!finalPhaseCounts[2]) {
+    console.error(
+      `[Layer Debug] WARNING: Layer 2 has ZERO frequencies after finalization! ` +
+      `Input had ${phaseCountsBefore[2]?.length || 0} layer-2 frequencies. ` +
+      `Check validation rejections and deduplication above.`,
+    )
+  }
+  // --- END LAYER DIAGNOSTIC LOGGING ---
 
   // Get extracted data for the response
   const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
