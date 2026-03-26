@@ -22,7 +22,7 @@ API_KEY = "pit-cf41e84d-56f5-4693-a608-a2d3ba42911f"
 BASE_URL = "https://services.leadconnectorhq.com"
 
 # Set your Location ID here or via env var GHL_LOCATION_ID
-LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "")
+LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "tZOMKTfgNThEo2zpfo5v")
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
