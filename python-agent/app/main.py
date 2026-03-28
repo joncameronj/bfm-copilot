@@ -65,7 +65,13 @@ async def startup_event():
 
     # Start background job executor (unless disabled)
     if os.environ.get("DISABLE_JOB_WORKER") != "true":
-        asyncio.create_task(start_executor())
+        task = asyncio.create_task(start_executor())
+        def _on_executor_done(t: asyncio.Task) -> None:
+            if t.cancelled():
+                logger.warning("Job executor task was cancelled")
+            elif t.exception():
+                logger.error("Job executor crashed: %s", t.exception(), exc_info=t.exception())
+        task.add_done_callback(_on_executor_done)
         logger.info("Background job executor started")
 
 

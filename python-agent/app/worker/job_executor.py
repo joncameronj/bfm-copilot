@@ -254,26 +254,33 @@ class JobExecutor:
             append=False
         )
 
-        # Save message to conversation
-        user_msg_result = client.table("messages").insert({
-            "conversation_id": conversation_id,
-            "role": "user",
-            "content": input_message,
-            "metadata": {},
-        }).execute()
+        # Save message to conversation — wrap in try/catch so a DB hiccup
+        # doesn't discard the agent output that was already streamed.
+        try:
+            client.table("messages").insert({
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": input_message,
+                "metadata": {},
+            }).execute()
 
-        assistant_msg_result = client.table("messages").insert({
-            "conversation_id": conversation_id,
-            "role": "assistant",
-            "content": accumulated_content,
-            "metadata": {
-                "reasoning": {
-                    "text": accumulated_reasoning,
-                } if accumulated_reasoning else None,
-                "steps": metadata.get("steps"),
-                "background_job_id": job_id,
-            },
-        }).execute()
+            client.table("messages").insert({
+                "conversation_id": conversation_id,
+                "role": "assistant",
+                "content": accumulated_content,
+                "metadata": {
+                    "reasoning": {
+                        "text": accumulated_reasoning,
+                    } if accumulated_reasoning else None,
+                    "steps": metadata.get("steps"),
+                    "background_job_id": job_id,
+                },
+            }).execute()
+        except Exception as db_err:
+            logger.error(f"Job {job_id}: failed to persist messages to DB: {db_err}")
+            traceback.print_exc()
+            # Still mark job completed — the streamed output was already saved
+            # via update_job_output above, so the user can still see the response.
 
         # Mark job as completed
         await job_service.update_job_status(job_id, "completed")

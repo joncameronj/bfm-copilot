@@ -518,6 +518,16 @@ async def _create_eval_job(
     return result.data[0]
 
 
+def _log_task_exception(task: asyncio.Task) -> None:
+    """Callback for fire-and-forget tasks — ensures exceptions are logged."""
+    if task.cancelled():
+        logger.warning("Background eval task was cancelled")
+        return
+    exc = task.exception()
+    if exc:
+        logger.error("Background eval task failed unexpectedly: %s", exc, exc_info=exc)
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -561,9 +571,10 @@ async def _create_eval_report_inner(request: EvalReportRequest) -> EvalJobRespon
     report_id = record["id"]
 
     # Fire background task (don't await — returns immediately)
-    asyncio.create_task(
+    task = asyncio.create_task(
         _run_eval_and_store(request.diagnostic_analysis_id, request.patient_id, report_id)
     )
+    task.add_done_callback(_log_task_exception)
 
     return EvalJobResponse(
         job_id=report_id,
@@ -658,13 +669,14 @@ async def create_batch_eval_reports(request: BatchEvalRequest):
         record = await _create_eval_job(patient_req.diagnostic_analysis_id, patient_req.patient_id)
         report_id = record["id"]
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             _run_eval_and_store(
                 patient_req.diagnostic_analysis_id,
                 patient_req.patient_id,
                 report_id,
             )
         )
+        task.add_done_callback(_log_task_exception)
 
         jobs.append(EvalJobResponse(
             job_id=report_id,

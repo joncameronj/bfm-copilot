@@ -480,25 +480,42 @@ export async function POST(request: Request) {
       : message
 
     // Forward to Python agent with streaming and role-based filtering
-    const response = await fetch(`${getPythonAgentUrl()}/agent/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        message: messageWithAttachmentContext,
-        conversation_id: conversationId,
-        conversation_type: conversationType,
-        patient_context: patientContext,
-        history: trimmedHistory,
-        file_ids: fileIds,
-        user_role: userRole,
-        user_id: user.id,
-        force_web_search: force_web_search || false,
-        deep_dive: deep_dive || false,
-      }),
-    })
+    // 5-minute timeout — eval/deep-dive calls can take a while
+    const agentAbort = new AbortController()
+    const agentTimeout = setTimeout(() => agentAbort.abort(), 5 * 60 * 1000)
+    let response: Response
+    try {
+      response = await fetch(`${getPythonAgentUrl()}/agent/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          message: messageWithAttachmentContext,
+          conversation_id: conversationId,
+          conversation_type: conversationType,
+          patient_context: patientContext,
+          history: trimmedHistory,
+          file_ids: fileIds,
+          user_role: userRole,
+          user_id: user.id,
+          force_web_search: force_web_search || false,
+          deep_dive: deep_dive || false,
+        }),
+        signal: agentAbort.signal,
+      })
+    } catch (err) {
+      clearTimeout(agentTimeout)
+      if (agentAbort.signal.aborted) {
+        return NextResponse.json(
+          { error: 'Agent request timed out after 5 minutes. Please try again.' },
+          { status: 504 }
+        )
+      }
+      throw err
+    }
+    clearTimeout(agentTimeout)
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({
@@ -530,8 +547,19 @@ export async function POST(request: Request) {
           if (done) break
           await writer.write(value)
         }
+      } catch (err) {
+        console.error('[Stream Proxy Error]', err)
+        // Send an SSE error event so the client knows the stream broke
+        const encoder = new TextEncoder()
+        try {
+          await writer.write(
+            encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'Connection to agent lost. Please try again.' })}\n\n`)
+          )
+        } catch {
+          // Writer may already be closed
+        }
       } finally {
-        await writer.close()
+        try { await writer.close() } catch { /* already closed */ }
       }
     })()
 
