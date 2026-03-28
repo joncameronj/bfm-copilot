@@ -319,10 +319,12 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Log extraction summary (structured for post-hoc debugging of parallelization quality)
     const successCount = extractionResults.filter(r => r.status === 'complete' || r.status === 'needs_review').length
+    const totalFiles = files?.length || 0
+    const skippedCount = extractionResults.filter(r => r.status === 'complete' || r.status === 'needs_review').length
     console.log(`[Extraction Summary]`, JSON.stringify({
-      totalFiles: files?.length || 0,
-      parallelExtracted: filesToExtract.length,
-      skippedAlreadyExtracted: (files?.length || 0) - filesToExtract.length,
+      totalFiles,
+      parallelExtracted: totalFiles - skippedCount,
+      skippedAlreadyExtracted: skippedCount,
       results: extractionResults.map(r => ({
         fileType: r.fileType,
         status: r.status,
