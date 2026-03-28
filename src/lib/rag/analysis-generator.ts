@@ -502,13 +502,19 @@ async function getExtractedDiagnosticData(
         diagnostic_extracted_values(
           extracted_data,
           extraction_confidence,
-          status
+          status,
+          created_at
         )
       `)
       .eq('upload_id', diagnosticUploadId)
 
     if (error || !files) {
       console.warn('No extracted diagnostic data found:', error?.message)
+      return null
+    }
+
+    if (files.length === 0) {
+      console.warn(`[getExtractedDiagnosticData] No diagnostic_files rows for upload ${diagnosticUploadId}`)
       return null
     }
 
@@ -531,13 +537,20 @@ async function getExtractedDiagnosticData(
     }
 
     files.forEach((file) => {
-      const extraction = (file.diagnostic_extracted_values as Array<{
+      // Sort extractions by created_at desc so we always pick the latest one
+      // (retries create updated records; we want the most recent result)
+      const extractions = (file.diagnostic_extracted_values as Array<{
         extracted_data: Record<string, unknown>
         extraction_confidence: number
         status: string
-      }>)?.[0]
+        created_at: string
+      }>) || []
+      extractions.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 
-      if (!extraction || (extraction.status !== 'complete' && extraction.status !== 'needs_review')) return
+      const extraction = extractions.find(
+        (e) => e.status === 'complete' || e.status === 'needs_review'
+      )
+      if (!extraction) return
 
       const data = extraction.extracted_data
 

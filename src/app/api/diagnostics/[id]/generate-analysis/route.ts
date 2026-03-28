@@ -333,10 +333,18 @@ export async function POST(request: Request, { params }: RouteParams) {
       successCount,
     }))
 
-    if (successCount === 0 && extractionResults.length > 0) {
-      const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
+    if (successCount === 0) {
+      if (extractionResults.length > 0) {
+        const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
+        return NextResponse.json(
+          { error: `All file extractions failed: ${failures}` },
+          { status: 400 }
+        )
+      }
+      // No files found at all — upload may be empty or files not yet linked
+      console.error(`[Generate] No diagnostic files found for upload ${diagnosticUploadId}`)
       return NextResponse.json(
-        { error: `All file extractions failed: ${failures}` },
+        { error: 'No diagnostic files found for this upload. Please upload files before generating analysis.' },
         { status: 400 }
       )
     }
