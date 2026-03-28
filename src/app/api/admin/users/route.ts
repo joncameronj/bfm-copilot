@@ -4,6 +4,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { type UserRole } from '@/types/roles'
+
+function getRecoveryRedirectTo(request: Request): string {
+  return new URL('/update-password', request.url).toString()
+}
 export const dynamic = 'force-dynamic'
 
 
@@ -183,7 +187,9 @@ export async function POST(request: Request) {
           .eq('id', signUpData.user.id)
 
         // Send password reset email so user can set their password
-        await supabase.auth.resetPasswordForEmail(email)
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: getRecoveryRedirectTo(request),
+        })
 
         return NextResponse.json({
           data: { id: signUpData.user.id, email, role },
@@ -200,7 +206,9 @@ export async function POST(request: Request) {
         .eq('id', authData.user.id)
 
       // Send password reset email
-      await supabase.auth.resetPasswordForEmail(email)
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: getRecoveryRedirectTo(request),
+      })
 
       return NextResponse.json({
         data: { id: authData.user.id, email, role },

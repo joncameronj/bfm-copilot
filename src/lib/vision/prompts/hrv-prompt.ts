@@ -111,4 +111,12 @@ DEAL BREAKER DETECTION:
 8. Delta > 20% (waking): low direct current
 
 Be precise with the dot positions - read the grid coordinates carefully.
-Include ALL brainwave percentages exactly as shown.`
+Include ALL brainwave percentages exactly as shown.
+
+MULTI-TEST DOCUMENT HANDLING:
+- Some documents contain MULTIPLE tests (e.g., initial exam + re-exam, or tests from different dates)
+- If you detect MULTIPLE test results on the same document, extract ONLY the MOST RECENT test
+- Look for date indicators, "Re-Exam", "Follow-up", or sequential test numbering
+- If you cannot determine which is most recent, extract the LAST test on the page
+- Do NOT average or combine values from multiple tests
+- If multiple tests detected, add "Multiple tests detected — extracted most recent only" to findings`

@@ -38,6 +38,26 @@ type ExtractedDataMap = {
 }
 
 /**
+ * Check extraction result for multi-test indicators and reduce confidence if found.
+ * This pushes multi-test extractions into 'needs_review' status (threshold 0.7).
+ */
+async function applyMultiTestCheck<T>(
+  extraction: Promise<ExtractionResult<T>>,
+  fileType: string,
+): Promise<ExtractionResult<T>> {
+  const result = await extraction
+  const findings = (result.data as Record<string, unknown>)?.findings
+  const hasMultiTest = Array.isArray(findings) && findings.some(
+    (f: unknown) => typeof f === 'string' && String(f).toLowerCase().includes('multiple tests')
+  )
+  if (hasMultiTest) {
+    console.warn(`[Multi-Test] ${fileType}: multiple tests detected on document, reducing confidence by 0.15`)
+    return { ...result, confidence: Math.max(0, result.confidence - 0.15) }
+  }
+  return result
+}
+
+/**
  * Extract diagnostic values from an image based on file type
  */
 export async function extractDiagnosticValues(
@@ -49,7 +69,7 @@ export async function extractDiagnosticValues(
     case 'd_pulse':
       return extractDPulse(imageUrl)
     case 'hrv':
-      return extractHRV(imageUrl)
+      return applyMultiTestCheck(extractHRV(imageUrl), fileType)
     case 'urinalysis':
       return extractUA(imageUrl)
     case 'vcs':
@@ -57,9 +77,9 @@ export async function extractDiagnosticValues(
     case 'brainwave':
       return extractBrainwave(imageUrl)
     case 'ortho':
-      return extractOrtho(imageUrl)
+      return applyMultiTestCheck(extractOrtho(imageUrl), fileType)
     case 'valsalva':
-      return extractValsalva(imageUrl)
+      return applyMultiTestCheck(extractValsalva(imageUrl), fileType)
     case 'blood_panel':
       return extractBloodPanel(imageUrl)
     case 'nes_scan':

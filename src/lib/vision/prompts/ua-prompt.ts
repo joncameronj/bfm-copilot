@@ -128,9 +128,17 @@ URIC ACID:
 - If uric acid is shown, extract the exact value/status
 - Mark "high" when the strip explicitly shows it elevated or flagged high
 
-UROBILINOGEN:
-- Extract it whenever shown
-- It has the same clinical significance as bilirubin in urine
+UROBILINOGEN (CRITICAL — DO NOT HALLUCINATE):
+- GRID POSITION WARNING: Urobilinogen is often at the TOP of UA strip grids. DO NOT let its
+  prominent position bias you toward marking it positive. Read the actual value carefully.
+- Standard/normal urobilinogen level is 0.2 mg/dL (or "Normal", "Normal Range") — this is NEGATIVE.
+  If you see "0.2" or "Normal", set status to "negative" — EVEN IF it appears highlighted or prominent.
+- Only mark urobilinogen as "positive" if the value is EXPLICITLY elevated: "1+", "2+", "4+", "8+",
+  "Positive", or a numeric value clearly above 0.2 (e.g., 1.0, 2.0, 4.0, 8.0).
+- If urobilinogen is absent from the report, set value and status to null — do NOT invent it.
+- A value of "0.2" or "Normal" with no abnormal flag = status "negative". ALWAYS.
+- When in doubt, set status to "negative" — a false negative is far less harmful than a false positive
+  for urobilinogen, which incorrectly triggers Blood Support protocol.
 
 SPECIFIC GRAVITY:
 - Mark "low" when it is 1.005 or lower

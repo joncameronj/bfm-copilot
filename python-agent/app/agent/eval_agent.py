@@ -141,8 +141,13 @@ GLUCOSE IN URINE — MUST BE ACTUALLY PRESENT:
 - Do NOT infer glucose in urine from blood glucose, HbA1c, or other metabolic markers.
 - Pancreos supplement is NOT indicated if glucose is not actually present in urine.
 
-UROBILINOGEN ON URINE:
-- Urobilinogen present in urine = same handling as bilirubin in urine → Blood Support protocol.
+UROBILINOGEN ON URINE (CRITICAL — DO NOT HALLUCINATE):
+- IMPORTANT: Urobilinogen "0.2 mg/dL" or "Normal" on UA strip is the standard reference value — this is NEGATIVE.
+  Do NOT treat standard/normal urobilinogen as a positive finding.
+- Only treat urobilinogen as clinically positive if urobilinogen_positive=true in the bundle,
+  which requires elevated values (1+, 2+, 4+, 8+) or explicitly flagged as abnormal/positive.
+- Do NOT trigger Blood Support based on a standard/normal urobilinogen reading.
+- When genuinely positive: same handling as bilirubin in urine → Blood Support protocol.
   Clinical significance: RBC destruction; heme protein damage; correlate liver overwhelm, gall bladder
   issues on other testing. Check for KPU (zinc, B6 + bilirubin together). Blue light toxicity correlation.
 - If BOTH bilirubin AND urobilinogen are present → more profound issue, higher priority Blood Support.

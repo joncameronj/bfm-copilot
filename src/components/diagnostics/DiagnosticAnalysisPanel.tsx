@@ -247,7 +247,13 @@ export function DiagnosticAnalysisPanel({ analysis, onRefresh, onCancel }: Diagn
       )}
 
       {/* Layered Protocols & Supplementation */}
-      {analysis.status === 'complete' && (
+      {analysis.status === 'complete' && frequencyCards.length === 0 && !analysis.summary && (
+        <div className="bg-neutral-50 rounded-2xl p-6 flex items-center gap-4">
+          <HugeiconsIcon icon={Loading03Icon} size={20} className="text-neutral-400 animate-spin" />
+          <p className="text-sm text-neutral-500">Loading results...</p>
+        </div>
+      )}
+      {analysis.status === 'complete' && (frequencyCards.length > 0 || !!analysis.summary) && (
         <LayeredProtocolsSection
           frequencyCards={frequencyCards}
           supplementation={isPractitionerOrAdmin ? (analysis.supplementation || []) : []}

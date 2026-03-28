@@ -28,7 +28,7 @@ function getRecoveryRedirectTo(): string | undefined {
 
   if (!appUrl) return undefined
 
-  return `${appUrl.replace(/\/+$/, '')}/api/auth/callback?next=/update-password`
+  return `${appUrl.replace(/\/+$/, '')}/update-password`
 }
 
 // Retry helper for profile lookup after auth.admin.createUser()

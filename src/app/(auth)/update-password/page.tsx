@@ -20,20 +20,48 @@ export default function UpdatePasswordPage() {
   useEffect(() => {
     let isMounted = true
 
+    const supabase = createClient()
+
+    const markSessionReady = (sessionExists: boolean) => {
+      if (!isMounted) return
+      setHasSession(sessionExists)
+      setIsCheckingSession(false)
+    }
+
     async function checkSession() {
-      const supabase = createClient()
       const { data } = await supabase.auth.getSession()
 
       if (!isMounted) return
 
-      setHasSession(Boolean(data.session))
-      setIsCheckingSession(false)
+      if (data.session) {
+        markSessionReady(true)
+      }
     }
 
     void checkSession()
 
+    const fallbackTimer = window.setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      markSessionReady(Boolean(data.session))
+    }, 1500)
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        event === 'PASSWORD_RECOVERY' ||
+        event === 'SIGNED_IN' ||
+        event === 'TOKEN_REFRESHED'
+      ) {
+        window.clearTimeout(fallbackTimer)
+        markSessionReady(Boolean(session))
+      }
+    })
+
     return () => {
       isMounted = false
+      window.clearTimeout(fallbackTimer)
+      subscription.unsubscribe()
     }
   }, [])
 

@@ -39,6 +39,7 @@ Return a JSON object with this EXACT structure:
     "r_lf1": <R(LF1) value>,
     "r_lf2": <R(LF2) value>
   },
+  "dots_superimposed": <true if ALL 4 values (hr, r_hf, r_lf1, r_lf2) are IDENTICAL between normal_breathing and deep_breathing, false otherwise>,
   "ei_ratio": <E/I ratio as decimal, e.g. 1.02>,
   "valsalva_ratio": <Valsalva ratio as decimal, e.g. 1.42>,
   "ans_assessment": "<full ANS assessment text>",
@@ -49,9 +50,24 @@ Return a JSON object with this EXACT structure:
   "confidence": <0.0 to 1.0>
 }
 
+CRITICAL — EXACT VALUE EXTRACTION:
+- Read ALL 4 numeric values for BOTH normal_breathing and deep_breathing from the DATA TABLE (not the dot plot)
+- Values must be extracted EXACTLY as printed — do not round, estimate, or approximate
+- The data table typically shows: HR (heart rate in bpm), R(HF), R(LF1), R(LF2)
+- Preserve all decimal places exactly as shown
+- After extracting, compare all 4 values between normal_breathing and deep_breathing.
+  If they are IDENTICAL across ALL 4 measurements, set dots_superimposed to true.
+  Even a 1-beat HR difference or 0.1 difference in any R value means dots_superimposed = false.
+
 IMPORTANT:
-- Read the numeric values from the data table, NOT from the dot plot
-- Record exact values — do not round
 - If normal_breathing and deep_breathing values are identical across all 4 measurements, note "Dots superimposed — NS Toxicity indicator" in findings
 - E/I Ratio < 1.05 is critically low — note this prominently
-- Look for text about vagus nerve function, parasympathetic response`
+- Look for text about vagus nerve function, parasympathetic response
+
+MULTI-TEST DOCUMENT HANDLING:
+- Some documents contain MULTIPLE tests (e.g., initial exam + re-exam, or tests from different dates)
+- If you detect MULTIPLE test results on the same document, extract ONLY the MOST RECENT test
+- Look for date indicators, "Re-Exam", "Follow-up", or sequential test numbering
+- If you cannot determine which is most recent, extract the LAST test on the page
+- Do NOT average or combine values from multiple tests
+- If multiple tests detected, add "Multiple tests detected — extracted most recent only" to findings`

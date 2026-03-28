@@ -767,3 +767,104 @@ class TestAccuracyReport:
 
         # Soft assertion: we want at least 80% accuracy
         assert overall >= 70, f"Overall accuracy {overall:.0f}% is below 70% threshold"
+
+
+# ============================================================================
+# UA RULES: UROBILINOGEN / BILIRUBIN → BLOOD SUPPORT
+# ============================================================================
+
+
+class TestBloodSupportFromUA:
+    """Verify Blood Support protocol triggers from bilirubin/urobilinogen."""
+
+    def test_urobilinogen_positive_triggers_blood_support(self):
+        bundle = DiagnosticBundle(
+            ua=UAData(urobilinogen_positive=True),
+        )
+        result = run_protocol_engine(bundle)
+        assert any(p.name == "Blood Support" for p in result.protocols), \
+            f"Missing Blood Support. Got: {_protocol_names(result)}"
+
+    def test_bilirubin_positive_triggers_blood_support(self):
+        bundle = DiagnosticBundle(
+            ua=UAData(bilirubin_positive=True),
+        )
+        result = run_protocol_engine(bundle)
+        assert any(p.name == "Blood Support" for p in result.protocols), \
+            f"Missing Blood Support. Got: {_protocol_names(result)}"
+
+    def test_both_bilirubin_and_urobilinogen_higher_priority(self):
+        bundle = DiagnosticBundle(
+            ua=UAData(bilirubin_positive=True, urobilinogen_positive=True),
+        )
+        result = run_protocol_engine(bundle)
+        blood_support = [p for p in result.protocols if p.name == "Blood Support"]
+        assert len(blood_support) == 1
+        assert blood_support[0].priority == 1, \
+            f"Both present should be priority 1, got {blood_support[0].priority}"
+
+    def test_only_urobilinogen_is_priority_2(self):
+        bundle = DiagnosticBundle(
+            ua=UAData(urobilinogen_positive=True, bilirubin_positive=False),
+        )
+        result = run_protocol_engine(bundle)
+        blood_support = [p for p in result.protocols if p.name == "Blood Support"]
+        assert len(blood_support) == 1
+        assert blood_support[0].priority == 2
+
+    def test_neither_does_not_trigger_blood_support(self):
+        bundle = DiagnosticBundle(
+            ua=UAData(bilirubin_positive=False, urobilinogen_positive=False),
+        )
+        result = run_protocol_engine(bundle)
+        assert not any(p.name == "Blood Support" for p in result.protocols), \
+            f"Blood Support should NOT trigger. Got: {_protocol_names(result)}"
+
+
+# ============================================================================
+# NS TOX / LOCUS COERULEUS — SUPERIMPOSITION TRIGGERS
+# ============================================================================
+
+
+class TestNSToxAndLocusCoeruleus:
+    """Verify NS Tox and Locus Coeruleus triggers from dot superimposition."""
+
+    def test_valsalva_superimposed_triggers_ns_tox(self):
+        bundle = DiagnosticBundle(
+            hrv=HRVData(valsalva_dots_superimposed=True),
+        )
+        result = run_protocol_engine(bundle)
+        assert any(p.name == "NS Tox" for p in result.protocols), \
+            f"Missing NS Tox. Got: {_protocol_names(result)}"
+
+    def test_valsalva_not_superimposed_no_ns_tox(self):
+        bundle = DiagnosticBundle(
+            hrv=HRVData(valsalva_dots_superimposed=False),
+        )
+        result = run_protocol_engine(bundle)
+        assert not any(p.name == "NS Tox" for p in result.protocols), \
+            f"NS Tox should NOT trigger. Got: {_protocol_names(result)}"
+
+    def test_ns_tox_also_triggers_pectasol_c(self):
+        bundle = DiagnosticBundle(
+            hrv=HRVData(valsalva_dots_superimposed=True),
+        )
+        result = run_protocol_engine(bundle)
+        assert any(s.name == "Pectasol-C" for s in result.supplements), \
+            f"Missing Pectasol-C with NS Tox. Got: {_supplement_names(result)}"
+
+    def test_ortho_superimposed_triggers_locus_coeruleus(self):
+        bundle = DiagnosticBundle(
+            hrv=HRVData(ortho_dots_superimposed=True),
+        )
+        result = run_protocol_engine(bundle)
+        assert any(p.name == "Locus Coeruleus Support" for p in result.protocols), \
+            f"Missing Locus Coeruleus Support. Got: {_protocol_names(result)}"
+
+    def test_ortho_not_superimposed_no_locus_coeruleus(self):
+        bundle = DiagnosticBundle(
+            hrv=HRVData(ortho_dots_superimposed=False),
+        )
+        result = run_protocol_engine(bundle)
+        assert not any(p.name == "Locus Coeruleus Support" for p in result.protocols), \
+            f"Locus Coeruleus should NOT trigger. Got: {_protocol_names(result)}"

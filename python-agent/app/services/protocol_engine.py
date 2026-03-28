@@ -1232,6 +1232,35 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
                 return value not in {"", "neg", "negative", "normal", "0"}
             return False
 
+        def _is_urobilinogen_positive(marker: object) -> bool:
+            """Allowlist: only explicit positive evidence triggers Blood Support.
+
+            IMPORTANT: Value is checked FIRST. If the value is a known-normal reading
+            (0.2 mg/dL, Normal, Neg), we return False regardless of status. This
+            defends against vision model hallucinations at the UA grid position.
+            """
+            if not marker or not isinstance(marker, dict):
+                return False
+
+            val = str(marker.get("value", "")).lower().strip()
+
+            # DEFENSE: known-normal values reject regardless of status
+            _normal = {"0.2", "0.2 mg/dl", "0.2 eu/dl", "normal", "normal range",
+                        "neg", "negative", ""}
+            if val in _normal:
+                return False
+
+            # Explicit positive value (allowlist)
+            if val in ("positive", "+", "1+", "2+", "4+", "8+", "++", "+++", "++++"):
+                return True
+
+            # Status check only after value is confirmed not-normal
+            status = str(marker.get("status", "")).lower().strip()
+            if status == "positive":
+                return True
+
+            return False
+
         def _coerce_float(value: object) -> float | None:
             if isinstance(value, (int, float)):
                 return float(value)
@@ -1273,7 +1302,7 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
             uric_acid=_coerce_float(ua_val),
             uric_acid_status=ua_status,
             bilirubin_positive=_marker_is_positive(ua_data.get("bilirubin")),
-            urobilinogen_positive=_marker_is_positive(ua_data.get("urobilinogen")),
+            urobilinogen_positive=_is_urobilinogen_positive(ua_data.get("urobilinogen")),
         )
 
         # VCS from UA

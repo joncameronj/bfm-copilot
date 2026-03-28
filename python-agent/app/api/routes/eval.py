@@ -49,6 +49,47 @@ def _is_positive(data) -> bool:
     return bool(data)
 
 
+# Known-normal urobilinogen values — these should NEVER be treated as positive,
+# even if the vision model incorrectly sets status to "positive".
+# 0.2 mg/dL is the standard reference range on UA strips.
+_UROBILINOGEN_NORMAL_VALUES = frozenset({
+    "0.2", "0.2 mg/dl", "0.2 eu/dl", "normal", "normal range",
+    "neg", "negative", "",
+})
+
+
+def _is_urobilinogen_positive(data) -> bool:
+    """Urobilinogen requires EXPLICIT positive evidence — '0.2 mg/dL' or 'Normal' is negative.
+
+    Standard urinalysis reference range for urobilinogen is 0.2 mg/dL (Normal).
+    Only 1+, 2+, 4+, 8+, or explicit 'positive' status should trigger Blood Support.
+
+    IMPORTANT: Value is checked FIRST. If the value is a known-normal reading,
+    we return False regardless of status. This defends against vision model
+    hallucinations where status is incorrectly set to 'positive' for normal values.
+    """
+    if not data or not isinstance(data, dict):
+        return False
+
+    val = str(data.get("value", "")).lower().strip()
+
+    # DEFENSE: If the value is a known-normal reading, reject regardless of status.
+    # This catches the hallucination where vision reads value="0.2" but status="positive".
+    if val in _UROBILINOGEN_NORMAL_VALUES:
+        return False
+
+    # Check value for explicit positive indicators (allowlist)
+    if val in ("positive", "+", "1+", "2+", "4+", "8+", "++", "+++", "++++"):
+        return True
+
+    # Check status only after value is confirmed not-normal
+    status = str(data.get("status", "")).lower().strip()
+    if status == "positive":
+        return True
+
+    return False
+
+
 def _is_glucose_positive(data) -> bool:
     """Glucose requires EXPLICIT positive evidence — never infer from ambiguous values.
 
@@ -216,7 +257,7 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
             "uric_acid": _coerce_float(uric_acid_value),
             "uric_acid_status": uric_acid_status,
             "bilirubin_positive": _is_positive(bilirubin_data),
-            "urobilinogen_positive": _is_positive(urobilinogen_data),
+            "urobilinogen_positive": _is_urobilinogen_positive(urobilinogen_data),
         }
 
     # ----- VCS normalization — standalone VCS file OR UA-embedded vcs_score -----
@@ -244,22 +285,26 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
     if ortho_raw:
         normalized["ortho"] = ortho_raw
         # Compute Locus Coeruleus flag (blue supine + red upright exactly matching)
+        # Use both: exact numeric match AND vision-reported flag
         supine = ortho_raw.get("supine", {})
         upright = ortho_raw.get("upright", {})
-        if supine and upright and _check_exact_match(supine, upright):
-            if "hrv" in normalized:
-                normalized["hrv"]["ortho_dots_superimposed"] = True
+        superimposed_by_values = supine and upright and _check_exact_match(supine, upright)
+        superimposed_by_vision = ortho_raw.get("dots_superimposed", False)
+        if (superimposed_by_values or superimposed_by_vision) and "hrv" in normalized:
+            normalized["hrv"]["ortho_dots_superimposed"] = True
 
     # ----- Valsalva normalization -----
     valsalva_raw = raw_bundle.get("valsalva", {})
     if valsalva_raw:
         normalized["valsalva"] = valsalva_raw
         # Compute NS Tox flag (blue normal + green deep exactly matching)
+        # Use both: exact numeric match AND vision-reported flag
         normal = valsalva_raw.get("normal_breathing", {})
         deep = valsalva_raw.get("deep_breathing", {})
-        if normal and deep and _check_exact_match(normal, deep):
-            if "hrv" in normalized:
-                normalized["hrv"]["valsalva_dots_superimposed"] = True
+        superimposed_by_values = normal and deep and _check_exact_match(normal, deep)
+        superimposed_by_vision = valsalva_raw.get("dots_superimposed", False)
+        if (superimposed_by_values or superimposed_by_vision) and "hrv" in normalized:
+            normalized["hrv"]["valsalva_dots_superimposed"] = True
 
     # ----- Blood panel (fallback from vision extraction) -----
     bp_raw = raw_bundle.get("blood_panel", {})

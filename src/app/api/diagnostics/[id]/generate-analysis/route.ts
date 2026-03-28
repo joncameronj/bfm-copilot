@@ -317,9 +317,19 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
-    // Log extraction summary
+    // Log extraction summary (structured for post-hoc debugging of parallelization quality)
     const successCount = extractionResults.filter(r => r.status === 'complete' || r.status === 'needs_review').length
-    console.log(`[Auto-Extract] ${successCount}/${extractionResults.length} files extracted successfully`)
+    console.log(`[Extraction Summary]`, JSON.stringify({
+      totalFiles: files?.length || 0,
+      parallelExtracted: filesToExtract.length,
+      skippedAlreadyExtracted: (files?.length || 0) - filesToExtract.length,
+      results: extractionResults.map(r => ({
+        fileType: r.fileType,
+        status: r.status,
+        error: r.error || undefined,
+      })),
+      successCount,
+    }))
 
     if (successCount === 0 && extractionResults.length > 0) {
       const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
@@ -469,7 +479,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         if (finalized) {
           // Eval is done — save protocols and update analysis to complete
-          // Use atomic update: only proceed if status is still 'processing' (prevents race condition)
+          // STEP 1: Atomically claim this analysis for finalization (prevents race condition)
+          // Set to 'finalizing' — NOT 'complete' yet (recommendations not inserted)
           const { data: updatedRow, error: updateError } = await supabase
             .from('diagnostic_analyses')
             .update({
@@ -480,7 +491,7 @@ export async function GET(request: Request, { params }: RouteParams) {
                 eval_report: finalized.evalReport || null,
               },
               supplementation: finalized.supplementation,
-              status: 'complete',
+              status: 'processing', // Keep as processing until recommendations are inserted
               rag_context: {},
             })
             .eq('id', analysis.id)
@@ -496,10 +507,10 @@ export async function GET(request: Request, { params }: RouteParams) {
             // Another request already finalized — skip duplicate work
             console.log(`[Finalize] Analysis ${analysis.id} already finalized by another request, skipping`)
           } else {
-            console.log(`[Finalize] Completing analysis ${analysis.id} with ${finalized.protocols.length} protocols`)
+            console.log(`[Finalize] Inserting ${finalized.protocols.length} protocols for analysis ${analysis.id}`)
           }
 
-          // Create protocol recommendations with reasoning records (only if we won the race)
+          // STEP 2: Create protocol recommendations BEFORE marking complete
           if (updatedRow) {
             for (const protocol of finalized.protocols) {
               const { data: recRecord, error: recError } = await supabase
@@ -537,6 +548,14 @@ export async function GET(request: Request, { params }: RouteParams) {
                 })
               }
             }
+
+            // STEP 3: NOW mark analysis as complete (all data is persisted)
+            await supabase
+              .from('diagnostic_analyses')
+              .update({ status: 'complete' })
+              .eq('id', analysis.id)
+
+            console.log(`[Finalize] Analysis ${analysis.id} marked complete with all recommendations persisted`)
 
             // Update diagnostic upload status to complete
             await supabase
