@@ -172,6 +172,14 @@ DOCUMENTED CONDITION RULES:
 - Cite the chart text directly (for example, "Medical history lists fibromyalgia"), not an invented
   diagnostic finding.
 
+DIAGNOSTIC SCALES (critical — use correct ranges, do NOT treat as percentages):
+- System Energy: 1-13 scale (NOT out of 100). 1-4 = Athlete range, 5-9 = Healthy, 10-13 = Energetic Debt.
+- Stress Response: 1-7 scale. 1 = best, 7 = worst.
+- Physiological Resources (D-Pulse): 150-600 units (NOT out of 100 or 13). Below 150 = low.
+- D-Pulse organ percentages: 0-100% (these ARE percentages).
+- Brain Activity / Immunity (D-Pulse): 0-100% (these ARE percentages).
+- PNS/SNS values: -4 to +4 scale on the 2D grid.
+
 AUTONOMIC PATTERN RULES (apply exactly):
 - SNS SWITCHED (upper-left quadrant, SNS clearly elevated and flipped): SNS Balance 35@709
 - LOWER-LEFT QUADRANT (both SNS and PNS negative/depleted — Energetic Imbalance):

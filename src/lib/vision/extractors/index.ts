@@ -9,6 +9,7 @@ import { HRV_SYSTEM_PROMPT, HRV_USER_PROMPT } from '../prompts/hrv-prompt'
 import { BRAINWAVE_SYSTEM_PROMPT, BRAINWAVE_USER_PROMPT } from '../prompts/brainwave-prompt'
 import { ORTHO_SYSTEM_PROMPT, ORTHO_USER_PROMPT } from '../prompts/ortho-prompt'
 import { VALSALVA_SYSTEM_PROMPT, VALSALVA_USER_PROMPT } from '../prompts/valsalva-prompt'
+import { LAB_PANEL_SYSTEM_PROMPT } from '../prompts/lab-panel-prompt'
 import type { DiagnosticType } from '@/types/shared'
 import type {
   ExtractionResult,
@@ -140,39 +141,47 @@ async function extractValsalva(imageUrl: string): Promise<ExtractionResult<Valsa
 }
 
 /**
- * Blood panel extraction
+ * Blood panel extraction — uses dedicated lab panel prompt with 77 marker aliases
+ * for accurate name normalization and abbreviation handling.
  */
 async function extractBloodPanel(imageUrl: string): Promise<ExtractionResult<BloodPanelExtractedData>> {
-  const systemPrompt = `You are an expert at analyzing blood panel / lab results.
-Extract all visible lab markers with their values, units, and reference ranges.
-Identify any markers that are out of range (high or low).
-Look for "ominous markers" - critical values that require attention.`
-
   const userPrompt = `Analyze this blood panel / lab result image.
 
-Extract ALL visible lab markers.
+Extract ALL visible lab markers. Use the normalized marker names from the alias list
+in your instructions — this is critical for downstream matching.
 
-Return a JSON object with this structure:
+Return a JSON object with this EXACT structure:
 {
   "markers": [
     {
-      "name": "Marker name",
-      "value": numeric_value,
-      "unit": "unit of measurement",
-      "reference_range": "normal range if shown",
+      "name": "Normalized marker name (use aliases from system prompt)",
+      "value": numeric_value_only,
+      "unit": "unit of measurement or empty string if not shown",
+      "reference_range": "normal range if shown, e.g. '4.0-11.0', or null",
       "status": "low" | "normal" | "high"
     }
   ],
-  "ominous_triggers": ["List of critical/ominous markers identified"],
+  "ominous_triggers": ["List of markers flagged H or critically out of range"],
   "total_markers": number_of_markers_extracted,
-  "out_of_range_count": number_outside_normal,
-  "affected_categories": ["thyroid", "inflammation", etc],
+  "out_of_range_count": number_flagged_high_or_low,
+  "affected_categories": ["thyroid", "inflammation", "lipids", "cbc", "metabolic", etc],
   "confidence": 0.0 to 1.0
 }
 
-Be thorough - extract ALL visible markers.`
+IMPORTANT:
+- Extract EVERY visible marker, even if uncertain about the match
+- Use the NORMALIZED name from the alias list (e.g., "TSH" not "Thyroid Stimulating Hormone")
+- Use numeric values only (no symbols, just the number)
+- Set status to "high" if flagged H or above reference range
+- Set status to "low" if flagged L or below reference range
+- Set status to "normal" if within reference range or not flagged
+- Include ominous_triggers for any critically abnormal values
+- Set high confidence (0.8-1.0) when text is clear
+- Set lower confidence (0.5-0.7) when text is blurry or uncertain
 
-  return extractFromImage<BloodPanelExtractedData>(imageUrl, systemPrompt, userPrompt)
+Be thorough - extract ALL visible lab values from this image.`
+
+  return extractFromImage<BloodPanelExtractedData>(imageUrl, LAB_PANEL_SYSTEM_PROMPT, userPrompt)
 }
 
 /**

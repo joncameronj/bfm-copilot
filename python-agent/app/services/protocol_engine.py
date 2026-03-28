@@ -998,7 +998,7 @@ def _apply_five_levers_rules(bundle: DiagnosticBundle, result: EngineResult) -> 
     # Lever 1: Melatonin — Pineal Support if brainwave disruption or low system energy
     if (bundle.brainwave and bundle.hrv and
         (bundle.brainwave.theta > bundle.brainwave.alpha or
-         (bundle.hrv.system_energy is not None and bundle.hrv.system_energy < 30))):
+         (bundle.hrv.system_energy is not None and bundle.hrv.system_energy >= 10))):
         if not any(p.name == "Pineal Support" for p in result.protocols):
             result.protocols.append(ProtocolRecommendation(
                 name="Pineal Support",
