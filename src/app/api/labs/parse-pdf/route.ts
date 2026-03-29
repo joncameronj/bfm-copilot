@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { extractLabPanelVision } from '@/lib/labs/vision-extractor';
+import { getPythonAgentUrl } from '@/lib/agent/url';
 export const dynamic = 'force-dynamic'
 
 // Accepted file types
@@ -74,47 +74,116 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: 'Vision API is not configured. Please contact support.' },
-        { status: 503 }
-      );
+    // Forward to Python agent for extraction
+    const agentUrl = getPythonAgentUrl();
+    const agentForm = new FormData();
+    agentForm.append('file', file);
+    agentForm.append('user_id', user.id);
+
+    const agentResponse = await fetch(`${agentUrl}/agent/labs/extract`, {
+      method: 'POST',
+      body: agentForm,
+    });
+
+    if (!agentResponse.ok) {
+      const errorData = await agentResponse.json().catch(() => null);
+      const errorMsg = errorData?.detail || `Python agent returned ${agentResponse.status}`;
+      console.error('Lab extraction failed:', errorMsg);
+      return NextResponse.json({ error: errorMsg }, { status: agentResponse.status });
     }
 
-    // Convert file to base64 data URL — Claude Vision handles both PDFs and images natively
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-    const mimeType = fileType === 'pdf' ? 'application/pdf' : (file.type || 'image/jpeg');
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const result = await agentResponse.json();
 
-    const parseResult = await extractLabPanelVision(dataUrl);
-
-    if (!parseResult.success) {
+    if (!result.success) {
       return NextResponse.json(
-        { error: parseResult.warnings?.[0] || 'Could not extract lab values from this file. Please ensure it contains lab results.' },
+        { error: result.warnings?.[0] || 'Could not extract lab values from this file.' },
         { status: 422 }
       );
     }
 
-    // Return parsed values
+    // Map to frontend-expected format (markerName, markerId, value, unit, confidence)
+    const { matchedValues, unmatchedCount } = mapToFrontendFormat(result.values);
+
     return NextResponse.json({
-      success: parseResult.success,
-      values: parseResult.values.filter((v) => v.markerId !== null), // Only return matched markers
-      unmatchedCount: parseResult.values.filter((v) => v.markerId === null).length,
-      warnings: parseResult.warnings.slice(0, 10), // Limit warnings
+      success: true,
+      values: matchedValues,
+      unmatchedCount,
+      warnings: (result.warnings || []).slice(0, 10),
       extractionMethod: 'vision',
     });
   } catch (error) {
     const errorName = error instanceof Error ? error.constructor.name : 'Unknown';
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`Lab file parse error [${errorName}]:`, errorMsg);
-    if (error instanceof Error && error.stack) {
-      console.error('Stack:', error.stack);
-    }
     return NextResponse.json(
       { error: `Failed to parse lab file: ${errorMsg}` },
       { status: 500 }
     );
   }
+}
+
+/**
+ * Map Python agent response values to the format the frontend PdfUpload component expects.
+ * The frontend needs { markerName, markerId, value, unit, confidence }.
+ */
+function mapToFrontendFormat(values: Array<{
+  markerName: string;
+  value: number;
+  unit: string | null;
+  rawName?: string;
+  flag?: string | null;
+}>) {
+  // Lazy-import lab markers to match by name
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { labMarkers } = require('@/data/lab-data');
+
+  const matched: Array<{
+    markerName: string;
+    markerId: string | null;
+    value: number;
+    unit: string | null;
+    confidence: number;
+  }> = [];
+
+  let unmatchedCount = 0;
+  const seenIds = new Set<string>();
+
+  for (const v of values) {
+    const marker = findMarker(v.markerName, labMarkers);
+    if (marker && !seenIds.has(marker.id)) {
+      seenIds.add(marker.id);
+      matched.push({
+        markerName: marker.displayName,
+        markerId: marker.id,
+        value: v.value,
+        unit: v.unit,
+        confidence: 0.85,
+      });
+    } else if (!marker) {
+      unmatchedCount++;
+    }
+  }
+
+  return { matchedValues: matched, unmatchedCount };
+}
+
+function findMarker(
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  labMarkers: Array<{ id: string; name: string; displayName: string }>
+) {
+  const lower = name.toLowerCase().trim();
+  // Direct match
+  for (const m of labMarkers) {
+    if (m.displayName.toLowerCase() === lower || m.name.toLowerCase() === lower) {
+      return m;
+    }
+  }
+  // Partial match
+  for (const m of labMarkers) {
+    if (lower.includes(m.displayName.toLowerCase()) || m.displayName.toLowerCase().includes(lower)) {
+      return m;
+    }
+  }
+  return null;
 }

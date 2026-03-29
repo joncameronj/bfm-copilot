@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api.routes import chat, ingest, health, rag, jobs, protocols, eval
+from app.api.routes import chat, ingest, health, rag, jobs, protocols, eval, labs
 from app.services.model_settings import init_model_settings_service, get_model_settings_service
 from app.services.ai_client import get_chat_model
 from app.worker.job_executor import start_executor, stop_executor
@@ -41,6 +41,7 @@ app.include_router(rag.router, prefix="/agent", tags=["RAG"])
 app.include_router(jobs.router, prefix="/agent", tags=["Jobs"])
 app.include_router(protocols.router, prefix="/agent", tags=["Protocols"])
 app.include_router(eval.router, prefix="/agent", tags=["Eval"])
+app.include_router(labs.router, prefix="/agent", tags=["Labs"])
 
 
 @app.on_event("startup")

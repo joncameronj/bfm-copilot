@@ -1,0 +1,273 @@
+"""
+Lab Extraction API Route — Extract structured lab values from PDFs and images.
+
+POST /agent/labs/extract  - Upload a PDF or image, get structured lab marker values back
+"""
+
+import base64
+import json
+import re
+
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+
+from app.services.ai_client import get_sync_client, get_vision_model
+from app.utils.logger import get_logger
+
+logger = get_logger("labs")
+
+router = APIRouter()
+
+ACCEPTED_MIME_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+}
+
+ACCEPTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+
+LAB_EXTRACTION_SYSTEM_PROMPT = """You are an expert at analyzing laboratory blood work and lab panel results.
+Your task is to extract ALL visible lab markers with their values, units, and identify any that are out of range.
+
+COMMON LAB MARKER ALIASES - Use these to normalize marker names:
+- NT-proBNP: also called NT proBNP, BNP, Pro-BNP
+- CRP: also called C-Reactive Protein, hs-CRP, hsCRP
+- Homocysteine: also called HCY
+- Uric Acid: also called Urate
+- Iron: also called Serum Iron, Fe
+- UIBC: also called Unsaturated Iron Binding Capacity
+- TIBC: also called Total Iron Binding Capacity
+- Transferrin Saturation: also called TSAT, Iron Saturation
+- Vitamin B12: also called B12, Cobalamin
+- Folate: also called Folic Acid, Serum Folate
+- Ferritin: also called Serum Ferritin
+- Total Cholesterol: also called Cholesterol, TC
+- Triglycerides: also called TG, Trigs
+- HDL: also called HDL Cholesterol, HDL-C, High Density Lipoprotein
+- LDL: also called LDL Cholesterol, LDL-C, Low Density Lipoprotein
+- sdLDL: also called Small Dense LDL
+- Apo A-1: also called Apolipoprotein A-1, ApoA1
+- Apo B: also called Apolipoprotein B, ApoB
+- Lp(a): also called Lipoprotein(a), Lipoprotein a, LPa
+- Glucose: also called Blood Glucose, Fasting Glucose, FBG
+- Insulin: also called Fasting Insulin, Serum Insulin
+- HbA1C: also called A1C, Hemoglobin A1c, Glycated Hemoglobin
+- Calcium: also called Ca, Serum Calcium, Total Calcium
+- Albumin: also called Serum Albumin, ALB
+- PTH: also called Parathyroid Hormone, Intact PTH, iPTH
+- Vitamin D: also called 25-OH Vitamin D, 25-Hydroxy Vitamin D, 25(OH)D
+- Magnesium: also called Mg, Serum Magnesium
+- Sodium: also called Na
+- Potassium: also called K
+- Chloride: also called Cl
+- CO2: also called Carbon Dioxide, Bicarbonate, HCO3
+- BUN: also called Blood Urea Nitrogen, Urea Nitrogen
+- Total Protein: also called Protein Total, Serum Protein
+- Creatinine: also called Serum Creatinine, Cr
+- Cystatin C: also called Cys-C
+- eGFR: also called GFR, Estimated GFR, Glomerular Filtration Rate
+- ALT: also called SGPT, Alanine Aminotransferase
+- AST: also called SGOT, Aspartate Aminotransferase
+- GGT: also called Gamma GT, Gamma-Glutamyl Transferase
+- Alkaline Phosphatase: also called Alk Phos, ALP
+- Total Bilirubin: also called Bilirubin Total, T-Bili, TBIL
+- Direct Bilirubin: also called Bilirubin Direct, D-Bili, DBIL
+- TSH: also called Thyroid Stimulating Hormone
+- T4 Total: also called T4, Total T4, Thyroxine
+- T4 Free: also called Free T4, FT4
+- T3 Total: also called T3, Total T3, Triiodothyronine
+- T3 Free: also called Free T3, FT3
+- WBC: also called White Blood Cell, White Blood Cells, Leukocytes
+- RBC: also called Red Blood Cell, Red Blood Cells, Erythrocytes
+- Hemoglobin: also called Hgb, Hb
+- Hematocrit: also called Hct, HCT
+- MCV: also called Mean Corpuscular Volume
+- MCH: also called Mean Corpuscular Hemoglobin
+- MCHC: also called Mean Corpuscular Hemoglobin Concentration
+- RDW: also called Red Cell Distribution Width, RDW-CV
+- Platelets: also called PLT, Platelet Count, Thrombocytes
+- Neutrophils: also called Neut, ANC
+- Lymphocytes: also called Lymph
+- Monocytes: also called Mono
+- Eosinophils: also called Eos
+- Basophils: also called Baso
+- Estradiol: also called E2, Estrogen
+- FSH: also called Follicle Stimulating Hormone
+- DHEA-S: also called DHEA Sulfate, DHEAS
+- LH: also called Luteinizing Hormone
+- SHBG: also called Sex Hormone Binding Globulin
+- Testosterone: also called Total Testosterone
+- Progesterone: also called P4
+- Globulin: also called Total Globulin, Serum Globulin
+
+EXTRACTION RULES:
+1. Extract ALL visible markers, not just the ones listed above
+2. Use the NORMALIZED name from the alias list when possible
+3. Extract the numeric value (handle commas, decimals)
+4. Extract the unit if visible
+5. Note if value is flagged as High (H), Low (L), or abnormal
+6. Include reference ranges if shown
+
+IMPORTANT: Return ONLY valid JSON, no markdown fences or other text."""
+
+LAB_EXTRACTION_USER_PROMPT = """Analyze this lab panel / blood work document.
+
+Extract ALL visible lab markers with their values.
+
+Return a JSON object with this EXACT structure:
+{
+  "values": [
+    {
+      "markerName": "Normalized marker name (use aliases from system prompt)",
+      "value": numeric_value_only,
+      "unit": "unit string or null if not shown",
+      "referenceRange": "normal range if shown, e.g., '4.0-11.0' or null",
+      "flag": "H" or "L" or null,
+      "rawName": "original name as shown in the report"
+    }
+  ],
+  "summary": {
+    "totalMarkersFound": number,
+    "flaggedCount": number,
+    "flaggedMarkers": ["List of marker names that are flagged H or L"]
+  },
+  "warnings": ["Any issues encountered during extraction"],
+  "confidence": 0.0 to 1.0
+}
+
+IMPORTANT:
+- Extract EVERY visible marker, even if you're not sure about matching
+- Use numeric values only (no symbols, just the number)
+- Normalize marker names using the alias list in the system prompt
+- Include the rawName to show what was originally in the report
+- Set flag to "H" for high, "L" for low, or null for normal
+- Set high confidence (0.8-1.0) when text is clear
+- Set lower confidence (0.5-0.7) when text is blurry or uncertain
+
+Be thorough - extract ALL visible lab values from this document."""
+
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from Claude response, stripping markdown fences if present."""
+    cleaned = text.strip()
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+    if fence_match:
+        cleaned = fence_match.group(1).strip()
+    return json.loads(cleaned)
+
+
+def _detect_file_type(filename: str, content_type: str | None) -> str | None:
+    """Detect if file is pdf or image. Returns None if unsupported."""
+    if content_type and content_type.lower() in ACCEPTED_MIME_TYPES:
+        return "pdf" if "pdf" in content_type.lower() else "image"
+    lower = filename.lower()
+    if lower.endswith(".pdf"):
+        return "pdf"
+    if any(lower.endswith(ext) for ext in (".jpg", ".jpeg", ".png")):
+        return "image"
+    return None
+
+
+@router.post("/labs/extract")
+async def extract_lab_values(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+):
+    """
+    Extract structured lab marker values from a PDF or image.
+
+    Sends the file directly to Claude Vision API which natively handles
+    both PDFs (as document blocks) and images.
+
+    Returns JSON with extracted marker names, values, units, and flags.
+    """
+    file_type = _detect_file_type(file.filename or "", file.content_type)
+    if not file_type:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF, JPEG, and PNG files are accepted",
+        )
+
+    file_content = await file.read()
+    if len(file_content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 50MB")
+
+    b64 = base64.b64encode(file_content).decode("utf-8")
+
+    if file_type == "pdf":
+        content_block = {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": b64,
+            },
+        }
+    else:
+        media_type = file.content_type or "image/jpeg"
+        if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
+            media_type = "image/jpeg"
+        content_block = {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": b64,
+            },
+        }
+
+    client = get_sync_client()
+    model = get_vision_model()
+
+    logger.info(f"Extracting lab values from {file_type}: {file.filename} ({len(file_content)} bytes)")
+
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=4000,
+            temperature=0.1,
+            system=LAB_EXTRACTION_SYSTEM_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": LAB_EXTRACTION_USER_PROMPT},
+                        content_block,
+                    ],
+                }
+            ],
+        )
+    except Exception as e:
+        logger.error(f"Claude API error during lab extraction: {e}")
+        raise HTTPException(status_code=502, detail=f"AI extraction failed: {str(e)}")
+
+    text_block = next((b for b in response.content if b.type == "text"), None)
+    if not text_block:
+        raise HTTPException(status_code=502, detail="No response from AI model")
+
+    try:
+        parsed = _extract_json(text_block.text)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse Claude response as JSON: {e}")
+        logger.error(f"Raw response: {text_block.text[:500]}")
+        raise HTTPException(
+            status_code=502,
+            detail="AI returned invalid JSON. Please try again.",
+        )
+
+    values = parsed.get("values", [])
+    confidence = parsed.get("confidence", 0.8)
+
+    logger.info(
+        f"Extracted {len(values)} lab values from {file.filename} "
+        f"(confidence: {confidence})"
+    )
+
+    return {
+        "success": len(values) > 0,
+        "values": values,
+        "summary": parsed.get("summary", {}),
+        "warnings": parsed.get("warnings", []),
+        "confidence": confidence,
+        "extractionMethod": "vision",
+    }
