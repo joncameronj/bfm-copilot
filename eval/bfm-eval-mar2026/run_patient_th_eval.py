@@ -46,6 +46,7 @@ def build_patient_th_bundle() -> DiagnosticBundle:
             vagus_dysfunction=True,     # Deep breathing shows NO improvement in PNS, E/I=1.02
             calm_sns=2.5,              # SNS activity from Ortho conclusion
             calm_pns=-4.0,             # PNS activity from Ortho conclusion (BLOCKED)
+            ortho_dots_superimposed=True,  # Red dot superimposed on blue dot per Ortho
         ),
         brainwave=BrainwaveData(
             delta=56,

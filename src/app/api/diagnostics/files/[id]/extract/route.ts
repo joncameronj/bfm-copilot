@@ -164,7 +164,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     // For blood_panel files, also persist to lab_results/lab_values tables
     // This ensures blood work appears in the patient's lab section
-    if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
+    // Accept both 'complete' and 'needs_review' — lab data is too important to gate on confidence
+    if (file.file_type === 'blood_panel' && result.success && (status === 'complete' || status === 'needs_review')) {
       const labPersistResult = await persistBloodPanelToLabTables(
         supabase,
         result.data as BloodPanelExtractedData,

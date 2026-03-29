@@ -283,7 +283,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', file.id)
 
           // CRITICAL: Persist blood panel to lab tables
-          if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
+          // Accept both 'complete' and 'needs_review' — lab data is too important to gate on confidence
+          if (file.file_type === 'blood_panel' && result.success && (status === 'complete' || status === 'needs_review')) {
             const labPersistResult = await persistBloodPanelToLabTables(
               supabase,
               result.data as BloodPanelExtractedData,
@@ -302,6 +303,9 @@ export async function POST(request: Request, { params }: RouteParams) {
           }
 
           console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
+          if (file.file_type === 'blood_panel' && !result.success) {
+            console.error(`[Auto-Extract] Blood panel extraction FAILED for file ${file.id} (${file.filename}):`, result.error, 'Raw response length:', result.rawResponse?.length || 0)
+          }
           return { fileId: file.id, fileType: file.file_type, status, error: result.error }
         }))
       )
@@ -333,10 +337,18 @@ export async function POST(request: Request, { params }: RouteParams) {
       successCount,
     }))
 
-    if (successCount === 0 && extractionResults.length > 0) {
-      const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
+    if (successCount === 0) {
+      if (extractionResults.length > 0) {
+        const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
+        return NextResponse.json(
+          { error: `All file extractions failed: ${failures}` },
+          { status: 400 }
+        )
+      }
+      // No files found at all — upload may be empty or files not yet linked
+      console.error(`[Generate] No diagnostic files found for upload ${diagnosticUploadId}`)
       return NextResponse.json(
-        { error: `All file extractions failed: ${failures}` },
+        { error: 'No diagnostic files found for this upload. Please upload files before generating analysis.' },
         { status: 400 }
       )
     }
