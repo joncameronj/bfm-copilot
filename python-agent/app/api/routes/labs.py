@@ -150,9 +150,20 @@ Be thorough - extract ALL visible lab values from this document."""
 def _extract_json(text: str) -> dict:
     """Extract JSON from Claude response, stripping markdown fences if present."""
     cleaned = text.strip()
-    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+    # Try to find JSON inside code fences: ```json ... ```
+    fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", cleaned, re.DOTALL)
     if fence_match:
         cleaned = fence_match.group(1).strip()
+    else:
+        # No closing fence — strip opening fence line if present
+        cleaned = re.sub(r"^```(?:json)?\s*\n", "", cleaned)
+        cleaned = re.sub(r"\n```\s*$", "", cleaned)
+    # Find first { to last } as fallback
+    if not cleaned.startswith("{"):
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1:
+            cleaned = cleaned[start:end + 1]
     return json.loads(cleaned)
 
 
