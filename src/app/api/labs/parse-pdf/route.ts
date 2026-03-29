@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPythonAgentUrl } from '@/lib/agent/url';
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120 // Claude Vision PDF extraction can take 30-60s
 
 // Accepted file types
 const ACCEPTED_TYPES = {
