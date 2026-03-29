@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { parseLabPdf } from '@/lib/labs/pdf-parser';
 import { extractLabPanelVision } from '@/lib/labs/vision-extractor';
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 50MB for images, matching diagnostics)
+    // Validate file size (max 50MB)
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
       return NextResponse.json(
@@ -75,56 +74,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to buffer
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json(
+        { error: 'Vision API is not configured. Please contact support.' },
+        { status: 503 }
+      );
+    }
+
+    // Convert file to base64 data URL — Claude Vision handles both PDFs and images natively
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    const mimeType = fileType === 'pdf' ? 'application/pdf' : (file.type || 'image/jpeg');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    let parseResult;
-    let pageCount = 1;
+    const parseResult = await extractLabPanelVision(dataUrl);
 
-    if (fileType === 'pdf') {
-      // PDF: Use text extraction
-      try {
-        const pdf = require('pdf-parse');
-        const pdfData = await pdf(buffer);
-        parseResult = await parseLabPdf(pdfData.text);
-        pageCount = pdfData.numpages;
-      } catch (pdfError) {
-        console.error('PDF parsing failed:', pdfError);
-        const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
-        // DOMMatrix / canvas errors are environment issues with pdf-parse
-        if (errorMsg.includes('DOMMatrix') || errorMsg.includes('canvas') || errorMsg.includes('is not defined')) {
-          return NextResponse.json(
-            { error: 'PDF text extraction is not available in this environment. Please upload your lab report as a JPG or PNG image instead.' },
-            { status: 422 }
-          );
-        }
-        return NextResponse.json(
-          { error: `Failed to parse PDF: ${errorMsg}` },
-          { status: 422 }
-        );
-      }
-    } else {
-      // Image: Use Vision API extraction
-      if (!process.env.ANTHROPIC_API_KEY) {
-        return NextResponse.json(
-          { error: 'Vision API is not configured. Please contact support.' },
-          { status: 503 }
-        );
-      }
-
-      const base64 = buffer.toString('base64');
-      const mimeType = file.type || 'image/jpeg';
-      const dataUrl = `data:${mimeType};base64,${base64}`;
-
-      parseResult = await extractLabPanelVision(dataUrl);
-
-      if (!parseResult.success) {
-        return NextResponse.json(
-          { error: parseResult.warnings?.[0] || 'Could not extract lab values from this image. Please ensure the image is clear and contains lab results.' },
-          { status: 422 }
-        );
-      }
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: parseResult.warnings?.[0] || 'Could not extract lab values from this file. Please ensure it contains lab results.' },
+        { status: 422 }
+      );
     }
 
     // Return parsed values
@@ -133,8 +103,7 @@ export async function POST(request: NextRequest) {
       values: parseResult.values.filter((v) => v.markerId !== null), // Only return matched markers
       unmatchedCount: parseResult.values.filter((v) => v.markerId === null).length,
       warnings: parseResult.warnings.slice(0, 10), // Limit warnings
-      pageCount,
-      extractionMethod: fileType === 'pdf' ? 'text' : 'vision',
+      extractionMethod: 'vision',
     });
   } catch (error) {
     const errorName = error instanceof Error ? error.constructor.name : 'Unknown';

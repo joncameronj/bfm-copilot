@@ -28,6 +28,20 @@ async function fetchImageAsBase64(imageUrl: string): Promise<{
   mediaType: SupportedImageType | 'application/pdf'
   isPdf: boolean
 }> {
+  // Handle data URLs directly without a round-trip fetch
+  const dataUrlMatch = imageUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (dataUrlMatch) {
+    const contentType = dataUrlMatch[1]
+    const data = dataUrlMatch[2]
+    if (contentType === 'application/pdf') {
+      return { data, mediaType: 'application/pdf', isPdf: true }
+    }
+    const mediaType = SUPPORTED_IMAGE_TYPES.includes(contentType as SupportedImageType)
+      ? (contentType as SupportedImageType)
+      : ('image/jpeg' as const)
+    return { data, mediaType, isPdf: false }
+  }
+
   const response = await fetch(imageUrl)
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
