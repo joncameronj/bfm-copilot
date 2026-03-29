@@ -256,23 +256,53 @@ def _apply_deal_breaker_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             ))
 
     # Deal Breaker 4: Vagus Nerve Dysfunction
+    # Escalation: Vagus Support (always) → +Vagus Balance (switched OR severe PNS)
+    #             → +Vagus Trauma (calm_pns <= -3.0) → +Medulla Support (calm_pns <= -4.0)
     if bundle.hrv and bundle.hrv.vagus_dysfunction:
         result.deal_breakers_found.append("Vagus Nerve Dysfunction")
-        # Escalating protocol: Vagus Support → Vagas Balance → Vagas Trauma
-        if bundle.hrv.switched_sympathetics:
+        calm_pns = bundle.hrv.calm_pns
+
+        # Vagus Support — always fires first
+        result.protocols.append(ProtocolRecommendation(
+            name="Vagus Support",
+            priority=1,
+            trigger="Vagus nerve dysfunction on HRV (>2 hash marks between dots)",
+            category="autonomic",
+        ))
+
+        # Vagus Balance — additional when SNS switched OR severe PNS collapse
+        if bundle.hrv.switched_sympathetics or (calm_pns is not None and calm_pns <= -4.0):
+            trigger_parts = []
+            if bundle.hrv.switched_sympathetics:
+                trigger_parts.append("SNS switched")
+            if calm_pns is not None and calm_pns <= -4.0:
+                trigger_parts.append(f"severe PNS collapse ({calm_pns})")
             result.protocols.append(ProtocolRecommendation(
-                name="Vagas Balance",
+                name="Vagus Balance",
                 priority=1,
-                trigger="Vagus dysfunction + SNS also switched",
+                trigger=f"Vagus dysfunction + {' + '.join(trigger_parts)}",
                 category="autonomic",
             ))
-        else:
+
+        # Vagus Trauma — escalation for severe vagal collapse (calm_pns <= -3.0)
+        if calm_pns is not None and calm_pns <= -3.0:
             result.protocols.append(ProtocolRecommendation(
-                name="Vagus Support",
-                priority=1,
-                trigger="Vagus nerve dysfunction on HRV (>2 hash marks between dots)",
+                name="Vagus Trauma",
+                priority=2,
+                trigger=f"Severe vagal collapse (PNS {calm_pns}) — escalation after Vagus Support",
+                category="autonomic",
+                notes="Only after Vagus Support proves insufficient; never first-line",
+            ))
+
+        # Medulla Support — brainstem exhaustion at extreme PNS collapse
+        if calm_pns is not None and calm_pns <= -4.0:
+            result.protocols.append(ProtocolRecommendation(
+                name="Medulla Support",
+                priority=2,
+                trigger=f"Extreme PNS collapse ({calm_pns}) — brainstem autonomic exhaustion",
                 category="autonomic",
             ))
+
         result.supplements.append(SupplementRecommendation(
             name="Innovita Vagus Nerve",
             trigger="Vagus nerve dysfunction",
@@ -467,8 +497,9 @@ def _apply_brainwave_rules(bundle: DiagnosticBundle, result: EngineResult) -> No
 
     bw = bundle.brainwave
 
-    # Beta dominant (already partially covered by deal breakers for theta>alpha)
+    # Beta dominant — deal breaker when Beta > Alpha AND Beta > 25%
     if bw.beta > bw.alpha and bw.beta > 25:
+        result.deal_breakers_found.append("Beta > Alpha")
         result.protocols.append(ProtocolRecommendation(
             name="CP-P",
             priority=2,
@@ -622,6 +653,28 @@ def _apply_dpulse_organ_rules(bundle: DiagnosticBundle, result: EngineResult) ->
             category="autonomic",
         ))
 
+    # Kidney Repair from D-Pulse: severe renal stress without lab confirmation
+    kidney_pct = dp.get_organ("Kidneys") or dp.get_organ("Kidney") or dp.get_organ("kidneys")
+    if kidney_pct is not None and kidney_pct < 10 and bundle.ua and bundle.ua.protein_positive:
+        result.protocols.append(ProtocolRecommendation(
+            name="Kidney Repair",
+            priority=2,
+            trigger=f"Kidneys {kidney_pct}% on D-Pulse + protein in urine — severe renal stress",
+            category="organ",
+            notes="D-Pulse kidneys critical + proteinuria even without eGFR labs",
+        ))
+
+    # X-39 for catastrophic organ collapse: ≥80% of organs in single digits
+    if dp.organs:
+        single_digit_count = sum(1 for o in dp.organs if o.percentage < 10)
+        if single_digit_count >= len(dp.organs) * 0.8:
+            if not any(s.name == "X-39" for s in result.supplements):
+                result.supplements.append(SupplementRecommendation(
+                    name="X-39",
+                    trigger=f"{single_digit_count}/{len(dp.organs)} organs in single digits — catastrophic collapse",
+                    notes="LifeWave X-39 patches for UB rates",
+                ))
+
     # All systems single digits = catastrophic
     if dp.organs and all(o.percentage < 10 for o in dp.organs):
         result.cross_correlations.append("All systems single digits — catastrophic, electron spin inversion")
@@ -664,9 +717,11 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
         return (m is not None and m.status == "low", m)
 
     # Liver: Elevated ALT/AST/GGT
-    for marker_name in ("ALT", "AST", "GGT"):
+    liver_enzyme_elevated = False
+    for marker_name in ("ALT", "AST", "GGT", "ALT (SGPT)", "AST (SGOT)"):
         high, m = is_high(marker_name)
         if high and m:
+            liver_enzyme_elevated = True
             result.protocols.append(ProtocolRecommendation(
                 name="Liver Inflame",
                 priority=2,
@@ -678,6 +733,8 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
                 name="Livergy", trigger=f"Elevated {marker_name}",
             ))
             break  # Only add once for liver
+    if liver_enzyme_elevated:
+        result.deal_breakers_found.append("Elevated Liver Enzymes")
 
     # Inflammation: Elevated CRP
     high, m = is_high("CRP")
@@ -700,6 +757,12 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
     # Iron/Ferritin
     high_ferritin, ferr = is_high("Ferritin")
     low_iron, iron = is_low("Iron")
+    # Also check for clinically elevated Ferritin >300 even if lab status is "normal"
+    if not high_ferritin:
+        ferr_marker = bundle.get_lab("Ferritin")
+        if ferr_marker and ferr_marker.value is not None and ferr_marker.value > 300:
+            high_ferritin = True
+            ferr = ferr_marker
     if high_ferritin and ferr:
         result.protocols.append(ProtocolRecommendation(
             name="Ferritin Lower",
@@ -710,6 +773,9 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
         result.supplements.append(SupplementRecommendation(
             name="IP6 Gold", trigger="High Ferritin",
             notes="NEVER give iron" if low_iron else "",
+        ))
+        result.supplements.append(SupplementRecommendation(
+            name="Rejuvenation H2", trigger="High Ferritin — hydrogen therapy",
         ))
         if low_iron:
             result.supplements.append(SupplementRecommendation(
@@ -796,14 +862,14 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
             name="Deuterium Drops", trigger=f"Low eGFR ({m.value})",
         ))
 
-    # High BUN:Creatinine ratio = EMF damage / dehydration
+    # High BUN:Creatinine ratio = EMF damage / dehydration (>15 flagged per master protocols)
     if high_bun and bun and creat and creat.value > 0:
         ratio = bun.value / creat.value
-        if ratio > 20:
+        if ratio > 15:
             result.protocols.append(ProtocolRecommendation(
                 name="EMF Cord",
                 priority=3,
-                trigger=f"BUN:Creatinine ratio {ratio:.0f} (>20 — EMF damage/dehydration)",
+                trigger=f"BUN:Creatinine ratio {ratio:.0f} (>15 — EMF damage/dehydration)",
                 category="lab",
             ))
 
@@ -851,7 +917,7 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
             name="Pancreos", trigger="Type 2 Diabetes pattern",
         ))
         result.supplements.append(SupplementRecommendation(
-            name="Rejuvenation", trigger="Diabetes — 11% insulin sensitivity gain in 28 days at 3 tabs/day",
+            name="Rejuvenation H2", trigger="Diabetes — 11% insulin sensitivity gain in 28 days at 3 tabs/day",
             dosage="3 tabs/day (diabetes dose)",
         ))
 
@@ -868,6 +934,40 @@ def _apply_lab_rules(bundle: DiagnosticBundle, result: EngineResult) -> None:
                 name="Augmented NAC",
                 trigger=f"Spike Ab {spike_m.value} — 99% spike protein denaturalization",
                 dosage="3 pills/day for 5-6 months",
+            ))
+            result.supplements.append(SupplementRecommendation(
+                name="Nattokinase",
+                trigger=f"Spike Ab {spike_m.value} — fibrinolytic enzyme to clear spike protein",
+                dosage="1 cap 2x/day",
+            ))
+            break
+
+    # Vitamin D: supplement when low or < 60
+    for vd_name in ("Vitamin D", "25-OH Vitamin D", "Vitamin D, 25-Hydroxy", "25-Hydroxy Vitamin D"):
+        vd_low, vd_m = is_low(vd_name)
+        if not vd_low:
+            vd_m = bundle.get_lab(vd_name)
+            if vd_m and vd_m.value is not None and vd_m.value < 60:
+                vd_low = True
+        if vd_low and vd_m:
+            result.supplements.append(SupplementRecommendation(
+                name="Vitamin D",
+                trigger=f"Vitamin D {vd_m.value} {vd_m.unit} (target ≥60)",
+                dosage="5000-10000 IU/day with K2",
+            ))
+            break
+
+    # Homocysteine: supplement when elevated (>10 or status=high)
+    for hcy_name in ("Homocysteine", "HCY", "Homocysteine, Plasma"):
+        hcy_high, hcy_m = is_high(hcy_name)
+        if not hcy_high:
+            hcy_m = bundle.get_lab(hcy_name)
+            if hcy_m and hcy_m.value is not None and hcy_m.value > 10:
+                hcy_high = True
+        if hcy_high and hcy_m:
+            result.supplements.append(SupplementRecommendation(
+                name="Homocysteine Factor",
+                trigger=f"Homocysteine {hcy_m.value} {hcy_m.unit} (elevated >10)",
             ))
             break
 
