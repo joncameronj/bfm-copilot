@@ -138,7 +138,18 @@ Use the interpret_lab_values tool to evaluate each marker against reference rang
     "mode_diagnostics": """## Current Mode: Diagnostic Analysis
 You are analyzing diagnostic files (D-Pulse, HRV, mold toxicity panels, etc.).
 Search the knowledge base for relevant interpretation guidelines.
-Reference case studies from the knowledge base when patterns match.""",
+Reference case studies from the knowledge base when patterns match.
+
+### DIAGNOSTIC SCALES (CRITICAL — use correct ranges, do NOT treat as percentages):
+- **System Energy**: 1-13 scale (NOT out of 100). 1-4 = Athlete range, 5-9 = Healthy, 10-13 = Energetic Debt.
+- **Stress Response**: 1-7 scale. 1 = best, 7 = worst.
+- **Physical Fitness Level**: Shown as two numbers like "11/7" = System Energy / Stress Response. NOT a percentage.
+- **Physiological Resources (D-Pulse)**: 150-600 units (NOT out of 100 or 13). Below 150 = low.
+- **D-Pulse organ percentages**: 0-100% (these ARE percentages). Green >60%, Yellow 40-60%, Red <40%.
+- **Brain Activity / Immunity (D-Pulse)**: 0-100% (these ARE percentages).
+- **PNS/SNS values**: -4 to +4 scale on the Ortho 2D grid.
+
+When reporting these values, ALWAYS include the correct scale (e.g., "System Energy 11/13" not "System Energy 11").""",
     "mode_brainstorm": """## Current Mode: Clinical Brainstorm
 Engage in open-ended clinical discussion. Draw from all available knowledge sources.
 Feel free to reference related conditions and cross-system connections.""",

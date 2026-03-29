@@ -283,7 +283,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', file.id)
 
           // CRITICAL: Persist blood panel to lab tables
-          if (file.file_type === 'blood_panel' && result.success && status === 'complete') {
+          // Accept both 'complete' and 'needs_review' — lab data is too important to gate on confidence
+          if (file.file_type === 'blood_panel' && result.success && (status === 'complete' || status === 'needs_review')) {
             const labPersistResult = await persistBloodPanelToLabTables(
               supabase,
               result.data as BloodPanelExtractedData,
@@ -302,6 +303,9 @@ export async function POST(request: Request, { params }: RouteParams) {
           }
 
           console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
+          if (file.file_type === 'blood_panel' && !result.success) {
+            console.error(`[Auto-Extract] Blood panel extraction FAILED for file ${file.id} (${file.filename}):`, result.error, 'Raw response length:', result.rawResponse?.length || 0)
+          }
           return { fileId: file.id, fileType: file.file_type, status, error: result.error }
         }))
       )
