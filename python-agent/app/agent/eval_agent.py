@@ -355,7 +355,7 @@ class EvalAgentRunner:
             max_tokens=EVAL_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
-            betas=["output-128k-2025-02-19"],
+            extra_headers={"anthropic-beta": "output-128k-2025-02-19"},
         ) as stream:
             raw_text = await stream.get_final_text()
             final_message = await stream.get_final_message()
