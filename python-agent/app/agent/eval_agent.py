@@ -35,6 +35,41 @@ _MASTER_PROTOCOLS_DIR = Path(
 _EVAL_REPORT_SCHEMA = json.dumps(EvalReport.model_json_schema(), indent=2)
 
 
+def _repair_truncated_json(text: str) -> str:
+    """Close off truncated JSON by balancing open braces, brackets, and strings."""
+    open_braces = 0
+    open_brackets = 0
+    in_string = False
+    escape_next = False
+
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            open_braces += 1
+        elif ch == "}":
+            open_braces -= 1
+        elif ch == "[":
+            open_brackets += 1
+        elif ch == "]":
+            open_brackets -= 1
+
+    if in_string:
+        text += '"'
+    text += "]" * open_brackets
+    text += "}" * open_braces
+    return text
+
+
 @lru_cache(maxsize=1)
 def _load_master_protocols() -> str:
     """
@@ -320,24 +355,37 @@ class EvalAgentRunner:
             max_tokens=EVAL_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
+            betas=["output-128k-2025-02-19"],
         ) as stream:
             raw_text = await stream.get_final_text()
             final_message = await stream.get_final_message()
 
         raw_text = raw_text.strip()
+        was_truncated = final_message.stop_reason == "max_tokens"
         logger.info(
             "Claude Sonnet eval complete for '%s': %d output chars, stop_reason=%s",
             patient_name,
             len(raw_text),
             final_message.stop_reason,
         )
+        if was_truncated:
+            logger.warning(
+                "Eval response for '%s' was truncated (hit max_tokens=%d). "
+                "Attempting JSON repair.",
+                patient_name,
+                EVAL_MAX_TOKENS,
+            )
 
         # Parse and validate
         try:
-            # Strip markdown code fences if Opus added them despite instructions
+            # Strip markdown code fences if Claude added them despite instructions
             if raw_text.startswith("```"):
                 lines = raw_text.split("\n")
                 raw_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+            # If truncated, attempt to repair before parsing
+            if was_truncated:
+                raw_text = _repair_truncated_json(raw_text)
 
             report_dict = json.loads(raw_text)
             report = EvalReport(**report_dict)
