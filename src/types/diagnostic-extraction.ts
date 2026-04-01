@@ -307,6 +307,15 @@ export interface BloodMarker {
   unit: string
   reference_range?: string
   status: 'low' | 'normal' | 'high'
+  comment?: string | null
+}
+
+export interface LabPageInfo {
+  totalPages: number
+  pagesRead: number[]
+  pagesSkipped: number[]
+  labProvider: 'LabCorp' | 'Quest' | 'Other' | 'Unknown'
+  filterApplied: boolean
 }
 
 export interface BloodPanelExtractedData {
@@ -321,6 +330,9 @@ export interface BloodPanelExtractedData {
 
   // Lab categories affected
   affected_categories: string[]     // e.g., ["thyroid", "inflammation", "lipids"]
+
+  // Page filtering info (present when Claude reports which pages were read)
+  pageInfo?: LabPageInfo
 }
 
 // ============================================

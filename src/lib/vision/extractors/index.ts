@@ -144,11 +144,17 @@ async function extractValsalva(imageUrl: string): Promise<ExtractionResult<Valsa
  * Blood panel extraction — uses dedicated lab panel prompt with 77 marker aliases
  * for accurate name normalization and abbreviation handling.
  */
-async function extractBloodPanel(imageUrl: string): Promise<ExtractionResult<BloodPanelExtractedData>> {
-  const userPrompt = `Analyze this blood panel / lab result image.
+export async function extractBloodPanel(imageUrl: string): Promise<ExtractionResult<BloodPanelExtractedData>> {
+  const userPrompt = `Analyze this blood panel / lab result document.
 
-Extract ALL visible lab markers. Use the normalized marker names from the alias list
-in your instructions — this is critical for downstream matching.
+PAGE FILTERING (apply before extraction):
+- First, scan all pages to identify the lab provider (LabCorp, Quest, or other).
+- If LabCorp: ONLY extract markers from pages marked "Final Report". Completely ignore interpretation, commentary, and summary pages — they contain LabCorp's broader epidemiological ranges that must not influence extraction.
+- If not LabCorp: extract from all pages normally.
+- Report which pages you read and skipped in the pageInfo field.
+
+Extract ALL visible lab markers from the applicable pages. Use the normalized marker names
+from the alias list in your instructions — this is critical for downstream matching.
 
 Return a JSON object with this EXACT structure:
 {
@@ -158,18 +164,26 @@ Return a JSON object with this EXACT structure:
       "value": numeric_value_only,
       "unit": "unit of measurement or empty string if not shown",
       "reference_range": "normal range if shown, e.g. '4.0-11.0', or null",
-      "status": "low" | "normal" | "high"
+      "status": "low" | "normal" | "high",
+      "comment": "any marker-specific footnote, note, or annotation from the report, or null"
     }
   ],
   "ominous_triggers": ["List of markers flagged H or critically out of range"],
   "total_markers": number_of_markers_extracted,
   "out_of_range_count": number_flagged_high_or_low,
   "affected_categories": ["thyroid", "inflammation", "lipids", "cbc", "metabolic", etc],
-  "confidence": 0.0 to 1.0
+  "confidence": 0.0 to 1.0,
+  "pageInfo": {
+    "totalPages": number_of_pages_in_document,
+    "pagesRead": [1, 3, 4],
+    "pagesSkipped": [2, 5],
+    "labProvider": "LabCorp" | "Quest" | "Other" | "Unknown",
+    "filterApplied": true | false
+  }
 }
 
 IMPORTANT:
-- Extract EVERY visible marker, even if uncertain about the match
+- Extract EVERY visible marker from applicable pages, even if uncertain about the match
 - Use the NORMALIZED name from the alias list (e.g., "TSH" not "Thyroid Stimulating Hormone")
 - Use numeric values only (no symbols, just the number)
 - Set status to "high" if flagged H or above reference range
@@ -178,10 +192,11 @@ IMPORTANT:
 - Include ominous_triggers for any critically abnormal values
 - Set high confidence (0.8-1.0) when text is clear
 - Set lower confidence (0.5-0.7) when text is blurry or uncertain
+- For LabCorp: only extract from "Final Report" pages, skip all others
 
-Be thorough - extract ALL visible lab values from this image.`
+Be thorough - extract ALL visible lab values from the applicable pages.`
 
-  return extractFromImage<BloodPanelExtractedData>(imageUrl, LAB_PANEL_SYSTEM_PROMPT, userPrompt)
+  return extractFromImage<BloodPanelExtractedData>(imageUrl, LAB_PANEL_SYSTEM_PROMPT, userPrompt, 8192)
 }
 
 /**

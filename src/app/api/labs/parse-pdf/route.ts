@@ -99,6 +99,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Log page filtering info for debugging
+    if (extraction.data.pageInfo) {
+      const pi = extraction.data.pageInfo;
+      console.log(
+        `[LabParse] Provider: ${pi.labProvider}, Filter: ${pi.filterApplied}, ` +
+        `Pages read: [${pi.pagesRead.join(',')}], Skipped: [${pi.pagesSkipped.join(',')}]`
+      );
+    }
+
     // Adapt BloodPanelExtractedData.markers → format mapToFrontendFormat expects
     const adaptedValues = extraction.data.markers.map((m) => ({
       markerName: m.name,
@@ -116,6 +125,7 @@ export async function POST(request: NextRequest) {
       unmatchedCount,
       warnings: [],
       extractionMethod: 'vision',
+      pageInfo: extraction.data.pageInfo ?? null,
     });
   } catch (error) {
     const errorName = error instanceof Error ? error.constructor.name : 'Unknown';

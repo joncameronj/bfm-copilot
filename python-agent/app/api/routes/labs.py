@@ -100,6 +100,20 @@ COMMON LAB MARKER ALIASES - Use these to normalize marker names:
 - Progesterone: also called P4
 - Globulin: also called Total Globulin, Serum Globulin
 
+LABCORP PDF PAGE FILTERING:
+When processing LabCorp lab reports, follow these page selection rules:
+
+1. IDENTIFY "Final Report" pages: Look for the text "Final Report" (typically in the bottom-right area of each page). These are the ONLY pages that contain actual lab result data with marker names, numeric values, units, and flags.
+2. ONLY extract marker values from pages marked "Final Report".
+3. COMPLETELY IGNORE all other pages — especially:
+   - LabCorp interpretation/analysis pages (often titled "Interpretation at a Glance", "Patient Health Summary", "Health Summary", or similar)
+   - Commentary pages discussing epidemiological reference ranges
+   - Cover pages, billing pages, or specimen collection detail pages
+   - Any page that contains narrative text about results rather than the actual result table
+4. If no "Final Report" markers are found (non-LabCorp report), extract from ALL pages normally — this filtering only applies to LabCorp reports.
+5. DO capture LabCorp's printed reference ranges in the referenceRange field for context, but do NOT let them influence your flag determination — BFM uses its own tighter ranges downstream.
+6. DO extract any marker-specific comments, footnotes, or annotations from Final Report pages into the comment field.
+
 EXTRACTION RULES:
 1. Extract ALL visible markers, not just the ones listed above
 2. Use the NORMALIZED name from the alias list when possible
@@ -107,12 +121,19 @@ EXTRACTION RULES:
 4. Extract the unit if visible
 5. Note if value is flagged as High (H), Low (L), or abnormal
 6. Include reference ranges if shown
+7. For LabCorp PDFs: only extract from "Final Report" pages (see LABCORP PAGE FILTERING above)
 
 IMPORTANT: Return ONLY valid JSON, no markdown fences or other text."""
 
 LAB_EXTRACTION_USER_PROMPT = """Analyze this lab panel / blood work document.
 
-Extract ALL visible lab markers with their values.
+PAGE FILTERING (apply before extraction):
+- First, scan all pages to identify the lab provider (LabCorp, Quest, or other).
+- If LabCorp: ONLY extract markers from pages marked "Final Report". Completely ignore interpretation, commentary, and summary pages — they contain LabCorp's broader epidemiological ranges that must not influence extraction.
+- If not LabCorp: extract from all pages normally.
+- Report which pages you read and skipped in the pageInfo field.
+
+Extract ALL visible lab markers with their values from the applicable pages.
 
 Return a JSON object with this EXACT structure:
 {
@@ -123,7 +144,8 @@ Return a JSON object with this EXACT structure:
       "unit": "unit string or null if not shown",
       "referenceRange": "normal range if shown, e.g., '4.0-11.0' or null",
       "flag": "H" or "L" or null,
-      "rawName": "original name as shown in the report"
+      "rawName": "original name as shown in the report",
+      "comment": "any marker-specific footnote, note, or annotation from the report, or null"
     }
   ],
   "summary": {
@@ -132,19 +154,27 @@ Return a JSON object with this EXACT structure:
     "flaggedMarkers": ["List of marker names that are flagged H or L"]
   },
   "warnings": ["Any issues encountered during extraction"],
-  "confidence": 0.0 to 1.0
+  "confidence": 0.0 to 1.0,
+  "pageInfo": {
+    "totalPages": number_of_pages_in_document,
+    "pagesRead": [1, 3, 4],
+    "pagesSkipped": [2, 5],
+    "labProvider": "LabCorp" or "Quest" or "Other" or "Unknown",
+    "filterApplied": true or false
+  }
 }
 
 IMPORTANT:
-- Extract EVERY visible marker, even if you're not sure about matching
+- Extract EVERY visible marker from applicable pages, even if you're not sure about matching
 - Use numeric values only (no symbols, just the number)
 - Normalize marker names using the alias list in the system prompt
 - Include the rawName to show what was originally in the report
 - Set flag to "H" for high, "L" for low, or null for normal
 - Set high confidence (0.8-1.0) when text is clear
 - Set lower confidence (0.5-0.7) when text is blurry or uncertain
+- For LabCorp: only extract from "Final Report" pages, skip all others
 
-Be thorough - extract ALL visible lab values from this document."""
+Be thorough - extract ALL visible lab values from the applicable pages."""
 
 
 def _extract_json(text: str) -> dict:
@@ -338,4 +368,5 @@ async def extract_lab_values(
         "warnings": parsed.get("warnings", []),
         "confidence": confidence,
         "extractionMethod": "vision",
+        "pageInfo": parsed.get("pageInfo"),
     }
