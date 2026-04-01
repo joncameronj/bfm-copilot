@@ -1,15 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateDiagnosticAnalysis, finalizeAnalysisFromEvalReport } from '@/lib/rag'
+import { summarizeUploadExtractionStage, type DiagnosticFileForExtraction } from '@/lib/diagnostics/extraction-pipeline'
 import { createReasoningRecords } from '@/lib/rag/reasoning-generator'
-import { extractDiagnosticValues } from '@/lib/vision'
-import { persistBloodPanelToLabTables } from '@/lib/labs/persist-from-diagnostic'
-import { getDefaultVisionModel } from '@/lib/ai/provider'
-import type { DiagnosticType } from '@/types/shared'
-import type { BloodPanelExtractedData } from '@/types/diagnostic-extraction'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // Parallel extraction + fire background job
+export const maxDuration = 120
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -79,26 +75,14 @@ async function resolveDiagnosticUpload(
 
 // POST /api/diagnostics/[id]/generate-analysis
 // Phase 1: Extract files + fire eval background job → returns immediately
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { id: inputId } = await params
-    const visionModel = getDefaultVisionModel()
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get user role (fallback to practitioner for resilience)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (profileError) {
-      console.warn('Profile lookup failed while generating analysis:', profileError.message)
     }
 
     // Resolve upload across upload/file/analysis ID types
@@ -114,6 +98,25 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!upload.patient_id) {
       return NextResponse.json(
         { error: 'Diagnostic upload must be linked to a patient before generating analysis' },
+        { status: 400 }
+      )
+    }
+
+    const { count: fileCount, error: fileCountError } = await supabase
+      .from('diagnostic_files')
+      .select('*', { count: 'exact', head: true })
+      .eq('upload_id', diagnosticUploadId)
+
+    if (fileCountError) {
+      return NextResponse.json(
+        { error: 'Failed to load diagnostic files for this upload' },
+        { status: 500 }
+      )
+    }
+
+    if (!fileCount) {
+      return NextResponse.json(
+        { error: 'No diagnostic files found for this upload. Please upload files before generating analysis.' },
         { status: 400 }
       )
     }
@@ -162,290 +165,6 @@ export async function POST(request: Request, { params }: RouteParams) {
         .eq('id', existingAnalysis.id)
     }
 
-    // AUTO-EXTRACT: Ensure all files are extracted before generating analysis
-    const { data: files, error: filesError } = await supabase
-      .from('diagnostic_files')
-      .select(`
-        id,
-        filename,
-        file_type,
-        mime_type,
-        storage_path,
-        upload_id,
-        diagnostic_extracted_values(id, status)
-      `)
-      .eq('upload_id', diagnosticUploadId)
-
-    type ExtractionResult = { fileId: string; fileType: string; status: string; error?: string }
-    type DiagnosticFileRow = NonNullable<typeof files>[number]
-
-    const extractionResults: ExtractionResult[] = []
-    let skippedOtherCount = 0
-    let skippedAlreadyExtractedCount = 0
-    let unknownFailureCount = 0
-
-    const isSuccessfulExtractionStatus = (status: string) =>
-      status === 'complete' || status === 'needs_review'
-
-    const isTransientExtractionError = (error: string | undefined) => {
-      if (!error) return false
-      return (
-        error.includes('overloaded') ||
-        error.includes('Overloaded') ||
-        error.includes('529') ||
-        error.includes('rate_limit') ||
-        error.includes('api_error') ||
-        error.includes('Internal server error')
-      )
-    }
-
-    const upsertExtractionResult = (nextResult: ExtractionResult) => {
-      const existingIndex = extractionResults.findIndex(result => result.fileId === nextResult.fileId)
-      if (existingIndex >= 0) {
-        extractionResults[existingIndex] = nextResult
-        return
-      }
-      extractionResults.push(nextResult)
-    }
-
-    // Inline concurrency limiter (avoids ESM issues with p-limit package)
-    function pLimit(concurrency: number) {
-      let active = 0
-      const queue: Array<() => void> = []
-      const next = () => { if (queue.length > 0 && active < concurrency) { active++; queue.shift()!() } }
-      return <T>(fn: () => Promise<T>): Promise<T> =>
-        new Promise<T>((resolve, reject) => {
-          queue.push(() => fn().then(resolve, reject).finally(() => { active--; next() }))
-          next()
-        })
-    }
-
-    if (!filesError && files) {
-      const limit = pLimit(3) // Max 3 concurrent vision API calls
-
-      const extractSingleFile = async (file: DiagnosticFileRow): Promise<ExtractionResult> => {
-        const existingExtraction = (file.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
-
-        // Generate short-lived signed URL (diagnostics bucket is private).
-        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-          .from('diagnostics')
-          .createSignedUrl(file.storage_path, 60 * 10)
-
-        if (signedUrlError || !signedUrlData?.signedUrl) {
-          console.warn(`[Auto-Extract] Failed to create signed URL for file ${file.id}:`, signedUrlError)
-          return {
-            fileId: file.id,
-            fileType: file.file_type,
-            status: 'error',
-            error: `Signed URL failed: ${signedUrlError?.message || 'no URL returned'}`,
-          }
-        }
-
-        // Create or update extraction record
-        let extractionId = existingExtraction?.id
-        if (!extractionId) {
-          const { data: newExtraction, error: insertError } = await supabase
-            .from('diagnostic_extracted_values')
-            .insert({
-              diagnostic_file_id: file.id,
-              status: 'processing',
-              extraction_method: 'vision_api',
-              extraction_model: visionModel,
-            })
-            .select('id')
-            .single()
-
-          if (insertError) {
-            console.error(`[Auto-Extract] Failed to insert extraction record for file ${file.id}:`, insertError)
-            return {
-              fileId: file.id,
-              fileType: file.file_type,
-              status: 'error',
-              error: `DB insert failed: ${insertError.message}`,
-            }
-          }
-          extractionId = newExtraction?.id
-        } else {
-          await supabase
-            .from('diagnostic_extracted_values')
-            .update({ status: 'processing' })
-            .eq('id', extractionId)
-        }
-
-        // Perform extraction
-        const result = await extractDiagnosticValues(
-          signedUrlData.signedUrl,
-          file.file_type as DiagnosticType,
-          file.mime_type
-        )
-
-        // Determine status based on confidence
-        const CONFIDENCE_THRESHOLD = 0.7
-        const status = !result.success
-          ? 'error'
-          : result.confidence < CONFIDENCE_THRESHOLD
-            ? 'needs_review'
-            : 'complete'
-
-        // Update extraction record
-        if (extractionId) {
-          const { error: updateError } = await supabase
-            .from('diagnostic_extracted_values')
-            .update({
-              extracted_data: result.data,
-              extraction_confidence: result.confidence,
-              raw_response: { response: result.rawResponse },
-              status,
-              error_message: result.error || null,
-            })
-            .eq('id', extractionId)
-
-          if (updateError) {
-            console.error(`[Auto-Extract] Failed to update extraction record for file ${file.id}:`, updateError)
-          }
-        }
-
-        // Mark file as processed
-        await supabase.from('diagnostic_files').update({ status: 'processed' }).eq('id', file.id)
-
-        // CRITICAL: Persist blood panel to lab tables
-        // Accept both 'complete' and 'needs_review' — lab data is too important to gate on confidence
-        if (file.file_type === 'blood_panel' && result.success && (status === 'complete' || status === 'needs_review')) {
-          const labPersistResult = await persistBloodPanelToLabTables(
-            supabase,
-            result.data as BloodPanelExtractedData,
-            file.upload_id,
-            user.id
-          )
-
-          if (labPersistResult.success) {
-            console.log(
-              `[Auto-Extract] Blood panel persisted to lab tables: ${labPersistResult.labResultId}, ` +
-              `${labPersistResult.labValuesCount} values`
-            )
-          } else {
-            console.warn('[Auto-Extract] Failed to persist blood panel to lab tables:', labPersistResult.error)
-          }
-        }
-
-        console.log(`[Auto-Extract] Extracted file ${file.id} (${file.file_type}): status=${status}, confidence=${result.confidence}`)
-        if (file.file_type === 'blood_panel' && !result.success) {
-          console.error(`[Auto-Extract] Blood panel extraction FAILED for file ${file.id} (${file.filename}):`, result.error, 'Raw response length:', result.rawResponse?.length || 0)
-        }
-        return { fileId: file.id, fileType: file.file_type, status, error: result.error }
-      }
-
-      const collectSettledResults = (settledResults: PromiseSettledResult<ExtractionResult>[]) => {
-        for (const result of settledResults) {
-          if (result.status === 'fulfilled') {
-            upsertExtractionResult(result.value)
-          } else {
-            console.error('[Auto-Extract] Extraction task failed:', result.reason)
-            upsertExtractionResult({
-              fileId: `unknown-${++unknownFailureCount}`,
-              fileType: 'unknown',
-              status: 'error',
-              error: result.reason?.message || 'Unknown error',
-            })
-          }
-        }
-      }
-
-      // Separate already-extracted files from those needing extraction
-      // Skip 'other' type files — not used in analysis (analysis engine checks hrv/dPulse/ua/vcs/brainwave/ortho/valsalva/bloodPanel only)
-      // Exception: if ALL files are 'other' (misclassified upload), treat them as blood_panel
-      const allFilesAreOther = files.every(f => f.file_type === 'other')
-      const filesToExtract: DiagnosticFileRow[] = []
-      for (const file of files) {
-        if (file.file_type === 'other' && !allFilesAreOther) {
-          skippedOtherCount++
-          continue
-        }
-        // Reclassify misclassified 'other' files as blood_panel for extraction
-        const effectiveFile: DiagnosticFileRow = (file.file_type === 'other' && allFilesAreOther)
-          ? { ...file, file_type: 'blood_panel' }
-          : file
-        const existingExtraction = (effectiveFile.diagnostic_extracted_values as Array<{ id: string; status: string }>)?.[0]
-        if (existingExtraction?.status === 'complete' || existingExtraction?.status === 'needs_review') {
-          skippedAlreadyExtractedCount++
-          upsertExtractionResult({ fileId: effectiveFile.id, fileType: effectiveFile.file_type, status: existingExtraction.status })
-        } else {
-          filesToExtract.push(effectiveFile)
-        }
-      }
-
-      // Extract files in parallel (concurrency 3)
-      const settled = await Promise.allSettled(
-        filesToExtract.map(file => limit(() => extractSingleFile(file)))
-      )
-
-      collectSettledResults(settled)
-
-      const hadParallelSuccess = filesToExtract.some(file => {
-        const result = extractionResults.find(extractionResult => extractionResult.fileId === file.id)
-        return result ? isSuccessfulExtractionStatus(result.status) : false
-      })
-
-      if (!hadParallelSuccess && filesToExtract.length > 1) {
-        console.warn(
-          `[Auto-Extract] Parallel extraction produced no usable results for upload ${diagnosticUploadId}; retrying sequentially`
-        )
-
-        for (const file of filesToExtract) {
-          const retriedResult = await extractSingleFile(file)
-          upsertExtractionResult(retriedResult)
-        }
-      }
-    }
-
-    // Log extraction summary (structured for post-hoc debugging of parallelization quality)
-    const successCount = extractionResults.filter(r => isSuccessfulExtractionStatus(r.status)).length
-    const totalFiles = files?.length || 0
-    const attemptedExtractionCount = Math.max(0, totalFiles - skippedAlreadyExtractedCount - skippedOtherCount)
-    console.log(`[Extraction Summary]`, JSON.stringify({
-      totalFiles,
-      attemptedExtractions: attemptedExtractionCount,
-      skippedAlreadyExtracted: skippedAlreadyExtractedCount,
-      skippedOther: skippedOtherCount,
-      results: extractionResults.map(r => ({
-        fileType: r.fileType,
-        status: r.status,
-        error: r.error || undefined,
-      })),
-      successCount,
-    }))
-
-    if (successCount === 0) {
-      if (extractionResults.length > 0) {
-        const allErrors = extractionResults.map(r => r.error || r.status)
-        const isTransientFailure = allErrors.some(e => typeof e === 'string' && isTransientExtractionError(e))
-        if (isTransientFailure) {
-          return NextResponse.json(
-            { error: 'The AI extraction service is temporarily unavailable. Please wait a moment and try again.' },
-            { status: 503 }
-          )
-        }
-        const failures = extractionResults.map(r => `${r.fileType}: ${r.error || r.status}`).join('; ')
-        return NextResponse.json(
-          { error: `All file extractions failed: ${failures}` },
-          { status: 400 }
-        )
-      }
-      // All files were 'other' type (skipped) — no recognized diagnostic types
-      if (skippedOtherCount > 0) {
-        return NextResponse.json(
-          { error: 'No recognized diagnostic files found. Please ensure files are uploaded with the correct type (HRV, D-Pulse, blood panel, urinalysis, etc.).' },
-          { status: 400 }
-        )
-      }
-      // No files found at all — upload may be empty or files not yet linked
-      console.error(`[Generate] No diagnostic files found for upload ${diagnosticUploadId}`)
-      return NextResponse.json(
-        { error: 'No diagnostic files found for this upload. Please upload files before generating analysis.' },
-        { status: 400 }
-      )
-    }
-
     // Create pending analysis record
     const { data: pendingAnalysis, error: pendingError } = await supabase
       .from('diagnostic_analyses')
@@ -473,13 +192,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       .eq('id', diagnosticUploadId)
 
     try {
-      // Fire eval background job (returns immediately — does NOT block)
-      const userRole = profile?.role === 'member' ? 'member' : 'practitioner'
       await generateDiagnosticAnalysis(
         diagnosticUploadId,
         upload.patient_id,
         user.id,
-        userRole
+        'practitioner'
       )
 
       // Log usage event
@@ -495,10 +212,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       // Return immediately — analysis is processing in background
       return NextResponse.json({
-        message: 'Analysis started — eval agent is processing',
+        message: 'Analysis started — extraction and eval are processing in the background',
         data: {
           analysisId: pendingAnalysis.id,
           status: 'processing',
+          stage: 'extracting',
         }
       })
 
@@ -738,22 +456,51 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Determine pipeline stage for frontend progress display
     let stage: string | undefined
     if (analysis.status === 'processing') {
-      const { data: evalReport } = await supabase
-        .from('diagnostic_eval_reports')
-        .select('status')
-        .eq('diagnostic_analysis_id', analysis.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const { data: extractionDetails } = await supabase
+        .from('diagnostic_files')
+        .select(`
+          id,
+          upload_id,
+          filename,
+          file_type,
+          mime_type,
+          storage_path,
+          status,
+          diagnostic_extracted_values (
+            id,
+            status,
+            created_at
+          )
+        `)
+        .eq('upload_id', diagnosticUploadId)
 
-      if (!evalReport) {
+      const extractionSummary = summarizeUploadExtractionStage(
+        (extractionDetails || []) as DiagnosticFileForExtraction[]
+      )
+      const extractionInFlight = extractionSummary.recognizedFiles > 0 && (
+        extractionSummary.pendingFiles > 0 || extractionSummary.processingFiles > 0
+      )
+
+      if (extractionInFlight) {
         stage = 'extracting'
-      } else if (evalReport.status === 'pending') {
-        stage = 'queued'
-      } else if (evalReport.status === 'processing') {
-        stage = 'analyzing'
-      } else if (evalReport.status === 'complete') {
-        stage = 'finalizing'
+      } else {
+        const { data: evalReport } = await supabase
+          .from('diagnostic_eval_reports')
+          .select('status')
+          .eq('diagnostic_analysis_id', analysis.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (!evalReport && (extractionDetails || []).length > 0) {
+          stage = 'extracting'
+        } else if (evalReport?.status === 'pending') {
+          stage = 'queued'
+        } else if (evalReport?.status === 'processing') {
+          stage = 'analyzing'
+        } else if (evalReport?.status === 'complete') {
+          stage = 'finalizing'
+        }
       }
     }
 

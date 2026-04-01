@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Loading03Icon, FileSearchIcon, Add01Icon, AiMagicIcon, File01Icon } from '@hugeicons/core-free-icons'
+import { Loading03Icon, FileSearchIcon, Add01Icon, AiMagicIcon, File01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { DiagnosticAnalysisPanel } from '@/components/diagnostics/DiagnosticAnalysisPanel'
@@ -219,6 +219,18 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
     }
   }
 
+  const handleDeleteUpload = async (uploadId: string) => {
+    if (!confirm('Remove this pending upload?')) return
+    try {
+      const res = await fetch(`/api/diagnostics/${uploadId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      toast.success('Upload removed')
+      fetchData()
+    } catch {
+      toast.error('Failed to remove upload')
+    }
+  }
+
   useEffect(() => {
     fetchData()
   }, [fetchData])
@@ -339,15 +351,24 @@ export function PatientDiagnosticAnalyses({ patientId }: PatientDiagnosticAnalys
                       {upload.files?.map(f => f.fileType.replace('_', ' ')).join(', ')}
                     </p>
                   </div>
-                  <Button
-                    onClick={() => handleGenerateAnalysis(upload.id)}
-                    isLoading={generatingId === upload.id}
-                    className="flex items-center gap-2"
-                    size="sm"
-                  >
-                    <HugeiconsIcon icon={AiMagicIcon} size={16} />
-                    Generate Analysis
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleGenerateAnalysis(upload.id)}
+                      isLoading={generatingId === upload.id}
+                      className="flex items-center gap-2"
+                      size="sm"
+                    >
+                      <HugeiconsIcon icon={AiMagicIcon} size={16} />
+                      Generate Analysis
+                    </Button>
+                    <button
+                      onClick={() => handleDeleteUpload(upload.id)}
+                      className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove this upload"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={16} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

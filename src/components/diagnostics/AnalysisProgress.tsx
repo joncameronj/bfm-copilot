@@ -20,8 +20,8 @@ const STEPS = [
 
 // Map stage to step index (which step is currently active)
 const STAGE_TO_STEP: Record<string, number> = {
-  extracting: 1,  // extraction done (POST returned), protocol engine running
-  queued: 2,      // eval queued
+  extracting: 0,  // extraction still running
+  queued: 1,      // extraction complete, eval queued
   analyzing: 2,   // eval running
   finalizing: 3,  // saving protocols
 }

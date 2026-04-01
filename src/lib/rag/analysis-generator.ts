@@ -25,41 +25,10 @@ import type { DiagnosticDataSummary } from '@/types/diagnostic-extraction'
 // TYPES
 // ============================================
 
-interface PatientContext {
-  id: string
-  firstName: string
-  lastName: string
-  gender: string
-  dateOfBirth: string
-  chiefComplaints: string | null
-  medicalHistory: string | null
-  currentMedications: string[] | null
-  allergies: string[] | null
-}
-
 interface DiagnosticFile {
   id: string
   filename: string
   fileType: string
-}
-
-interface ProtocolEngineResult {
-  protocols: Array<{
-    name: string
-    priority: number
-    trigger: string
-    category: string
-    notes: string
-  }>
-  supplements: Array<{
-    name: string
-    trigger: string
-    dosage: string
-    timing: string
-    notes: string
-  }>
-  deal_breakers: string[]
-  cross_correlations: string[]
 }
 
 interface GeneratedAnalysis {
@@ -85,35 +54,12 @@ interface GeneratedAnalysis {
 export async function generateDiagnosticAnalysis(
   diagnosticUploadId: string,
   patientId: string,
-  practitionerId: string,
+  _practitionerId: string,
   userRole: 'practitioner' | 'member' = 'practitioner'
 ): Promise<GeneratedAnalysis> {
   const supabase = await createClient()
 
-  // 1. Get patient context
-  const { data: patient, error: patientError } = await supabase
-    .from('patients')
-    .select('id, first_name, last_name, gender, date_of_birth, chief_complaints, medical_history, current_medications, allergies')
-    .eq('id', patientId)
-    .single()
-
-  if (patientError || !patient) {
-    throw new Error('Patient not found')
-  }
-
-  const patientContext: PatientContext = {
-    id: patient.id,
-    firstName: patient.first_name,
-    lastName: patient.last_name,
-    gender: patient.gender,
-    dateOfBirth: patient.date_of_birth,
-    chiefComplaints: patient.chief_complaints,
-    medicalHistory: patient.medical_history,
-    currentMedications: patient.current_medications,
-    allergies: patient.allergies,
-  }
-
-  // 2. Get diagnostic files
+  // 1. Get diagnostic files
   const { data: diagnosticFilesRaw, error: filesError } = await supabase
     .from('diagnostic_files')
     .select('id, filename, file_type')
@@ -129,74 +75,17 @@ export async function generateDiagnosticAnalysis(
     fileType: f.file_type,
   }))
 
-  // 2a. Check for demo mode
+  // 1a. Check for demo mode
   const demoResponse = await checkDemoMode(supabase, diagnosticFiles)
   if (demoResponse) {
-    const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
     return {
       ...demoResponse,
       ragContext: [],
-      extractedData,
+      extractedData: null,
     }
   }
 
-  // 3. Fetch extracted diagnostic values (from Vision API)
-  const extractedData = await getExtractedDiagnosticData(diagnosticUploadId, supabase)
-
-  // 4. Run deterministic protocol engine on extracted data
-  let engineResult: ProtocolEngineResult | null = null
-  if (extractedData) {
-    try {
-      const engineInput = {
-        ...extractedData,
-        patient_context: {
-          chief_complaints: patientContext.chiefComplaints,
-          medical_history: patientContext.medicalHistory,
-          current_medications: patientContext.currentMedications ?? [],
-          allergies: patientContext.allergies ?? [],
-        },
-      }
-
-      const engineResponse = await fetch(`${getPythonAgentUrl()}/agent/protocols/engine`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extracted_data: engineInput }),
-      })
-      if (engineResponse.ok) {
-        engineResult = await engineResponse.json() as ProtocolEngineResult
-        console.log(
-          `[Protocol Engine] Found ${engineResult.protocols.length} protocols, ` +
-          `${engineResult.supplements.length} supplements, ` +
-          `${engineResult.deal_breakers.length} deal breakers`
-        )
-      } else {
-        console.warn(`[Protocol Engine] Failed: ${engineResponse.status} ${engineResponse.statusText}`)
-      }
-    } catch (engineError) {
-      console.warn('[Protocol Engine] Unavailable, eval agent will handle all protocols:', engineError)
-    }
-  }
-
-  // 5. Guard: eval agent requires extracted data
-  // getExtractedDiagnosticData always returns an object (never null) — check if it has real data
-  const hasExtractedData = extractedData && (
-    extractedData.hrv !== null ||
-    extractedData.dPulse !== null ||
-    extractedData.ua !== null ||
-    extractedData.vcs !== null ||
-    extractedData.brainwave !== null ||
-    extractedData.ortho !== null ||
-    extractedData.valsalva !== null ||
-    extractedData.bloodPanel !== null
-  )
-  if (!hasExtractedData) {
-    throw new Error(
-      'No extracted diagnostic data available for this upload. ' +
-      'Ensure diagnostic files have been uploaded and extraction has completed before generating analysis.'
-    )
-  }
-
-  // 6. Handle member role — educational-only response (no protocols)
+  // 2. Handle member role — educational-only response (no protocols)
   if (userRole === 'member') {
     return {
       summary: 'Your diagnostic results have been reviewed. For treatment guidance, please consult with your practitioner or refer to your program materials.',
@@ -204,11 +93,11 @@ export async function generateDiagnosticAnalysis(
       supplementation: [],
       ragContext: [],
       reasoningChain: [],
-      extractedData,
+      extractedData: null,
     }
   }
 
-  // 7. Find the diagnostic_analysis_id for the eval agent
+  // 3. Find the diagnostic_analysis_id for the eval agent
   // The generate-analysis route creates a pending record before calling us.
   // We need that ID to pass to the eval agent.
   const { data: analysisRecord } = await supabase
@@ -224,7 +113,7 @@ export async function generateDiagnosticAnalysis(
     throw new Error('No diagnostic analysis record found for this upload')
   }
 
-  // 8. Fire the eval agent as a BACKGROUND JOB (async — returns immediately)
+  // 4. Fire the eval agent as a BACKGROUND JOB (async — returns immediately)
   // The eval takes 2-5 min; we cannot block the Vercel serverless function.
   // The GET polling handler will finalize when the eval report is ready.
   await startEvalBackgroundJob(analysisRecord.id, patientId)
@@ -237,7 +126,7 @@ export async function generateDiagnosticAnalysis(
     supplementation: [],
     ragContext: [],
     reasoningChain: [],
-    extractedData,
+    extractedData: null,
   }
 }
 

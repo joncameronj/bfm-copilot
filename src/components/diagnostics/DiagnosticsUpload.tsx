@@ -6,6 +6,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { AiMagicIcon, Loading03Icon, Tick01Icon } from '@hugeicons/core-free-icons'
 import { FilePreview } from './FilePreview'
 import { Button } from '@/components/ui/Button'
+import { classifyDiagnosticFile } from '@/lib/diagnostics/file-classification'
 import type { DiagnosticType } from '@/types/shared'
 
 interface UploadFile {
@@ -42,25 +43,10 @@ export function DiagnosticsUpload({
   const [analysisGenerated, setAnalysisGenerated] = useState(false)
   const [analysisAbortController, setAnalysisAbortController] = useState<AbortController | null>(null)
 
-  const guessFileType = useCallback((filename: string): DiagnosticType => {
-    const lower = filename.toLowerCase()
-    if (lower.includes('pulse') || lower.includes('dpulse') || lower.includes('depulse')) return 'd_pulse'
-    if (lower.includes('hrv')) return 'hrv'
-    if (lower.includes('ortho')) return 'ortho'
-    if (lower.includes('valsalva')) return 'valsalva'
-    if (lower.includes('ua') || lower.includes('urinalysis') || lower.includes('urine')) return 'urinalysis'
-    if (lower.includes('vcs') || lower.includes('visual contrast')) return 'vcs'
-    if (lower.includes('brainwave') || lower.includes('eeg') || lower.includes('brain')) return 'brainwave'
-    if (lower.includes('nes') || lower.includes('nes scan')) return 'nes_scan'
-    if (lower.includes('mold') || lower.includes('mycotox')) return 'mold_toxicity'
-    if (
-      lower.includes('blood') || lower.includes('lab') || lower.includes('cbc') ||
-      lower.includes('panel') || lower.includes('quest') || lower.includes('labcorp') ||
-      lower.includes('metabolic') || lower.includes('lipid') || lower.includes('thyroid') ||
-      lower.includes('comprehensive') || lower.includes('bmp') || lower.includes('cmp') ||
-      lower.includes('result') || lower.includes('report')
-    ) return 'blood_panel'
-    return 'other'
+  const guessFileType = useCallback((filename: string, mimeType?: string): DiagnosticType => {
+    return classifyDiagnosticFile(filename, mimeType, {
+      preferBloodPanelForUnknownReport: true,
+    })
   }, [])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -69,7 +55,7 @@ export function DiagnosticsUpload({
     const newFiles = acceptedFiles.slice(0, availableSlots).map((file) => ({
       id: crypto.randomUUID(),
       file,
-      type: guessFileType(file.name),
+      type: guessFileType(file.name, file.type),
       progress: 0,
       status: 'pending' as const,
     }))

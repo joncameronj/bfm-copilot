@@ -66,6 +66,7 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
         if (!res.ok) return
         const data = await res.json()
         const status = data?.data?.status
+        const remoteStage = data?.data?.stage
 
         if (status === 'complete') {
           stopElapsed()
@@ -81,6 +82,10 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
           setErrorMessage(msg)
           clearInterval(pollRef.current!)
           pollRef.current = null
+        } else if (remoteStage === 'extracting') {
+          setStage('extracting')
+        } else if (remoteStage) {
+          setStage('analyzing')
         }
       } catch {
         // Silently ignore poll failures — network blip, not fatal
@@ -137,8 +142,7 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
       setStage('extracting')
 
       // ── Step 2: Kick off extraction + eval ─────────────────────────
-      // This call blocks until PDF extraction completes (~30-60s),
-      // then returns immediately once the eval job is fired.
+      // This returns quickly; extraction and eval continue in the background.
       const abortCtrl = new AbortController()
       const abortTimeout = setTimeout(() => abortCtrl.abort(), 130_000)
 
@@ -159,6 +163,7 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
 
       const analyzeData = await analyzeRes.json()
       const status = analyzeData?.data?.status
+      const remoteStage = analyzeData?.data?.stage
 
       if (status === 'complete') {
         // Rare: already done (e.g. re-running on existing extraction)
@@ -167,8 +172,7 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
         onComplete?.()
         toast.success('Blood panel processed and analysis complete')
       } else {
-        // Normal path: eval agent is running — switch to polling stage
-        setStage('analyzing')
+        setStage(remoteStage === 'extracting' ? 'extracting' : 'analyzing')
       }
     } catch (error) {
       stopElapsed()

@@ -13,10 +13,12 @@ import json
 import re
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.agent.eval_agent import get_eval_runner
+from app.config import get_settings
 from app.models.eval_models import (
     EvalReportRequest,
     BatchEvalRequest,
@@ -34,6 +36,45 @@ router = APIRouter()
 
 # Max concurrent eval jobs per user (each costs ~$2-4 in Claude Sonnet tokens)
 MAX_CONCURRENT_EVAL_JOBS = 5
+
+
+async def _ensure_diagnostics_extracted(diagnostic_analysis_id: str) -> dict:
+    """Trigger the frontend extraction pipeline before building the eval bundle."""
+    db = get_supabase_client()
+    settings = get_settings()
+
+    analysis_result = db.table("diagnostic_analyses").select(
+        "diagnostic_upload_id"
+    ).eq("id", diagnostic_analysis_id).single().execute()
+
+    if not analysis_result.data or not analysis_result.data.get("diagnostic_upload_id"):
+        raise ValueError(f"Diagnostic analysis not found: {diagnostic_analysis_id}")
+
+    upload_id = analysis_result.data["diagnostic_upload_id"]
+    frontend_url = settings.frontend_url.rstrip("/")
+    endpoint = f"{frontend_url}/api/internal/diagnostics/{upload_id}/extract-pending"
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client:
+        response = await client.post(
+            endpoint,
+            headers={"Authorization": f"Bearer {settings.supabase_service_key}"},
+        )
+
+    if response.is_success:
+        payload = response.json()
+        return payload.get("data") or {}
+
+    error_message = response.text
+    try:
+        payload = response.json()
+        error_message = payload.get("error") or error_message
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        f"Diagnostic extraction failed for upload {upload_id}: "
+        f"{response.status_code} {error_message}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +502,17 @@ async def _run_eval_and_store(
     db = get_supabase_client()
 
     try:
-        # Mark as processing
+        extraction_summary = await _ensure_diagnostics_extracted(diagnostic_analysis_id)
+        logger.info(
+            "Extraction complete for analysis %s: recognized=%s success=%s failed=%s skipped=%s",
+            diagnostic_analysis_id,
+            extraction_summary.get("recognizedFiles"),
+            extraction_summary.get("successfulFiles"),
+            extraction_summary.get("failedFiles"),
+            extraction_summary.get("skippedFiles"),
+        )
+
+        # Extraction is done; mark eval as actively processing.
         db.table("diagnostic_eval_reports").update({
             "status": "processing",
         }).eq("id", report_id).execute()

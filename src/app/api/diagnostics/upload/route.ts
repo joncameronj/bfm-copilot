@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { classifyDiagnosticFile } from '@/lib/diagnostics/file-classification'
 import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,11 @@ export async function POST(request: Request) {
       'ortho', 'valsalva',
       'other',
     ]
-    const safeFileType = validFileTypes.includes(type) ? type : 'other'
+    const requestedType = validFileTypes.includes(type) ? type : 'other'
+    const inferredType = classifyDiagnosticFile(file.name, file.type, {
+      preferBloodPanelForUnknownReport: true,
+    })
+    const safeFileType = requestedType === 'other' ? inferredType : requestedType
 
     // Create diagnostic file record
     const { data: fileData, error: fileError } = await supabase
