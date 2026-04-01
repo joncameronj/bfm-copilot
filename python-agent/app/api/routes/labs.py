@@ -10,7 +10,7 @@ import re
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
-from app.services.ai_client import get_sync_client, get_vision_model
+from app.services.ai_client import get_async_client, get_vision_model
 from app.utils.logger import get_logger
 
 logger = get_logger("labs")
@@ -164,7 +164,50 @@ def _extract_json(text: str) -> dict:
         end = cleaned.rfind("}")
         if start != -1 and end != -1:
             cleaned = cleaned[start:end + 1]
-    return json.loads(cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Attempt to repair truncated JSON (e.g. from hitting max_tokens)
+        repaired = _try_repair_truncated_json(cleaned)
+        return json.loads(repaired)
+
+
+def _try_repair_truncated_json(text: str) -> str:
+    """Try to close off truncated JSON by balancing braces/brackets."""
+    open_braces = 0
+    open_brackets = 0
+    in_string = False
+    escape_next = False
+
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            open_braces += 1
+        elif ch == '}':
+            open_braces -= 1
+        elif ch == '[':
+            open_brackets += 1
+        elif ch == ']':
+            open_brackets -= 1
+
+    # If we're inside a string, close it
+    if in_string:
+        text += '"'
+
+    # Close any open brackets then braces
+    text += ']' * open_brackets
+    text += '}' * open_braces
+    return text
 
 
 def _detect_file_type(filename: str, content_type: str | None) -> str | None:
@@ -227,44 +270,58 @@ async def extract_lab_values(
             },
         }
 
-    client = get_sync_client()
+    client = get_async_client()
     model = get_vision_model()
 
     logger.info(f"Extracting lab values from {file_type}: {file.filename} ({len(file_content)} bytes)")
 
-    try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=4000,
-            temperature=0.1,
-            system=LAB_EXTRACTION_SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": LAB_EXTRACTION_USER_PROMPT},
-                        content_block,
-                    ],
-                }
-            ],
-        )
-    except Exception as e:
-        logger.error(f"Claude API error during lab extraction: {e}")
-        raise HTTPException(status_code=502, detail=f"AI extraction failed: {str(e)}")
+    max_attempts = 2
+    last_error = None
 
-    text_block = next((b for b in response.content if b.type == "text"), None)
-    if not text_block:
-        raise HTTPException(status_code=502, detail="No response from AI model")
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = await client.messages.create(
+                model=model,
+                max_tokens=8192,
+                temperature=0.1,
+                system=LAB_EXTRACTION_SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": LAB_EXTRACTION_USER_PROMPT},
+                            content_block,
+                        ],
+                    }
+                ],
+            )
+        except Exception as e:
+            logger.error(f"Claude API error during lab extraction (attempt {attempt}): {e}")
+            last_error = e
+            if attempt < max_attempts:
+                continue
+            raise HTTPException(status_code=502, detail=f"AI extraction failed: {str(last_error)}")
 
-    try:
-        parsed = _extract_json(text_block.text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse Claude response as JSON: {e}")
-        logger.error(f"Raw response: {text_block.text[:500]}")
-        raise HTTPException(
-            status_code=502,
-            detail="AI returned invalid JSON. Please try again.",
-        )
+        text_block = next((b for b in response.content if b.type == "text"), None)
+        if not text_block:
+            if attempt < max_attempts:
+                logger.warning(f"No text in AI response (attempt {attempt}), retrying...")
+                continue
+            raise HTTPException(status_code=502, detail="No response from AI model")
+
+        try:
+            parsed = _extract_json(text_block.text)
+            break  # Success — exit retry loop
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Claude response as JSON (attempt {attempt}): {e}")
+            logger.error(f"Raw response: {text_block.text[:500]}")
+            last_error = e
+            if attempt < max_attempts:
+                continue
+            raise HTTPException(
+                status_code=502,
+                detail="AI returned invalid JSON. Please try again.",
+            )
 
     values = parsed.get("values", [])
     confidence = parsed.get("confidence", 0.8)

@@ -11,9 +11,9 @@ class Settings(BaseSettings):
 
     # Anthropic (primary AI provider)
     anthropic_api_key: str | None = None
-    anthropic_chat_model: str = "claude-opus-4-6"
+    anthropic_chat_model: str = "claude-sonnet-4-6"
     anthropic_fast_model: str = "claude-haiku-4-5-20251001"
-    anthropic_vision_model: str = "claude-opus-4-6"
+    anthropic_vision_model: str = "claude-sonnet-4-6"
 
     # OpenAI embeddings (xAI removed standalone embedding models)
     openai_api_key: str | None = None

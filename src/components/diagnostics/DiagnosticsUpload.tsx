@@ -53,7 +53,13 @@ export function DiagnosticsUpload({
     if (lower.includes('brainwave') || lower.includes('eeg') || lower.includes('brain')) return 'brainwave'
     if (lower.includes('nes') || lower.includes('nes scan')) return 'nes_scan'
     if (lower.includes('mold') || lower.includes('mycotox')) return 'mold_toxicity'
-    if (lower.includes('blood') || lower.includes('lab') || lower.includes('cbc')) return 'blood_panel'
+    if (
+      lower.includes('blood') || lower.includes('lab') || lower.includes('cbc') ||
+      lower.includes('panel') || lower.includes('quest') || lower.includes('labcorp') ||
+      lower.includes('metabolic') || lower.includes('lipid') || lower.includes('thyroid') ||
+      lower.includes('comprehensive') || lower.includes('bmp') || lower.includes('cmp') ||
+      lower.includes('result') || lower.includes('report')
+    ) return 'blood_panel'
     return 'other'
   }, [])
 

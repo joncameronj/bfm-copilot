@@ -68,8 +68,8 @@ export const AVAILABLE_PROVIDERS = [
 
 // Available Anthropic model options for the dropdown
 export const AVAILABLE_MODELS = [
+  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Best balance of speed and capability (default)', provider: 'anthropic' },
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6', description: 'Most capable, deep reasoning', provider: 'anthropic' },
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', description: 'Best balance of speed and capability', provider: 'anthropic' },
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', description: 'Fast model for simple tasks', provider: 'anthropic' },
 ] as const
 

@@ -4,6 +4,7 @@ Replaces the xai-sdk streaming loop with Anthropic's stateless messages API.
 Handles multi-turn tool calling via message accumulation.
 """
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass
@@ -132,6 +133,7 @@ class AgentRunner:
             for m in messages
         ]
 
+        overload_retries = 0
         for iteration in range(MAX_TOOL_ITERATIONS):
             create_params: dict = {
                 "model": self.model,
@@ -234,7 +236,25 @@ class AgentRunner:
                                 current_tool_block = None
                                 current_tool_input_json = ""
 
-            except anthropic.APIError as e:
+            except anthropic.APIStatusError as e:
+                # 529 (overloaded) and 503 (service unavailable) — retry with backoff.
+                # Use status_code check instead of anthropic.OverloadedError /
+                # anthropic.ServiceUnavailableError because those are not exported
+                # from the top-level anthropic namespace in all SDK versions.
+                if e.status_code in (529, 503):
+                    overload_retries += 1
+                    if overload_retries <= 3:
+                        wait_secs = 2 ** overload_retries  # 2s, 4s, 8s
+                        logger.warning(
+                            f"Anthropic overloaded (attempt {overload_retries}/3), retrying in {wait_secs}s"
+                        )
+                        await asyncio.sleep(wait_secs)
+                        continue
+                    yield StreamEvent(
+                        type="error",
+                        data={"error": "Anthropic API is temporarily overloaded. Please try again in a moment."},
+                    )
+                    return
                 # If thinking is not supported by this model, retry without it
                 if thinking and "thinking" in str(e).lower():
                     logger.warning(
@@ -242,6 +262,9 @@ class AgentRunner:
                     )
                     thinking = None
                     continue
+                yield StreamEvent(type="error", data={"error": e.message})
+                return
+            except anthropic.APIError as e:
                 yield StreamEvent(type="error", data={"error": str(e)})
                 return
 

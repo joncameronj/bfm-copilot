@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getPythonAgentUrl } from '@/lib/agent/url';
+import { extractBloodPanel } from '@/lib/vision/extractors';
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Claude Vision PDF extraction can take 30-60s
 
@@ -75,41 +75,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Forward to Python agent for extraction
-    const agentUrl = getPythonAgentUrl();
-    const agentForm = new FormData();
-    agentForm.append('file', file);
-    agentForm.append('user_id', user.id);
+    // Convert file to base64 data URL for the vision client
+    const arrayBuffer = await file.arrayBuffer();
+    const b64 = Buffer.from(arrayBuffer).toString('base64');
+    const mimeType = file.type || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg');
+    const dataUrl = `data:${mimeType};base64,${b64}`;
 
-    const agentResponse = await fetch(`${agentUrl}/agent/labs/extract`, {
-      method: 'POST',
-      body: agentForm,
-    });
+    // Extract using vision client — has built-in retry logic for 529 overloaded errors,
+    // and uses Sonnet by default (configurable via ANTHROPIC_VISION_MODEL env var)
+    const extraction = await extractBloodPanel(dataUrl);
 
-    if (!agentResponse.ok) {
-      const errorData = await agentResponse.json().catch(() => null);
-      const errorMsg = errorData?.detail || `Python agent returned ${agentResponse.status}`;
-      console.error('Lab extraction failed:', errorMsg);
-      return NextResponse.json({ error: errorMsg }, { status: agentResponse.status });
-    }
-
-    const result = await agentResponse.json();
-
-    if (!result.success) {
+    if (!extraction.success) {
+      const isOverloaded = extraction.error && (
+        extraction.error.includes('overloaded') || extraction.error.includes('529')
+      );
       return NextResponse.json(
-        { error: result.warnings?.[0] || 'Could not extract lab values from this file.' },
-        { status: 422 }
+        {
+          error: isOverloaded
+            ? 'Claude AI is temporarily overloaded. Please wait a moment and try again.'
+            : extraction.error || 'Could not extract lab values from this file.'
+        },
+        { status: isOverloaded ? 503 : 422 }
       );
     }
 
+    // Adapt BloodPanelExtractedData.markers → format mapToFrontendFormat expects
+    const adaptedValues = extraction.data.markers.map((m) => ({
+      markerName: m.name,
+      value: m.value,
+      unit: m.unit,
+      flag: m.status === 'high' ? 'H' : m.status === 'low' ? 'L' : null,
+    }));
+
     // Map to frontend-expected format (markerName, markerId, value, unit, confidence)
-    const { matchedValues, unmatchedCount } = mapToFrontendFormat(result.values);
+    const { matchedValues, unmatchedCount } = mapToFrontendFormat(adaptedValues);
 
     return NextResponse.json({
       success: true,
       values: matchedValues,
       unmatchedCount,
-      warnings: (result.warnings || []).slice(0, 10),
+      warnings: [],
       extractionMethod: 'vision',
     });
   } catch (error) {
@@ -124,7 +129,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Map Python agent response values to the format the frontend PdfUpload component expects.
+ * Map extracted blood panel markers to the format the frontend PdfUpload component expects.
  * The frontend needs { markerName, markerId, value, unit, confidence }.
  */
 function mapToFrontendFormat(values: Array<{

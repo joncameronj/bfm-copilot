@@ -36,7 +36,7 @@ interface FilePreviewProps {
   disabled?: boolean
 }
 
-export function FilePreview({ file, onRemove, disabled }: FilePreviewProps) {
+export function FilePreview({ file, onTypeChange, onRemove, disabled }: FilePreviewProps) {
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -95,10 +95,22 @@ export function FilePreview({ file, onRemove, disabled }: FilePreviewProps) {
         </p>
       </div>
 
-      {/* Auto-detected type badge */}
-      <span className="flex-shrink-0 px-2.5 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">
-        {TYPE_LABELS[file.type] || file.type}
-      </span>
+      {/* File type selector */}
+      {file.status === 'pending' && !disabled ? (
+        <select
+          value={file.type}
+          onChange={(e) => onTypeChange(e.target.value as DiagnosticType)}
+          className="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400"
+        >
+          {(Object.keys(TYPE_LABELS) as DiagnosticType[]).map((key) => (
+            <option key={key} value={key}>{TYPE_LABELS[key]}</option>
+          ))}
+        </select>
+      ) : (
+        <span className="flex-shrink-0 px-2.5 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">
+          {TYPE_LABELS[file.type] || file.type}
+        </span>
+      )}
 
       {/* Remove Button */}
       {(file.status === 'pending' || file.status === 'error') && !disabled && (

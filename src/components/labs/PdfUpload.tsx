@@ -272,36 +272,40 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
         <input {...getInputProps()} />
 
         <div className="flex flex-col items-center gap-2">
-          <svg
-            className={cn(
-              'w-10 h-10',
-              isDragActive ? 'text-neutral-900' : 'text-neutral-400'
-            )}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-
           {isUploading ? (
-            <p className="text-neutral-600">Analyzing lab file...</p>
-          ) : isDragActive ? (
-            <p className="text-neutral-900 font-medium">Drop your lab file here</p>
+            <>
+              <div className="w-10 h-10 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
+              <p className="text-neutral-900 font-medium">Analyzing lab file...</p>
+              <p className="text-sm text-neutral-400">
+                This can take up to 30 seconds for large reports
+              </p>
+            </>
           ) : (
             <>
-              <p className="text-neutral-600">
-                Drag & drop a lab report (PDF or image), or{' '}
-                <span className="text-neutral-900 font-medium underline">browse</span>
-              </p>
-              <p className="text-sm text-neutral-400">
-                PDF, JPEG, PNG up to 50MB
-              </p>
+              <svg
+                className={cn('w-10 h-10', isDragActive ? 'text-neutral-900' : 'text-neutral-400')}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              {isDragActive ? (
+                <p className="text-neutral-900 font-medium">Drop your lab file here</p>
+              ) : (
+                <>
+                  <p className="text-neutral-600">
+                    Drag & drop a lab report (PDF or image), or{' '}
+                    <span className="text-neutral-900 font-medium underline">browse</span>
+                  </p>
+                  <p className="text-sm text-neutral-400">PDF, JPEG, PNG up to 50MB</p>
+                </>
+              )}
             </>
           )}
         </div>

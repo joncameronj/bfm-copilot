@@ -5,7 +5,7 @@ export function getAIProvider(): AIProvider {
 }
 
 export function getDefaultChatModel(): string {
-  return process.env.ANTHROPIC_CHAT_MODEL || 'claude-opus-4-6'
+  return process.env.ANTHROPIC_CHAT_MODEL || 'claude-sonnet-4-6'
 }
 
 export function getDefaultFastModel(): string {
@@ -13,7 +13,7 @@ export function getDefaultFastModel(): string {
 }
 
 export function getDefaultVisionModel(): string {
-  return process.env.ANTHROPIC_VISION_MODEL || 'claude-opus-4-6'
+  return process.env.ANTHROPIC_VISION_MODEL || 'claude-sonnet-4-6'
 }
 
 export function getDefaultEmbeddingModel(): string {
