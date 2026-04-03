@@ -133,7 +133,8 @@ class AgentRunner:
             for m in messages
         ]
 
-        overload_retries = 0
+        api_retries = 0
+        max_api_retries = 5
         for iteration in range(MAX_TOOL_ITERATIONS):
             create_params: dict = {
                 "model": self.model,
@@ -237,22 +238,30 @@ class AgentRunner:
                                 current_tool_input_json = ""
 
             except anthropic.APIStatusError as e:
-                # 529 (overloaded) and 503 (service unavailable) — retry with backoff.
-                # Use status_code check instead of anthropic.OverloadedError /
-                # anthropic.ServiceUnavailableError because those are not exported
-                # from the top-level anthropic namespace in all SDK versions.
-                if e.status_code in (529, 503):
-                    overload_retries += 1
-                    if overload_retries <= 3:
-                        wait_secs = 2 ** overload_retries  # 2s, 4s, 8s
+                # 429 (rate limit), 529 (overloaded), 503 (service unavailable) — retry with backoff.
+                if e.status_code in (429, 529, 503):
+                    api_retries += 1
+                    if api_retries <= max_api_retries:
+                        # Use Retry-After header if available (common on 429), else exponential backoff
+                        retry_after = None
+                        if hasattr(e, "response") and e.response is not None:
+                            retry_after = e.response.headers.get("retry-after")
+                        if retry_after:
+                            wait_secs = min(float(retry_after), 60.0)
+                        else:
+                            wait_secs = min(2 ** api_retries, 60.0)  # 2s, 4s, 8s, 16s, 32s
+                        status_label = {429: "rate limited", 529: "overloaded", 503: "unavailable"}.get(
+                            e.status_code, f"HTTP {e.status_code}"
+                        )
                         logger.warning(
-                            f"Anthropic overloaded (attempt {overload_retries}/3), retrying in {wait_secs}s"
+                            f"Anthropic {status_label} (attempt {api_retries}/{max_api_retries}), "
+                            f"retrying in {wait_secs:.1f}s"
                         )
                         await asyncio.sleep(wait_secs)
                         continue
                     yield StreamEvent(
                         type="error",
-                        data={"error": "Anthropic API is temporarily overloaded. Please try again in a moment."},
+                        data={"error": "The AI service is temporarily busy. Please try again in a moment."},
                     )
                     return
                 # If thinking is not supported by this model, retry without it

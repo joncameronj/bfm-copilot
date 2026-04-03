@@ -46,13 +46,27 @@ app.include_router(labs.router, prefix="/agent", tags=["Labs"])
 
 @app.on_event("startup")
 async def startup_event():
+    # Validate critical configuration
+    if not settings.frontend_url and not settings.debug:
+        raise RuntimeError(
+            "FRONTEND_URL env var must be set in production. "
+            "Example: https://your-app.railway.app"
+        )
+    if not settings.supabase_service_key:
+        logger.warning("SUPABASE_SERVICE_KEY is not set — internal API calls will fail")
+
+    if settings.frontend_url:
+        logger.info(f"Frontend URL: {settings.frontend_url}")
+    else:
+        logger.warning("FRONTEND_URL not set (debug mode) — using localhost defaults")
+
     # Validate Anthropic API key on startup
     chat_model = get_chat_model()
     logger.info(f"AI Provider: Anthropic (model: {chat_model})")
 
     # Initialize model settings service
     init_model_settings_service(
-        api_url=settings.frontend_url,
+        api_url=settings.frontend_url or "http://localhost:3000",
         default_model=chat_model,
         default_reasoning_effort=settings.reasoning_effort,
         default_reasoning_summary=settings.reasoning_summary,
@@ -81,6 +95,10 @@ async def shutdown_event():
     # Stop background job executor
     stop_executor()
     logger.info("Background job executor stopped")
+
+    # Close shared httpx client for Supabase RPCs
+    from app.tools.rag_search import close_supabase_http_client
+    await close_supabase_http_client()
 
 
 if __name__ == "__main__":

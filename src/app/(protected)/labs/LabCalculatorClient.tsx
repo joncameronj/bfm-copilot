@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { LabCalculator, type LabSaveOptions } from '@/components/labs/LabCalculator';
 import { PatientSelectorCompact } from '@/components/labs/PatientSelectorCompact';
@@ -31,8 +31,11 @@ export function LabCalculatorClient({
   recentResults,
 }: LabCalculatorClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>('import');
-  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(undefined);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(
+    searchParams.get('patient') || undefined
+  );
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   // Fetch full patient data when selectedPatientId changes

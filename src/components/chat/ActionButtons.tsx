@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import type { ActionButton } from '@/types/chat'
@@ -42,7 +43,7 @@ export function ActionButtons({ actions, className }: ActionButtonsProps) {
             className="group bg-neutral-100 border border-neutral-200 text-neutral-700 hover:bg-neutral-200 hover:border-neutral-300"
           >
             <span>{action.label}</span>
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="transition-transform group-hover:translate-x-0.5" />
           </Button>
         </motion.div>
       ))}

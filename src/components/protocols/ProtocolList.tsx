@@ -20,7 +20,7 @@ interface ProtocolListProps {
 export function ProtocolList({ viewMode = 'table' }: ProtocolListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const urlPatientId = searchParams.get('patientId')
+  const urlPatientId = searchParams.get('patient') || searchParams.get('patientId')
 
   const [filters, setFilters] = useState<ProtocolFiltersType>({
     status: 'all',

@@ -19,6 +19,28 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+# Shared httpx client for Supabase RPC calls — avoids TLS handshake per request.
+_supabase_http_client: httpx.AsyncClient | None = None
+
+
+def _get_supabase_http_client() -> httpx.AsyncClient:
+    """Return a persistent httpx client for Supabase RPC calls."""
+    global _supabase_http_client
+    if _supabase_http_client is None or _supabase_http_client.is_closed:
+        _supabase_http_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            timeout=30.0,
+        )
+    return _supabase_http_client
+
+
+async def close_supabase_http_client() -> None:
+    """Close the shared httpx client (call on app shutdown)."""
+    global _supabase_http_client
+    if _supabase_http_client is not None and not _supabase_http_client.is_closed:
+        await _supabase_http_client.aclose()
+        _supabase_http_client = None
+
 from app.embeddings.embedder import embed_query
 from app.embeddings.chunker import extract_protocols_from_text, normalize_protocol_name
 from app.services.supabase import get_supabase_client
@@ -168,15 +190,15 @@ async def _search_with_day_filter(
         "p_seminar_day": seminar_day,  # NEW: Filter by seminar day
     }
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
-            headers=headers,
-            json=payload,
-            timeout=30.0
-        )
-        resp.raise_for_status()
-        result_data = resp.json()
+    client = _get_supabase_http_client()
+    resp = await client.post(
+        f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
+        headers=headers,
+        json=payload,
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    result_data = resp.json()
 
     results = []
     for row in result_data or []:
@@ -322,6 +344,7 @@ async def sunday_first_search(
     limit: int = 10,
     threshold: float = 0.40,
     min_sunday_results: int = 3,
+    precomputed_embedding: list[float] | None = None,
 ) -> list[SearchResult]:
     """
     Parallel search across all seminar days with Sunday prioritization.
@@ -361,8 +384,8 @@ async def sunday_first_search(
         if body_systems is None and analysis.body_systems:
             body_systems = analysis.body_systems
 
-        # Generate query embedding once
-        query_embedding = await embed_query(query)
+        # Use precomputed embedding if available, otherwise generate
+        query_embedding = precomputed_embedding if precomputed_embedding is not None else await embed_query(query)
         tag_names = analysis.all_tags() if analysis else None
         should_expand = include_related and (analysis.should_expand if analysis else True)
 
@@ -546,15 +569,15 @@ async def smart_search(
             "p_user_role": user_role,
         }
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
-                headers=headers,
-                json=payload,
-                timeout=30.0
-            )
-            resp.raise_for_status()
-            result_data = resp.json()
+        client = _get_supabase_http_client()
+        resp = await client.post(
+            f'{settings.supabase_url}/rest/v1/rpc/bfm_search_20250122',
+            headers=headers,
+            json=payload,
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        result_data = resp.json()
 
         # Convert to SearchResult objects
         results = []

@@ -5,10 +5,13 @@ Uses the configured fast model to analyze queries and extract structured informa
 Includes diagnostic-to-protocol mappings derived from Dr. Rob's Sunday teaching sessions.
 """
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
+
+import anthropic
 
 from app.services.ai_client import get_async_client, get_fast_model
 from app.services.prompt_service import get_query_analyzer_prompt
@@ -413,32 +416,46 @@ async def analyze_query(
         api_messages.append({"role": "assistant", "content": "Understood."})
     api_messages.append({"role": "user", "content": f"Analyze this query:\n{query}"})
 
-    try:
-        response = await client.messages.create(
-            model=fast_model,
-            system=system_prompt,
-            messages=api_messages,
-            max_tokens=1024,
-        )
-
-        content = response.content[0].text if response.content else None
-        if content:
-            # Strip markdown code fences if present
-            text = content.strip()
-            if text.startswith("```"):
-                lines = text.split("\n")
-                text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-            data = json.loads(text)
-            parsed = QueryAnalysis.from_dict(data)
-            parsed.body_systems = _filter_allowed_systems(
-                _normalize_body_systems(parsed.body_systems)
+    max_api_retries = 2
+    for attempt in range(max_api_retries + 1):
+        try:
+            response = await client.messages.create(
+                model=fast_model,
+                system=system_prompt,
+                messages=api_messages,
+                max_tokens=1024,
             )
-            # Enrich with protocol suggestions from diagnostic mappings
-            enriched = enrich_analysis_with_protocols(parsed, query)
-            return enriched
 
-    except Exception as e:
-        logger.warning(f"Query analysis failed: {e}")
+            content = response.content[0].text if response.content else None
+            if content:
+                # Strip markdown code fences if present
+                text = content.strip()
+                if text.startswith("```"):
+                    lines = text.split("\n")
+                    text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                data = json.loads(text)
+                parsed = QueryAnalysis.from_dict(data)
+                parsed.body_systems = _filter_allowed_systems(
+                    _normalize_body_systems(parsed.body_systems)
+                )
+                # Enrich with protocol suggestions from diagnostic mappings
+                enriched = enrich_analysis_with_protocols(parsed, query)
+                return enriched
+
+        except anthropic.APIStatusError as e:
+            if e.status_code in (429, 529, 503) and attempt < max_api_retries:
+                wait_secs = min(2 ** (attempt + 1), 15.0)
+                logger.warning(
+                    f"Query analysis API error {e.status_code} (attempt {attempt + 1}/{max_api_retries + 1}), "
+                    f"retrying in {wait_secs:.0f}s"
+                )
+                await asyncio.sleep(wait_secs)
+                continue
+            logger.warning(f"Query analysis failed after retries: {e}")
+
+        except Exception as e:
+            logger.warning(f"Query analysis failed: {e}")
+            break
 
     # Fallback: basic keyword extraction
     fallback = _fallback_analysis(query)

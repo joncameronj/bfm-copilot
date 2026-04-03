@@ -4,9 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { PatientLabUploadModal } from './PatientLabUploadModal'
-import { PatientDiagnosticsModal } from './PatientDiagnosticsModal'
 import { PatientAddNoteModal } from './PatientAddNoteModal'
+import { StartConversationButton } from './StartConversationButton'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { TestTube01Icon, FolderUploadIcon, NoteIcon } from '@hugeicons/core-free-icons'
 
@@ -20,12 +19,8 @@ interface PatientProfileActionsProps {
 export function PatientProfileActions({
   patientId,
   patientName,
-  patientAge,
-  patientGender,
 }: PatientProfileActionsProps) {
   const router = useRouter()
-  const [showLabModal, setShowLabModal] = useState(false)
-  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false)
   const [showNoteModal, setShowNoteModal] = useState(false)
 
   const handleSuccess = () => {
@@ -44,47 +39,28 @@ export function PatientProfileActions({
         </Button>
         <Button
           variant="secondary"
-          onClick={() => setShowLabModal(true)}
+          onClick={() => router.push(`/labs?patient=${patientId}`)}
         >
           <HugeiconsIcon icon={TestTube01Icon} size={16} className="mr-2" />
           Upload Labs
         </Button>
         <Button
           variant="secondary"
-          onClick={() => setShowDiagnosticsModal(true)}
+          onClick={() => router.push(`/diagnostics?patient=${patientId}`)}
         >
           <HugeiconsIcon icon={FolderUploadIcon} size={16} className="mr-2" />
           Upload Diagnostics
         </Button>
+        <StartConversationButton patientId={patientId} />
         <Link href={`/patients/${patientId}/edit`}>
           <Button>Edit Patient</Button>
         </Link>
       </div>
 
-      {/* Note Modal */}
+      {/* Note Modal — no dedicated notes page, so modal is appropriate */}
       <PatientAddNoteModal
         isOpen={showNoteModal}
         onClose={() => setShowNoteModal(false)}
-        patientId={patientId}
-        patientName={patientName}
-        onSuccess={handleSuccess}
-      />
-
-      {/* Lab Upload Modal */}
-      <PatientLabUploadModal
-        isOpen={showLabModal}
-        onClose={() => setShowLabModal(false)}
-        patientId={patientId}
-        patientName={patientName}
-        patientAge={patientAge}
-        patientGender={patientGender}
-        onSuccess={handleSuccess}
-      />
-
-      {/* Diagnostics Upload Modal */}
-      <PatientDiagnosticsModal
-        isOpen={showDiagnosticsModal}
-        onClose={() => setShowDiagnosticsModal(false)}
         patientId={patientId}
         patientName={patientName}
         onSuccess={handleSuccess}

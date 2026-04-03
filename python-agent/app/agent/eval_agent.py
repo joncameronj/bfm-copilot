@@ -13,10 +13,13 @@ Do NOT use RAG for this flow. The master protocols ARE the context.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from functools import lru_cache
 from pathlib import Path
+
+import anthropic
 
 from app.models.eval_models import EvalReport
 from app.services.claude_client import get_claude_client, EVAL_MODEL, EVAL_MAX_TOKENS
@@ -350,15 +353,32 @@ class EvalAgentRunner:
             len(json.dumps(bundle_dict)),
         )
 
-        async with client.messages.stream(
-            model=EVAL_MODEL,
-            max_tokens=EVAL_MAX_TOKENS,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-            extra_headers={"anthropic-beta": "output-128k-2025-02-19"},
-        ) as stream:
-            raw_text = await stream.get_final_text()
-            final_message = await stream.get_final_message()
+        max_api_retries = 5
+        for api_attempt in range(max_api_retries):
+            try:
+                async with client.messages.stream(
+                    model=EVAL_MODEL,
+                    max_tokens=EVAL_MAX_TOKENS,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    extra_headers={"anthropic-beta": "output-128k-2025-02-19"},
+                ) as stream:
+                    raw_text = await stream.get_final_text()
+                    final_message = await stream.get_final_message()
+                break  # Success
+            except anthropic.APIStatusError as e:
+                if e.status_code in (429, 529, 503) and api_attempt < max_api_retries - 1:
+                    retry_after = None
+                    if hasattr(e, "response") and e.response is not None:
+                        retry_after = e.response.headers.get("retry-after")
+                    wait_secs = min(float(retry_after), 60.0) if retry_after else min(2 ** (api_attempt + 1), 60.0)
+                    logger.warning(
+                        "Eval API %d (attempt %d/%d) for '%s', retrying in %.1fs",
+                        e.status_code, api_attempt + 1, max_api_retries, patient_name, wait_secs,
+                    )
+                    await asyncio.sleep(wait_secs)
+                    continue
+                raise  # Non-retryable error or exhausted retries
 
         raw_text = raw_text.strip()
         was_truncated = final_message.stop_reason == "max_tokens"

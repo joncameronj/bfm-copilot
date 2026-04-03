@@ -51,6 +51,11 @@ async def _ensure_diagnostics_extracted(diagnostic_analysis_id: str) -> dict:
         raise ValueError(f"Diagnostic analysis not found: {diagnostic_analysis_id}")
 
     upload_id = analysis_result.data["diagnostic_upload_id"]
+    if not settings.frontend_url:
+        raise RuntimeError(
+            "FRONTEND_URL is not configured — cannot call internal extraction endpoint. "
+            "Set FRONTEND_URL in your environment."
+        )
     frontend_url = settings.frontend_url.rstrip("/")
     endpoint = f"{frontend_url}/api/internal/diagnostics/{upload_id}/extract-pending"
 

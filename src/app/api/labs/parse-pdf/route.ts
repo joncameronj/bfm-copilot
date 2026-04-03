@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { extractBloodPanel } from '@/lib/vision/extractors';
+import { labMarkers } from '@/data/lab-data';
+import { MARKER_ALIASES } from '@/lib/labs/marker-aliases';
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Claude Vision PDF extraction can take 30-60s
 
@@ -149,10 +151,6 @@ function mapToFrontendFormat(values: Array<{
   rawName?: string;
   flag?: string | null;
 }>) {
-  // Lazy-import lab markers to match by name
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { labMarkers } = require('@/data/lab-data');
-
   const matched: Array<{
     markerName: string;
     markerId: string | null;
@@ -186,17 +184,32 @@ function mapToFrontendFormat(values: Array<{
 function findMarker(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  labMarkers: Array<{ id: string; name: string; displayName: string }>
+  markers: Array<{ id: string; name: string; displayName: string }>
 ) {
   const lower = name.toLowerCase().trim();
-  // Direct match
-  for (const m of labMarkers) {
+  // 1) Direct match on displayName or name
+  for (const m of markers) {
     if (m.displayName.toLowerCase() === lower || m.name.toLowerCase() === lower) {
       return m;
     }
   }
-  // Partial match
-  for (const m of labMarkers) {
+  // 2) Alias lookup — match against known aliases, then find the canonical marker
+  for (const [canonicalName, aliases] of Object.entries(MARKER_ALIASES)) {
+    for (const alias of aliases) {
+      if (alias.toLowerCase() === lower) {
+        const found = markers.find(
+          (m) =>
+            m.displayName.toLowerCase() === canonicalName.toLowerCase() ||
+            m.name.toLowerCase() === canonicalName.toLowerCase() ||
+            m.displayName.toLowerCase().includes(canonicalName.toLowerCase()) ||
+            canonicalName.toLowerCase().includes(m.displayName.toLowerCase())
+        );
+        if (found) return found;
+      }
+    }
+  }
+  // 3) Partial match fallback
+  for (const m of markers) {
     if (lower.includes(m.displayName.toLowerCase()) || m.displayName.toLowerCase().includes(lower)) {
       return m;
     }

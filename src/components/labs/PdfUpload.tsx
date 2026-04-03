@@ -83,8 +83,20 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
 
       const data = await response.json();
 
-      if (!data.success || data.values.length === 0) {
-        toast.error('No lab values could be extracted from this file');
+      if (!data.success) {
+        toast.error('Could not extract values from this file. Try a clearer scan.');
+        return;
+      }
+
+      if (data.values.length === 0) {
+        if (data.unmatchedCount > 0) {
+          toast.error(
+            `${data.unmatchedCount} lab values were found but none matched known markers. ` +
+            'Try uploading a standard LabCorp or Quest panel.'
+          );
+        } else {
+          toast.error('No lab values found in this file.');
+        }
         return;
       }
 

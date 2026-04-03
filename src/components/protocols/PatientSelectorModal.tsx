@@ -192,6 +192,17 @@ export function PatientSelectorModal({
             <Button variant="secondary" onClick={handleClose}>
               Cancel
             </Button>
+            {tempSelectedId && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onSelect(undefined as unknown as string, '')
+                  onClose()
+                }}
+              >
+                Clear Selection
+              </Button>
+            )}
             <Button onClick={handleConfirm} disabled={!tempSelectedId}>
               Select Patient
             </Button>

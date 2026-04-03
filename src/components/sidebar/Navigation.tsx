@@ -17,6 +17,7 @@ import {
   StarIcon,
   HealthIcon,
   ChartHistogramIcon,
+  DashboardSquare01Icon,
 } from '@hugeicons/core-free-icons'
 import { UnreadBadge } from './UnreadBadge'
 
@@ -30,6 +31,7 @@ interface NavItem {
 const PRACTITIONER_NAV_ITEMS: NavItem[] = [
   { label: 'New Chat', href: '/', icon: 'NewChat' },
   { label: 'Chats', href: '/chats', icon: 'Chats' },
+  { label: 'Dashboard', href: '/dashboard', icon: 'Dashboard' },
   { label: 'Diagnostics', href: '/diagnostics', icon: 'Diagnostics' },
   { label: 'Labs', href: '/labs', icon: 'Labs' },
   { label: 'Patients', href: '/patients', icon: 'Patients' },
@@ -63,6 +65,7 @@ const TRANSITION_DURATION = '300ms'
 const NAV_ICONS: Record<string, typeof BubbleChatIcon> = {
   NewChat: Add01Icon,
   Chats: BubbleChatIcon,
+  Dashboard: DashboardSquare01Icon,
   Diagnostics: Pulse01Icon,
   Labs: TestTubeIcon,
   Patients: UserGroupIcon,

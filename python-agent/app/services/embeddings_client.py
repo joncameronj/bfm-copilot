@@ -4,9 +4,15 @@ xAI removed standalone embedding models, so we use OpenAI's
 text-embedding-3-small via the same OpenAI-compatible REST format.
 """
 
+import asyncio
+import time
+
 import httpx
 
 from app.config import get_settings
+from app.utils.logger import get_logger
+
+logger = get_logger("embeddings")
 
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 
@@ -33,22 +39,36 @@ async def create_embedding(
     model = model or default_model
     dimensions = dimensions or default_dims
 
+    max_retries = 3
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{OPENAI_BASE_URL}/embeddings",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": text,
-                "dimensions": dimensions,
-            },
-        )
+        for attempt in range(max_retries):
+            resp = await client.post(
+                f"{OPENAI_BASE_URL}/embeddings",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "input": text,
+                    "dimensions": dimensions,
+                },
+            )
+            if resp.status_code == 429:
+                retry_after = float(resp.headers.get("retry-after", 2 ** attempt))
+                wait_secs = min(retry_after, 30.0)
+                logger.warning(
+                    f"OpenAI embeddings rate limited (attempt {attempt + 1}/{max_retries}), "
+                    f"retrying in {wait_secs:.1f}s"
+                )
+                await asyncio.sleep(wait_secs)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            return data["data"][0]["embedding"]
+        # Exhausted retries
         resp.raise_for_status()
-        data = resp.json()
-        return data["data"][0]["embedding"]
+        return []  # unreachable but satisfies type checker
 
 
 def create_embedding_batch_sync(

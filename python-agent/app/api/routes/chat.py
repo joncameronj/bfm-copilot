@@ -23,6 +23,8 @@ from app.services.ai_client import get_async_client
 from app.services.supabase import get_supabase_client
 from app.services.protocol_loader import get_known_supplements
 from app.tools.rag_search import sunday_first_search
+from app.tools.query_analyzer import analyze_query
+from app.embeddings.embedder import embed_query
 from app.utils.logger import get_logger
 
 logger = get_logger("chat")
@@ -57,6 +59,20 @@ def _is_protocol_or_supplement_query(message: str) -> bool:
     """Return True when the query likely needs protocol/supplement grounding."""
     text = (message or "").lower()
     return any(re.search(pattern, text) for pattern in PROTOCOL_SUPPLEMENT_QUERY_PATTERNS)
+
+
+DEFINITIONAL_QUERY_PATTERNS = [
+    r"^what (?:is|are|does|do)\b",
+    r"^(?:can you )?(?:explain|define|describe)\b",
+    r"^(?:tell me )?(?:about |what ).{0,40}(?:mean|means|is)\b",
+    r"^how (?:is|are|does|do) .{1,30} (?:defined|work)\b",
+]
+
+
+def _is_definitional_query(message: str) -> bool:
+    """Return True for simple definitional questions that don't need presearch."""
+    text = (message or "").lower().strip()
+    return any(re.search(pattern, text) for pattern in DEFINITIONAL_QUERY_PATTERNS)
 
 
 def _build_presearch_query(base_message: str, category_keyword: str) -> str:
@@ -208,6 +224,11 @@ async def _build_sunday_presearch_context(
         else NORMAL_PRESEARCH_EXCERPTS_PER_CATEGORY
     )
 
+    # Compute query analysis and embedding ONCE, shared across all 4 category searches.
+    # This reduces API calls from 4+4 (per category) to 1+1 total.
+    shared_analysis = await analyze_query(message)
+    shared_embedding = await embed_query(message)
+
     async def fetch_category_section(label: str, keyword: str) -> str:
         query = _build_presearch_query(message, keyword)
         try:
@@ -216,6 +237,8 @@ async def _build_sunday_presearch_context(
                 user_id=user_id,
                 user_role=user_role,  # type: ignore[arg-type]
                 conversation_id=conversation_id,
+                analysis=shared_analysis,
+                precomputed_embedding=shared_embedding,
                 include_related=True,
                 limit=limit,
                 threshold=threshold,
@@ -371,34 +394,44 @@ async def chat_stream(
     # Hard guard for protocol/supplement questions:
     # - Practitioner/admin: pre-search Sunday chunks and inject evidence.
     # - Member: enforce educational-only override with course callout.
-    if _is_protocol_or_supplement_query(request.message):
+    is_protocol_query = _is_protocol_or_supplement_query(request.message)
+    is_definitional = _is_definitional_query(request.message)
+    needs_presearch = is_protocol_query and not is_definitional
+
+    if is_protocol_query:
         user_id = request.user_id or "system"
         user_role = request.user_role or "member"
         if user_role in {"practitioner", "admin"}:
-            sunday_context = await _build_sunday_presearch_context(
-                message=request.message,
-                user_id=user_id,
-                user_role=user_role,
-                conversation_id=request.conversation_id,
-                deep_dive=request.deep_dive,
-            )
-            has_deuterium_evidence = "deuterium" in sunday_context.lower()
-            agent_config.instructions += (
-                "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
-                "The system pre-searched Sunday chunks across Diabetes, Thyroid, Hormones, and Neurological categories.\n"
-                "Use this Sunday evidence first for protocol/supplement answers.\n"
-                "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
-                "Always cite sources using [Source: Document Title].\n"
-                "Only cite source titles that appear in retrieved context. Never invent source names.\n"
-                "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n"
-                "Only if Sunday evidence is absent may you use non-Sunday context conservatively.\n\n"
-                f"{sunday_context}"
-            )
-            if has_deuterium_evidence:
+            if needs_presearch:
+                sunday_context = await _build_sunday_presearch_context(
+                    message=request.message,
+                    user_id=user_id,
+                    user_role=user_role,
+                    conversation_id=request.conversation_id,
+                    deep_dive=request.deep_dive,
+                )
+                has_deuterium_evidence = "deuterium" in sunday_context.lower()
                 agent_config.instructions += (
-                    "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
-                    "Do NOT state that Deuterium Drops are unavailable in BFM protocols. "
-                    "Answer directly from this retrieved context and avoid additional tool calls unless the user asks for deeper detail."
+                    "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
+                    "The system pre-searched Sunday chunks across Diabetes, Thyroid, Hormones, and Neurological categories.\n"
+                    "Use this Sunday evidence first for protocol/supplement answers.\n"
+                    "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
+                    "Always cite sources using [Source: Document Title].\n"
+                    "Only cite source titles that appear in retrieved context. Never invent source names.\n"
+                    "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n"
+                    "Only if Sunday evidence is absent may you use non-Sunday context conservatively.\n\n"
+                    f"{sunday_context}"
+                )
+                if has_deuterium_evidence:
+                    agent_config.instructions += (
+                        "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
+                        "Do NOT state that Deuterium Drops are unavailable in BFM protocols. "
+                        "Answer directly from this retrieved context and avoid additional tool calls unless the user asks for deeper detail."
+                    )
+            else:
+                logger.info(
+                    "Skipping presearch for definitional query: %s",
+                    request.message[:80],
                 )
         else:
             agent_config.instructions += (
@@ -484,32 +517,37 @@ async def chat_sync(
         user_role=request.user_role,
     )
 
-    if _is_protocol_or_supplement_query(request.message):
+    sync_is_protocol = _is_protocol_or_supplement_query(request.message)
+    sync_is_definitional = _is_definitional_query(request.message)
+    sync_needs_presearch = sync_is_protocol and not sync_is_definitional
+
+    if sync_is_protocol:
         user_id = request.user_id or "system"
         user_role = request.user_role or "member"
         if user_role in {"practitioner", "admin"}:
-            sunday_context = await _build_sunday_presearch_context(
-                message=request.message,
-                user_id=user_id,
-                user_role=user_role,
-                conversation_id=request.conversation_id,
-                deep_dive=request.deep_dive,
-            )
-            has_deuterium_evidence = "deuterium" in sunday_context.lower()
-            system_prompt += (
-                "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
-                "Use this Sunday evidence first for protocol/supplement answers.\n"
-                "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
-                "Always cite sources using [Source: Document Title].\n"
-                "Only cite source titles that appear in retrieved context. Never invent source names.\n\n"
-                "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n\n"
-                f"{sunday_context}"
-            )
-            if has_deuterium_evidence:
-                system_prompt += (
-                    "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
-                    "Do NOT state that Deuterium Drops are unavailable in BFM protocols."
+            if sync_needs_presearch:
+                sunday_context = await _build_sunday_presearch_context(
+                    message=request.message,
+                    user_id=user_id,
+                    user_role=user_role,
+                    conversation_id=request.conversation_id,
+                    deep_dive=request.deep_dive,
                 )
+                has_deuterium_evidence = "deuterium" in sunday_context.lower()
+                system_prompt += (
+                    "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
+                    "Use this Sunday evidence first for protocol/supplement answers.\n"
+                    "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
+                    "Always cite sources using [Source: Document Title].\n"
+                    "Only cite source titles that appear in retrieved context. Never invent source names.\n\n"
+                    "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n\n"
+                    f"{sunday_context}"
+                )
+                if has_deuterium_evidence:
+                    system_prompt += (
+                        "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
+                        "Do NOT state that Deuterium Drops are unavailable in BFM protocols."
+                    )
         else:
             system_prompt += (
                 "\n\n[MEMBER SAFETY OVERRIDE]\n"

@@ -15,6 +15,7 @@ interface ProtocolCartProps {
   selectedPatientId?: string
   selectedPatientName?: string
   onPatientSelect: (patientId: string, patientName: string) => void
+  onPatientClear?: () => void
   onSubmit: (input: {
     patientId: string
     sessionDate: string
@@ -34,6 +35,7 @@ export function ProtocolCart({
   selectedPatientId,
   selectedPatientName,
   onPatientSelect,
+  onPatientClear,
   onSubmit,
   isLoading = false,
 }: ProtocolCartProps) {
@@ -132,14 +134,26 @@ export function ProtocolCart({
             <span className="font-medium text-neutral-900 dark:text-neutral-100">
               {selectedPatientName}
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsPatientModalOpen(true)}
-              disabled={isLoading || submitting}
-            >
-              Change
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsPatientModalOpen(true)}
+                disabled={isLoading || submitting}
+              >
+                Change
+              </Button>
+              {onPatientClear && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onPatientClear}
+                  disabled={isLoading || submitting}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <Button

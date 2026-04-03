@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000"]
 
-    # Frontend URL for fetching dynamic settings
-    frontend_url: str = "http://localhost:3000"
+    # Frontend URL for fetching dynamic settings (required in production)
+    frontend_url: str | None = "http://localhost:3000"
 
     # Reasoning settings (defaults, can be overridden by admin panel)
     reasoning_effort: str = "high"  # low, medium, high

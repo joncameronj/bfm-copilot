@@ -305,7 +305,7 @@ async def extract_lab_values(
 
     logger.info(f"Extracting lab values from {file_type}: {file.filename} ({len(file_content)} bytes)")
 
-    max_attempts = 2
+    max_attempts = 4
     last_error = None
 
     for attempt in range(1, max_attempts + 1):
@@ -326,11 +326,19 @@ async def extract_lab_values(
                 ],
             )
         except Exception as e:
-            logger.error(f"Claude API error during lab extraction (attempt {attempt}): {e}")
+            logger.error(f"Claude API error during lab extraction (attempt {attempt}/{max_attempts}): {e}")
             last_error = e
             if attempt < max_attempts:
+                # Backoff before retry — especially important for 429/529
+                import asyncio
+                wait_secs = min(2 ** attempt, 30.0)
+                logger.info(f"Retrying lab extraction in {wait_secs:.0f}s...")
+                await asyncio.sleep(wait_secs)
                 continue
-            raise HTTPException(status_code=502, detail=f"AI extraction failed: {str(last_error)}")
+            raise HTTPException(
+                status_code=503,
+                detail="Lab extraction is temporarily unavailable. Please try again in a moment.",
+            )
 
         text_block = next((b for b in response.content if b.type == "text"), None)
         if not text_block:

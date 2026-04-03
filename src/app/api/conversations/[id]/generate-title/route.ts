@@ -57,20 +57,37 @@ export async function POST(request: Request, { params }: RouteParams) {
       .map((m) => `${m.role}: ${m.content.slice(0, 500)}`)
       .join('\n')
 
-    // Generate title using the configured Anthropic model
+    // Generate title using the configured Anthropic model (with 429/529 retry)
     const client = getAnthropicClient()
-    const completion = await client.messages.create({
-      model: getDefaultFastModel(),
-      max_tokens: 30,
-      temperature: 0.7,
-      system: 'You are a title generator. Generate a concise, descriptive title (3-6 words) for the following conversation. The title should capture the main topic or intent. Return only the title text, nothing else.',
-      messages: [
-        {
-          role: 'user',
-          content: conversationText,
-        },
-      ],
-    })
+    let completion
+    const maxRetries = 3
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        completion = await client.messages.create({
+          model: getDefaultFastModel(),
+          max_tokens: 30,
+          temperature: 0.7,
+          system: 'You are a title generator. Generate a concise, descriptive title (3-6 words) for the following conversation. The title should capture the main topic or intent. Return only the title text, nothing else.',
+          messages: [
+            {
+              role: 'user',
+              content: conversationText,
+            },
+          ],
+        })
+        break
+      } catch (apiError: unknown) {
+        const status = (apiError as { status?: number })?.status
+        if (status && [429, 529, 503].includes(status) && attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, Math.min(2 ** (attempt + 1) * 1000, 15000)))
+          continue
+        }
+        throw apiError
+      }
+    }
+    if (!completion) {
+      return NextResponse.json({ title: 'New Conversation' })
+    }
 
     const textBlock = completion.content.find((b) => b.type === 'text')
     const generatedTitle =

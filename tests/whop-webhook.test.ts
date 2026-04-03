@@ -185,8 +185,7 @@ describe('POST /api/webhooks/whop', () => {
         type: 'recovery',
         email: 'test@example.com',
         options: {
-          redirectTo:
-            'https://copilot.example.com/api/auth/callback?next=/update-password',
+          redirectTo: 'https://copilot.example.com/update-password',
         },
       })
     })
