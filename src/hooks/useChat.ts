@@ -7,6 +7,18 @@ import { parseSSELines, parseSSEData } from '@/lib/utils/sse-parser'
 
 const DEBUG_STREAMING = process.env.NODE_ENV === 'development'
 
+function debugStreaming(...args: unknown[]) {
+  if (DEBUG_STREAMING) {
+    console.log(...args)
+  }
+}
+
+function debugStreamingWarn(...args: unknown[]) {
+  if (DEBUG_STREAMING) {
+    console.warn(...args)
+  }
+}
+
 interface UseChatOptions {
   conversationId?: string
   patientId?: string
@@ -335,11 +347,11 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
 
         if (reader) {
           // Use buffered SSE parser to handle chunks split across network boundaries
-          console.log('[Streaming] Starting to read SSE stream...')
+          debugStreaming('[Streaming] Starting to read SSE stream...')
           let lineCount = 0
           for await (const line of parseSSELines(reader)) {
             lineCount++
-            console.log(`[SSE Line ${lineCount}]`, line.slice(0, 80))
+            debugStreaming(`[SSE Line ${lineCount}]`, line.slice(0, 80))
             let parsed: SSEStreamEvent | null
             try {
               parsed = parseSSEData<SSEStreamEvent>(line)
@@ -521,7 +533,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
 
               // Handle done event
               if (parsed.type === 'done') {
-                console.log('[SSE] Stream completed normally')
+                debugStreaming('[SSE] Stream completed normally')
               }
             } catch (eventError) {
               console.error('[SSE Event Handling Error]', {
@@ -533,11 +545,15 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
               throw eventError
             }
           }
-          console.log(`[Streaming] Finished reading. Total lines: ${lineCount}, assistantMessage length: ${assistantMessage.length}`)
+          debugStreaming(
+            `[Streaming] Finished reading. Total lines: ${lineCount}, assistantMessage length: ${assistantMessage.length}`
+          )
 
           // Warn if stream completed with no text output
           if (!assistantMessage.trim()) {
-            console.warn('[Streaming] WARNING: Stream completed with no text output. Agent may have encountered an issue or timed out.')
+            debugStreamingWarn(
+              '[Streaming] WARNING: Stream completed with no text output. Agent may have encountered an issue or timed out.'
+            )
           }
         }
 

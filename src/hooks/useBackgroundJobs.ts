@@ -7,6 +7,13 @@ import type { BackgroundJob, BackgroundJobStatus } from '@/types/chat'
 
 // Maximum concurrent background jobs
 const MAX_CONCURRENT_JOBS = 3
+const DEBUG_BACKGROUND_JOBS = process.env.NODE_ENV === 'development'
+
+function debugBackgroundJobs(...args: unknown[]) {
+  if (DEBUG_BACKGROUND_JOBS) {
+    console.log(...args)
+  }
+}
 
 interface UseBackgroundJobsOptions {
   userId?: string
@@ -92,7 +99,7 @@ export function useBackgroundJobs(options: UseBackgroundJobsOptions = {}): UseBa
         console.error('[BackgroundJobs] API error:', response.status, errorData)
         // If table doesn't exist yet, just return empty - this is expected before migration runs
         if (errorData.error?.includes('relation') || errorData.error?.includes('does not exist')) {
-          console.log('[BackgroundJobs] Table not yet created, skipping fetch')
+          debugBackgroundJobs('[BackgroundJobs] Table not yet created, skipping fetch')
           setJobs([])
           setUnreadCount(0)
           setActiveCount(0)
@@ -143,7 +150,7 @@ export function useBackgroundJobs(options: UseBackgroundJobsOptions = {}): UseBa
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('[BackgroundJobs] Realtime update:', payload.eventType, payload)
+          debugBackgroundJobs('[BackgroundJobs] Realtime update:', payload.eventType, payload)
 
           if (payload.eventType === 'INSERT') {
             // New job created
