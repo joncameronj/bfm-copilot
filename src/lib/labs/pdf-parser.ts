@@ -134,13 +134,39 @@ function findMatchingMarker(testName: string): { id: string; name: string } | nu
     }
   }
 
-  // Try partial match as last resort
+  // Try partial match as last resort — but only when the test name is long
+  // enough to be meaningful and the match is close in length to avoid
+  // false positives (e.g., "Transferrin Saturation" matching "Transferrin"
+  // or random text near numbers matching short marker names).
   for (const marker of labMarkers) {
-    if (
-      normalizedTestName.includes(marker.displayName.toLowerCase()) ||
-      marker.displayName.toLowerCase().includes(normalizedTestName)
-    ) {
-      return { id: marker.id, name: marker.displayName };
+    const markerLower = marker.displayName.toLowerCase();
+    const nameLower = marker.name.toLowerCase();
+
+    // Only allow partial matches when:
+    // 1. The test name is at least 4 chars (avoid matching "Na", "Ca" etc. randomly)
+    // 2. The lengths are within 50% of each other (avoid "Transferrin" matching "Transferrin Saturation")
+    const lengthRatio = normalizedTestName.length / markerLower.length;
+    const nameRatio = normalizedTestName.length / nameLower.length;
+
+    if (normalizedTestName.length >= 4) {
+      if (
+        normalizedTestName === markerLower ||
+        normalizedTestName === nameLower
+      ) {
+        return { id: marker.id, name: marker.displayName };
+      }
+      if (
+        (normalizedTestName.includes(markerLower) || markerLower.includes(normalizedTestName)) &&
+        lengthRatio >= 0.6 && lengthRatio <= 1.5
+      ) {
+        return { id: marker.id, name: marker.displayName };
+      }
+      if (
+        (normalizedTestName.includes(nameLower) || nameLower.includes(normalizedTestName)) &&
+        nameRatio >= 0.6 && nameRatio <= 1.5
+      ) {
+        return { id: marker.id, name: marker.displayName };
+      }
     }
   }
 

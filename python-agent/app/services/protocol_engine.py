@@ -1259,6 +1259,22 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
         stressed = hrv_data.get("stressed_position", {})
         recovery = hrv_data.get("recovery_position", {})
 
+        # switched_sympathetics can come from patterns dict (vision extraction)
+        # or as a flat field (normalized bundle). Also check for "PSNS switched"
+        # in deal_breakers/findings text — newer HRV software uses this label
+        # for the same deal breaker as "SNS switched".
+        switched = (
+            patterns.get("switched_sympathetics", False)
+            or hrv_data.get("switched_sympathetics", False)
+        )
+        if not switched:
+            # Check deal_breakers and findings for "PSNS switched" text
+            deal_breakers = hrv_data.get("deal_breakers") or []
+            findings = hrv_data.get("findings") or []
+            all_text = " ".join(str(item) for item in deal_breakers + findings).lower()
+            if "psns switched" in all_text or "psns switch" in all_text:
+                switched = True
+
         bundle.hrv = HRVData(
             system_energy=hrv_data.get("system_energy"),
             stress_response=hrv_data.get("stress_response"),
@@ -1268,7 +1284,7 @@ def bundle_from_extracted_data(data: dict) -> DiagnosticBundle:
             stressed_sns=stressed.get("sns") if stressed else None,
             recovery_pns=recovery.get("pns") if recovery else None,
             recovery_sns=recovery.get("sns") if recovery else None,
-            switched_sympathetics=patterns.get("switched_sympathetics", False),
+            switched_sympathetics=switched,
             pns_negative=patterns.get("pns_negative", False),
             vagus_dysfunction=patterns.get("vagus_dysfunction", False),
             ortho_dots_superimposed=patterns.get("ortho_dots_superimposed", False),

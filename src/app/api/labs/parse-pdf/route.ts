@@ -208,10 +208,18 @@ function findMarker(
       }
     }
   }
-  // 3) Partial match fallback
+  // 3) Partial match fallback — only when names are close in length to avoid
+  // false positives (e.g., "Transferrin Saturation" matching plain "Transferrin")
   for (const m of markers) {
-    if (lower.includes(m.displayName.toLowerCase()) || m.displayName.toLowerCase().includes(lower)) {
-      return m;
+    const markerLower = m.displayName.toLowerCase();
+    if (lower.length >= 4) {
+      const lengthRatio = lower.length / markerLower.length;
+      if (
+        (lower.includes(markerLower) || markerLower.includes(lower)) &&
+        lengthRatio >= 0.6 && lengthRatio <= 1.5
+      ) {
+        return m;
+      }
     }
   }
   return null;

@@ -32,9 +32,11 @@ These images have a SPECIFIC FORMAT with these components:
 
 CRITICAL CLINICAL RULES FOR BFM:
 
-**Deal Breaker #1 - SNS Switched:**
+**Deal Breaker #1 - SNS Switched (also labeled "PSNS Switched" in newer software):**
 - In NORMAL: Red (stressed) dot should be HIGH on SNS axis, Blue (calm) should be LOW
 - If Red (stressed) dot is LOWER on SNS than Blue (calm) = SWITCHED SYMPATHETICS
+- NOTE: Some HRV software versions label this "PSNS Switched" — it is the SAME deal breaker
+- Whether the report says "SNS Switched" or "PSNS Switched", set switched_sympathetics to true
 - This is the #1 deal breaker and MUST be addressed first
 
 **Deal Breaker - PNS Negative:**
@@ -101,7 +103,7 @@ READING THE DOT POSITIONS:
 - Blue dot = Calm, Red dot = Stressed, Green dot = Recovery
 
 DEAL BREAKER DETECTION:
-1. SNS Switched: Compare stressed_position.sns vs calm_position.sns. If stressed < calm = SWITCHED
+1. SNS Switched (or "PSNS Switched"): Compare stressed_position.sns vs calm_position.sns. If stressed < calm = SWITCHED. Some software labels this "PSNS Switched" — treat it the same way and set switched_sympathetics to true.
 2. PNS Negative: Check if any position has pns < 0
 3. System Energy >= 10: energetic debt
 4. Stress Response >= 5: poor stress handling

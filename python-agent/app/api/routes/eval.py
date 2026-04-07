@@ -198,6 +198,15 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
         calm_sns = calm.get("sns") if calm else None
         switched = patterns.get("switched_sympathetics", False)
 
+        # Newer HRV software labels the same deal breaker as "PSNS switched".
+        # Check deal_breakers/findings text for this variant.
+        if not switched:
+            deal_breakers = hrv_raw.get("deal_breakers") or []
+            findings = hrv_raw.get("findings") or []
+            all_text = " ".join(str(item) for item in deal_breakers + findings).lower()
+            if "psns switched" in all_text or "psns switch" in all_text:
+                switched = True
+
         # Validate switched_sympathetics against numerical data:
         # If both calm_sns and calm_pns are negative, this is a lower-left quadrant
         # (total depletion) pattern — NOT switched sympathetics. The Vision API
@@ -338,6 +347,17 @@ def _normalize_bundle(raw_bundle: dict) -> dict:
         superimposed_by_vision = ortho_raw.get("dots_superimposed", False)
         if (superimposed_by_values or superimposed_by_vision) and "hrv" in normalized:
             normalized["hrv"]["ortho_dots_superimposed"] = True
+
+        # Propagate SNS/PSNS switched from ortho to HRV deal breaker.
+        # Newer HRV software labels the switched sympathetics condition as
+        # "PSNS switched" — treat it identically to "SNS switched".
+        ortho_sns_status = (ortho_raw.get("sns_status") or "").lower().strip()
+        if ortho_sns_status == "switched" and "hrv" in normalized:
+            if not normalized["hrv"].get("switched_sympathetics"):
+                logger.info(
+                    "Setting switched_sympathetics=True from ortho sns_status='switched'"
+                )
+                normalized["hrv"]["switched_sympathetics"] = True
 
     # ----- Valsalva normalization -----
     valsalva_raw = raw_bundle.get("valsalva", {})
