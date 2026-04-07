@@ -213,7 +213,7 @@ For EVERY patient, assess all 5 BFM levers:
 2. **Leptin** — Appetite regulation, fat metabolism, biotoxin connection
 3. **MSH (Melanocyte-Stimulating Hormone)** — Immune regulation, inflammation control
 4. **Vitamin D** — Immune modulation, bone health, hormone precursor
-5. **UB Rates (Urinary Biotoxin Rates)** — Toxin clearance capacity
+5. **UB Rates (Ubiquitin Protease System)** — Protein quality control; tags misfolded proteins as safe or unsafe for removal. Impaired system → misfolded protein accumulation → protein spillage in urine
 
 Group the 5 Levers together in Layer 2 protocols. The lever frequencies are:
 Pineal Support, Leptin Resist, Pit A Support, Pars Intermedia, and Vitamin D management.

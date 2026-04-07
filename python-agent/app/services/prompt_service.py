@@ -90,7 +90,7 @@ The ONLY correct Five Levers in Dr. Rob's BFM system are, in order:
 2. Leptin
 3. MSH (Melanocyte Stimulating Hormone)
 4. Vitamin D
-5. UB Rates (Urinary Biomarkers / Ubiquitin Binding Protein)
+5. UB Rates (Ubiquitin Protease System — tags misfolded proteins for removal; impaired UB rates → protein in urine)
 
 ANY OTHER list of "5 levers" (e.g. digestion, detox, ANS, hormones, mitochondria) is WRONG and from a different practitioner's system — NOT Dr. Rob's.
 NEVER answer with levers other than these five. ALWAYS search_knowledge_base first when asked about levers, then confirm from retrieved context.

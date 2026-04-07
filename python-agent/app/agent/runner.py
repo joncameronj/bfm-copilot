@@ -58,6 +58,9 @@ class StreamEvent:
     data: dict
 
 
+DEFAULT_MAX_TOKENS = 8192
+
+
 def _get_thinking_config(reasoning_effort: str | None, model: str = "") -> dict | None:
     """Map reasoning effort string to Anthropic extended thinking config.
 
@@ -67,11 +70,26 @@ def _get_thinking_config(reasoning_effort: str | None, model: str = "") -> dict 
     """
     if not reasoning_effort or reasoning_effort == "low":
         return None
+    # Haiku does not support extended thinking
+    if "haiku" in model.lower():
+        return None
     if reasoning_effort == "medium":
         return {"type": "enabled", "budget_tokens": 8000}
     # high — Opus gets 16K, others get 10K
     budget = 16000 if "opus" in model else 10000
     return {"type": "enabled", "budget_tokens": budget}
+
+
+def compute_max_tokens(thinking_config: dict | None) -> int:
+    """Compute max_tokens that accommodates both thinking budget and output.
+
+    When extended thinking is enabled, max_tokens must exceed budget_tokens.
+    We add DEFAULT_MAX_TOKENS on top so the model always has a full output window.
+    """
+    if not thinking_config:
+        return DEFAULT_MAX_TOKENS
+    budget = thinking_config.get("budget_tokens", 0)
+    return budget + DEFAULT_MAX_TOKENS
 
 
 def _strip_thinking_blocks(content):
@@ -145,7 +163,7 @@ class AgentRunner:
                 "model": self.model,
                 "system": self.instructions,
                 "messages": conversation,
-                "max_tokens": 8192,
+                "max_tokens": compute_max_tokens(thinking),
             }
             if tools:
                 create_params["tools"] = tools

@@ -73,9 +73,11 @@ Light devices: Sperti, Chroma, EMR Tek
 
 ---
 
-## Master Lever: 5. UB Rates
+## Master Lever: 5. UB Rates (Ubiquitin Protease System)
 
-**How to Assess:** Urinalysis protein; various autoimmune markers; sleep apnea
+**What It Is:** The ubiquitin-proteasome system tags proteins as safe or unsafe. When proteins misfold, ubiquitin marks them for degradation and removal. If UB rates are impaired, misfolded proteins accumulate and spill into the urine.
+
+**How to Assess:** Urinalysis protein (positive = impaired UB rates); autoimmune markers; sleep apnea
 
 **Problem Indicators:** Protein in urine; autoimmune; neurodegeneration; sleep apnea
 

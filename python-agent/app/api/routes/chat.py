@@ -9,13 +9,15 @@ over the Anthropic messages API.
 import json
 import re
 import asyncio
+import time
+from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from app.models.requests import ChatRequest
 from app.agent.system_prompts import get_system_prompt
 from app.agent import create_base_agent, determine_reasoning_effort
-from app.agent.runner import _get_thinking_config, _strip_thinking_blocks
+from app.agent.runner import _get_thinking_config, _strip_thinking_blocks, compute_max_tokens, DEFAULT_MAX_TOKENS
 from app.services.output_validator import validate_output, check_for_clinical_leakage
 from app.services.model_settings import get_model_settings_service
 from app.services.query_complexity import analyze_query_complexity
@@ -434,17 +436,147 @@ def _sse_response_from_result(content: str, reasoning_content: str = "") -> Resp
     )
 
 
+async def _stream_chat_response(
+    client,
+    create_params: dict,
+    tool_registry,
+    user_role: str,
+) -> AsyncGenerator[str, None]:
+    """
+    Stream chat response as SSE events with tool-calling and thinking support.
+
+    Yields step_start/step_complete for presearch and tool calls,
+    reasoning_delta for thinking tokens, and text_delta for response tokens.
+    Handles up to 5 tool-call iterations before returning the final answer.
+    """
+    for iteration in range(5):
+        tool_uses: list[dict] = []
+        current_tool: dict | None = None
+        current_tool_json = ""
+        assistant_blocks: list[dict] = []
+        accumulated_text = ""
+        reasoning_started = False
+        reasoning_start_time: float | None = None
+
+        try:
+            async with client.messages.stream(**create_params) as stream:
+                async for event in stream:
+                    if event.type == "content_block_start":
+                        block = event.content_block
+                        if block.type == "thinking":
+                            reasoning_started = True
+                            reasoning_start_time = time.time()
+                            yield _emit_sse("step_start", {
+                                "step_id": f"reasoning-{iteration + 1}",
+                                "label": "Thinking...",
+                            })
+                            assistant_blocks.append({"type": "thinking", "thinking": ""})
+                        elif block.type == "text":
+                            if reasoning_started:
+                                elapsed = int((time.time() - (reasoning_start_time or time.time())) * 1000)
+                                yield _emit_sse("step_complete", {"step_id": f"reasoning-{iteration + 1}"})
+                                yield _emit_sse("reasoning_done", {"summary": None, "elapsed_ms": elapsed})
+                                reasoning_started = False
+                            assistant_blocks.append({"type": "text", "text": ""})
+                        elif block.type == "tool_use":
+                            current_tool = {"id": block.id, "name": block.name, "input": {}}
+                            current_tool_json = ""
+                            assistant_blocks.append({
+                                "type": "tool_use",
+                                "id": block.id,
+                                "name": block.name,
+                                "input": {},
+                            })
+
+                    elif event.type == "content_block_delta":
+                        delta = event.delta
+                        if delta.type == "thinking_delta":
+                            if assistant_blocks and assistant_blocks[-1].get("type") == "thinking":
+                                assistant_blocks[-1]["thinking"] += delta.thinking
+                            elapsed = int((time.time() - (reasoning_start_time or time.time())) * 1000)
+                            yield _emit_sse("reasoning_delta", {"delta": delta.thinking, "elapsed_ms": elapsed})
+                        elif delta.type == "text_delta":
+                            if assistant_blocks and assistant_blocks[-1].get("type") == "text":
+                                assistant_blocks[-1]["text"] += delta.text
+                            accumulated_text += delta.text
+                            yield _emit_sse("text_delta", {"delta": delta.text})
+                        elif delta.type == "input_json_delta":
+                            current_tool_json += delta.partial_json
+
+                    elif event.type == "content_block_stop":
+                        if current_tool is not None:
+                            try:
+                                current_tool["input"] = json.loads(current_tool_json) if current_tool_json else {}
+                            except json.JSONDecodeError:
+                                current_tool["input"] = {}
+                            for ab in assistant_blocks:
+                                if ab.get("type") == "tool_use" and ab.get("id") == current_tool["id"]:
+                                    ab["input"] = current_tool["input"]
+                                    break
+                            tool_uses.append(current_tool)
+                            current_tool = None
+                            current_tool_json = ""
+
+            # Close any open reasoning block
+            if reasoning_started and reasoning_start_time:
+                elapsed = int((time.time() - reasoning_start_time) * 1000)
+                yield _emit_sse("step_complete", {"step_id": f"reasoning-{iteration + 1}"})
+                yield _emit_sse("reasoning_done", {"summary": None, "elapsed_ms": elapsed})
+
+        except Exception as e:
+            logger.error("Streaming error in iteration %d: %s", iteration, e, exc_info=e)
+            yield _emit_sse("error", {"error": str(e)})
+            yield "data: [DONE]\n\n"
+            return
+
+        # No tool calls → final response
+        if not tool_uses:
+            break
+
+        # Execute each tool and emit step events
+        tool_results = []
+        for tu in tool_uses:
+            tool_label = tu["name"].replace("_", " ").title()
+            step_id = f"tool-{iteration + 1}-{tu['name']}"
+            yield _emit_sse("step_start", {"step_id": step_id, "label": f"Searching {tool_label}..."})
+            try:
+                tool_result = await tool_registry.execute(tu["name"], tu["input"])
+            except Exception as e:
+                tool_result = json.dumps({"error": str(e)})
+            tool_results.append({"type": "tool_result", "tool_use_id": tu["id"], "content": tool_result})
+            yield _emit_sse("step_complete", {"step_id": step_id})
+
+        # Append assistant turn (tool_use blocks only, no thinking) + tool results
+        safe_assistant_blocks = [ab for ab in assistant_blocks if ab.get("type") != "thinking"]
+        create_params["messages"] = list(create_params["messages"]) + [
+            {"role": "assistant", "content": safe_assistant_blocks},
+            {"role": "user", "content": tool_results},
+        ]
+        # Extended thinking cannot be used in follow-up turns after tool use
+        create_params.pop("thinking", None)
+        create_params["max_tokens"] = DEFAULT_MAX_TOKENS
+        accumulated_text = ""
+
+    # Final member validation (runs on complete accumulated text)
+    if user_role == "member" and accumulated_text:
+        accumulated_text, _ = validate_output(accumulated_text, user_role)
+
+    check_for_clinical_leakage(accumulated_text, user_role)
+    yield _emit_sse("text_done", {"content": accumulated_text})
+    yield _emit_sse("done", {})
+    yield "data: [DONE]\n\n"
+
+
 @router.post("/chat")
 async def chat_stream(
     request: ChatRequest,
 ):
     """
-    Return SSE-compatible chat responses for the frontend.
+    Stream SSE chat responses for the frontend.
 
-    This currently uses the stable non-streaming Anthropic call path and emits
-    SSE events the frontend already understands. The previous streaming runner
-    was failing in production before any SSE payload was emitted, which caused
-    plain HTTP 500 responses at the browser boundary.
+    Uses client.messages.stream() for real-time token delivery — showing
+    thinking progress, tool step events, and text as it arrives.
+    Supports up to 5 tool-call iterations (RAG search, web search).
     """
     # Get dynamic model settings from admin panel (with caching)
     model_settings = await get_model_settings_service().get_settings()
@@ -524,64 +656,31 @@ async def chat_stream(
             "You MUST use the search_medical_sources tool to find relevant information before responding."
         )
 
-    # Hard guard for protocol/supplement questions:
-    # - Practitioner/admin: pre-search Sunday chunks and inject evidence.
-    # - Member: enforce educational-only override with course callout.
+    # Protocol/supplement guard setup (member override applied immediately;
+    # practitioner presearch deferred to the generator so step events show live)
     is_protocol_query = _is_protocol_or_supplement_query(request.message)
     is_definitional = _is_definitional_query(request.message)
     needs_presearch = is_protocol_query and not is_definitional
+    user_role = request.user_role or "member"
+    user_id = request.user_id or "system"
 
-    if is_protocol_query:
-        user_id = request.user_id or "system"
-        user_role = request.user_role or "member"
-        if user_role in {"practitioner", "admin"}:
-            if needs_presearch:
-                sunday_context = await _build_sunday_presearch_context(
-                    message=request.message,
-                    user_id=user_id,
-                    user_role=user_role,
-                    conversation_id=request.conversation_id,
-                    deep_dive=request.deep_dive,
-                )
-                has_deuterium_evidence = "deuterium" in sunday_context.lower()
-                agent_config.instructions += (
-                    "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
-                    "The system pre-searched Sunday chunks across Diabetes, Thyroid, Hormones, and Neurological categories.\n"
-                    "Use this Sunday evidence first for protocol/supplement answers.\n"
-                    "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
-                    "Always cite sources using [Source: Document Title].\n"
-                    "Only cite source titles that appear in retrieved context. Never invent source names.\n"
-                    "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n"
-                    "Only if Sunday evidence is absent may you use non-Sunday context conservatively.\n\n"
-                    f"{sunday_context}"
-                )
-                if has_deuterium_evidence:
-                    agent_config.instructions += (
-                        "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
-                        "Do NOT state that Deuterium Drops are unavailable in BFM protocols. "
-                        "Answer directly from this retrieved context and avoid additional tool calls unless the user asks for deeper detail."
-                    )
-            else:
-                logger.info(
-                    "Skipping presearch for definitional query: %s",
-                    request.message[:80],
-                )
-        else:
-            agent_config.instructions += (
-                "\n\n[MEMBER SAFETY OVERRIDE]\n"
-                "The user is a member. Do NOT provide protocols, frequencies, dosing, timing, or treatment steps.\n"
-                "Use base knowledge to provide educational context only.\n"
-                "Use an analogy-first explanation style.\n"
-                "End with a clear Course Connection that points them to their purchased BFM course materials.\n"
-                "If a specific module title is available in retrieved context, name it. Otherwise say:\n"
-                "\"Review the lesson in your purchased BFM course on this topic and discuss specifics with your practitioner.\""
-            )
+    if is_protocol_query and user_role not in {"practitioner", "admin"}:
+        agent_config.instructions += (
+            "\n\n[MEMBER SAFETY OVERRIDE]\n"
+            "The user is a member. Do NOT provide protocols, frequencies, dosing, timing, or treatment steps.\n"
+            "Use base knowledge to provide educational context only.\n"
+            "Use an analogy-first explanation style.\n"
+            "End with a clear Course Connection that points them to their purchased BFM course materials.\n"
+            "If a specific module title is available in retrieved context, name it. Otherwise say:\n"
+            "\"Review the lesson in your purchased BFM course on this topic and discuss specifics with your practitioner.\""
+        )
 
     logger.info(
-        "Starting SSE-compatible chat response for: %s...",
+        "Starting streaming chat response for: %s... (model=%s effort=%s)",
         request.message[:50],
+        selected_model,
+        reasoning_effort,
     )
-    logger.debug("Model: %s, Reasoning effort: %s", agent_config.model, reasoning_effort)
 
     client = get_async_client()
     api_messages = []
@@ -592,91 +691,73 @@ async def chat_stream(
     thinking_config = _get_thinking_config(reasoning_effort, agent_config.model)
     tool_definitions = agent_config.tool_registry.get_tool_definitions() if agent_config.tool_registry else None
 
-    try:
-        create_params: dict = {
-            "model": agent_config.model,
-            "system": agent_config.instructions,
-            "messages": api_messages,
-            "max_tokens": 8192,
-        }
-        if thinking_config:
-            create_params["thinking"] = thinking_config
-        if tool_definitions:
-            create_params["tools"] = tool_definitions
+    create_params: dict = {
+        "model": agent_config.model,
+        "system": agent_config.instructions,
+        "messages": api_messages,
+        "max_tokens": compute_max_tokens(thinking_config),
+    }
+    if thinking_config:
+        create_params["thinking"] = thinking_config
+    if tool_definitions:
+        create_params["tools"] = tool_definitions
 
-        content = ""
-        reasoning_content = ""
-
-        # Tool-calling loop: execute up to 5 tool calls before final answer
-        for _tool_iteration in range(5):
-            response = await client.messages.create(**create_params)
-
-            # Collect text, reasoning, and any tool_use blocks
-            tool_uses = []
-            iteration_text = ""
-            for block in response.content:
-                if block.type == "text":
-                    iteration_text += block.text
-                elif block.type == "thinking":
-                    reasoning_content += block.thinking
-                elif block.type == "tool_use":
-                    tool_uses.append(block)
-
-            # If no tool calls, we have the final response
-            if not tool_uses:
-                content = iteration_text
-                break
-
-            # Execute tool calls and build tool_result messages
-            tool_results = []
-            for tu in tool_uses:
-                tool_input = tu.input if isinstance(tu.input, dict) else {}
-                tool_result = await agent_config.tool_registry.execute(tu.name, tool_input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tu.id,
-                    "content": tool_result,
+    async def generate() -> AsyncGenerator[str, None]:
+        # Run presearch inside the generator so the "Searching knowledge base..."
+        # step event appears in the UI while retrieval is happening.
+        if is_protocol_query and user_role in {"practitioner", "admin"}:
+            if needs_presearch:
+                yield _emit_sse("step_start", {
+                    "step_id": "presearch",
+                    "label": "Searching knowledge base...",
                 })
+                try:
+                    sunday_context = await _build_sunday_presearch_context(
+                        message=request.message,
+                        user_id=user_id,
+                        user_role=user_role,
+                        conversation_id=request.conversation_id,
+                        deep_dive=request.deep_dive,
+                    )
+                    has_deuterium_evidence = "deuterium" in sunday_context.lower()
+                    presearch_addendum = (
+                        "\n\n[CRITICAL: SUNDAY-FIRST PRESEARCH CONTEXT]\n"
+                        "The system pre-searched Sunday chunks across Diabetes, Thyroid, Hormones, and Neurological categories.\n"
+                        "Use this Sunday evidence first for protocol/supplement answers.\n"
+                        "If a supplement/protocol appears in these sources, do NOT claim it is unapproved or unavailable.\n"
+                        "Always cite sources using [Source: Document Title].\n"
+                        "Only cite source titles that appear in retrieved context. Never invent source names.\n"
+                        "Do not invent dosing or timing values. If not explicitly present in retrieved evidence, ask for follow-up context.\n"
+                        "Only if Sunday evidence is absent may you use non-Sunday context conservatively.\n\n"
+                        f"{sunday_context}"
+                    )
+                    if has_deuterium_evidence:
+                        presearch_addendum += (
+                            "\n\n[VALIDATION NOTE] Sunday evidence for Deuterium is present above. "
+                            "Do NOT state that Deuterium Drops are unavailable in BFM protocols. "
+                            "Answer directly from this retrieved context and avoid additional tool calls unless the user asks for deeper detail."
+                        )
+                    create_params["system"] = agent_config.instructions + presearch_addendum
+                except Exception as presearch_err:
+                    logger.warning("Presearch failed, continuing without context: %s", presearch_err)
+                yield _emit_sse("step_complete", {"step_id": "presearch"})
+            else:
+                logger.info("Skipping presearch for definitional query: %s", request.message[:80])
 
-            # Serialize SDK content blocks to plain dicts, dropping thinking blocks
-            # (thinking blocks require signatures we don't track across turns)
-            assistant_blocks = []
-            for block in response.content:
-                if block.type == "text":
-                    assistant_blocks.append({"type": "text", "text": block.text})
-                elif block.type == "tool_use":
-                    assistant_blocks.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input if isinstance(block.input, dict) else {},
-                    })
-                # thinking blocks intentionally omitted
+        async for chunk in _stream_chat_response(
+            client, create_params, agent_config.tool_registry, user_role,
+        ):
+            yield chunk
 
-            # Append assistant turn (with tool_use blocks) and tool results to conversation
-            create_params["messages"] = list(create_params["messages"]) + [
-                {"role": "assistant", "content": assistant_blocks},
-                {"role": "user", "content": tool_results},
-            ]
-            # Extended thinking cannot be used in follow-up turns after tool use
-            create_params.pop("thinking", None)
-
-        if request.user_role == "member":
-            content, _ = validate_output(content, request.user_role)
-
-        check_for_clinical_leakage(content, request.user_role)
-        return _sse_response_from_result(content=content, reasoning_content=reasoning_content)
-    except Exception as e:
-        logger.error("SSE chat fallback failed: %s", e, exc_info=e)
-        return Response(
-            _emit_sse("error", {"error": str(e)}) + "data: [DONE]\n\n",
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/chat/sync")
@@ -689,8 +770,6 @@ async def chat_sync(
     Uses the Anthropic messages API for synchronous responses.
     Useful for testing and debugging.
     """
-    from app.agent.runner import _get_thinking_config
-
     client = get_async_client()
 
     # Get dynamic model settings from admin panel (with caching)
@@ -788,7 +867,7 @@ async def chat_sync(
             "model": sync_selected_model,
             "system": system_prompt,
             "messages": api_messages,
-            "max_tokens": 8192,
+            "max_tokens": compute_max_tokens(thinking_config),
         }
         if thinking_config:
             create_params["thinking"] = thinking_config

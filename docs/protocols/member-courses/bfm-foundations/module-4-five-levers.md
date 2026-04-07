@@ -41,7 +41,7 @@ If redux is how you build energy production, these five levers are how you **con
 2. Leptin
 3. Vitamin D
 4. MSH (Melanocyte Stimulating Hormone)
-5. UB Rates (Ubiquitin Binding Protein)
+5. UB Rates (Ubiquitin Protease System)
 
 These are things that:
 - Cannot be fixed with supplements or pharmaceuticals
@@ -261,7 +261,7 @@ If leptin is incorrect (leptin resistant), **MSH won't work**.
 
 ### What is UB Rates?
 
-UB = Ubiquitin Binding Protein
+UB = Ubiquitin Protease System
 
 This is the **tagging system** your immune system uses to mark which proteins and cells need to be:
 - Fixed
