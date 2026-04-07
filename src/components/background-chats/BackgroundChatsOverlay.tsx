@@ -15,8 +15,8 @@ import type { BackgroundJob } from '@/types/chat'
 
 interface BackgroundChatsOverlayProps {
   jobs: BackgroundJob[]
-  onReview: (job: BackgroundJob) => void
-  onCancel: (jobId: string) => void
+  onReview: (_job: BackgroundJob) => void
+  onCancel: (_jobId: string) => void
   isLoading?: boolean
 }
 
@@ -61,7 +61,7 @@ function JobStatusIndicator({ job }: { job: BackgroundJob }) {
 
   if (job.status === 'completed') {
     return (
-      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+      <div className="flex items-center gap-1.5 text-white">
         <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} />
         <span className="text-sm font-medium">Complete</span>
       </div>
@@ -70,7 +70,7 @@ function JobStatusIndicator({ job }: { job: BackgroundJob }) {
 
   if (job.status === 'failed') {
     return (
-      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+      <div className="flex items-center gap-1.5 text-red-100">
         <HugeiconsIcon icon={AlertCircleIcon} size={16} />
         <span className="text-sm font-medium">Failed</span>
       </div>
@@ -79,7 +79,7 @@ function JobStatusIndicator({ job }: { job: BackgroundJob }) {
 
   if (job.status === 'cancelled') {
     return (
-      <div className="flex items-center gap-1.5 text-neutral-500">
+      <div className="flex items-center gap-1.5 text-blue-100/80">
         <HugeiconsIcon icon={Cancel01Icon} size={16} />
         <span className="text-sm font-medium">Cancelled</span>
       </div>
@@ -88,7 +88,7 @@ function JobStatusIndicator({ job }: { job: BackgroundJob }) {
 
   // Active job (pending, running, streaming)
   return (
-    <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+    <div className="flex items-center gap-1.5 text-blue-50/90">
       <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
       <span className="text-sm">
         {job.currentStep || 'Thinking...'} ({elapsedTime})
@@ -104,16 +104,16 @@ function JobItem({
   onCancel,
 }: {
   job: BackgroundJob
-  onReview: (job: BackgroundJob) => void
-  onCancel: (jobId: string) => void
+  onReview: (_job: BackgroundJob) => void
+  onCancel: (_jobId: string) => void
 }) {
   const isActive = ['pending', 'running', 'streaming'].includes(job.status)
   const isCompleted = job.status === 'completed'
 
   return (
-    <div className="px-3 py-2.5 border-b border-neutral-100 dark:border-neutral-700 last:border-b-0">
+    <div className="px-3 py-2.5 border-b border-white/15 last:border-b-0">
       {/* Title */}
-      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate mb-1">
+      <p className="mb-1 truncate text-sm font-medium text-white">
         {getJobTitle(job)}
       </p>
 
@@ -126,7 +126,7 @@ function JobItem({
           {isActive && (
             <button
               onClick={() => onCancel(job.id)}
-              className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+              className="rounded-md p-1 text-blue-100/80 transition-colors hover:bg-white/10 hover:text-white"
               title="Cancel"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={14} />
@@ -137,7 +137,7 @@ function JobItem({
           {isCompleted && (
             <button
               onClick={() => onReview(job)}
-              className="flex items-center gap-1 px-2.5 py-1 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-md hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
+              className="flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50"
             >
               Review
               <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
@@ -148,7 +148,7 @@ function JobItem({
 
       {/* Error message if failed */}
       {job.status === 'failed' && job.errorMessage && (
-        <p className="mt-1 text-xs text-red-600 dark:text-red-400 truncate">
+        <p className="mt-1 truncate text-xs text-red-100">
           {job.errorMessage}
         </p>
       )}
@@ -187,8 +187,8 @@ export function BackgroundChatsOverlay({
   return (
     <div
       className={cn(
-        'fixed top-4 right-4 z-[9999]',
-        'bg-white dark:bg-neutral-800 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-700',
+        'fixed bottom-4 right-4 z-[9999]',
+        'rounded-xl border border-blue-400 bg-blue-500 text-white shadow-xl shadow-blue-900/20',
         'transition-all duration-300 ease-in-out',
         isExpanded ? 'w-80' : 'w-auto'
       )}
@@ -198,40 +198,33 @@ export function BackgroundChatsOverlay({
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           'w-full flex items-center gap-2.5 p-3',
-          'hover:bg-neutral-50 dark:hover:bg-neutral-700/50 rounded-xl transition-colors',
-          isExpanded && 'border-b border-neutral-100 dark:border-neutral-700 rounded-b-none'
+          'rounded-xl transition-colors hover:bg-white/10',
+          isExpanded && 'rounded-b-none border-b border-white/15'
         )}
       >
         {/* Copilot icon */}
-        <div className="w-7 h-7 rounded-full bg-black dark:bg-white flex items-center justify-center flex-shrink-0">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/15">
           <Image
-            src="/icons/bfm-icon-white.svg"
+            src="/icons/bfm-icon-black.svg"
             alt="Copilot"
             width={16}
             height={18}
-            className="dark:hidden"
-          />
-          <Image
-            src="/icons/bfm-icon.svg"
-            alt="Copilot"
-            width={16}
-            height={18}
-            className="hidden dark:block"
+            className="invert"
           />
         </div>
 
         {/* Title and counts */}
         {isExpanded ? (
           <div className="flex-1 text-left">
-            <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            <span className="text-sm font-semibold text-white">
               Background Chats
             </span>
-            <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <div className="flex items-center gap-2 text-xs text-blue-100/80">
               {activeCount > 0 && (
                 <span>{activeCount} active</span>
               )}
               {completedCount > 0 && (
-                <span className="text-green-600 dark:text-green-400">
+                <span className="text-white">
                   {completedCount} ready
                 </span>
               )}
@@ -241,12 +234,12 @@ export function BackgroundChatsOverlay({
           <>
             {/* Compact badges when collapsed */}
             {activeCount > 0 && (
-              <span className="flex items-center justify-center w-5 h-5 text-xs font-medium bg-neutral-200 dark:bg-neutral-600 text-neutral-700 dark:text-neutral-200 rounded-full">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-medium text-white">
                 {activeCount}
               </span>
             )}
             {completedCount > 0 && (
-              <span className="flex items-center justify-center w-5 h-5 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-medium text-white">
                 {completedCount}
               </span>
             )}
@@ -270,7 +263,7 @@ export function BackgroundChatsOverlay({
 
       {/* Loading state */}
       {isExpanded && isLoading && visibleJobs.length === 0 && (
-        <div className="p-4 text-center text-sm text-neutral-500">
+        <div className="p-4 text-center text-sm text-blue-50/90">
           <HugeiconsIcon icon={Loading03Icon} size={20} className="animate-spin mx-auto mb-2" />
           Loading...
         </div>
