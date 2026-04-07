@@ -472,7 +472,14 @@ export async function POST(request: Request) {
     const { messages: trimmedHistory } = trimHistoryByCharBudget(
       messages.map((m) => ({
         role: m.role as ConversationMessage['role'],
-        content: m.content || '',
+        content: typeof m.content === 'string'
+          ? m.content
+          : Array.isArray(m.content)
+            ? (m.content as Array<{ type?: string; text?: string }>)
+                .filter((b) => b.type === 'text')
+                .map((b) => b.text || '')
+                .join('')
+            : m.content ? String(m.content) : '',
       })),
       Number.isFinite(CHAT_HISTORY_CHAR_BUDGET) && CHAT_HISTORY_CHAR_BUDGET > 0
         ? CHAT_HISTORY_CHAR_BUDGET
