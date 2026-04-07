@@ -107,7 +107,7 @@ Clinic Copilot serves three distinct user types:
 ### Shared Features
 
 **AI Chat**
-- xAI-powered assistant
+- Anthropic/OpenAI-powered assistant
 - Streaming responses with real-time display
 - Extended reasoning visualization
 - Tool/function calling with display
@@ -135,7 +135,7 @@ Clinic Copilot serves three distinct user types:
 ### Backend
 - **API Framework**: Next.js API Routes
 - **Python Agent**: FastAPI for advanced AI processing
-- **AI/LLM**: xAI Grok chat/vision/embedding models
+- **AI/LLM**: Anthropic Claude for chat/vision and OpenAI for embeddings
 - **Vector Search**: pgvector for RAG embeddings
 
 ### Infrastructure
@@ -151,9 +151,9 @@ The RAG (Retrieval-Augmented Generation) system is the core intelligence layer t
 ### How It Works
 
 ```
-User Query → Python Agent → Query Analysis (grok-4-1-fast-non-reasoning)
+User Query → Python Agent → Query Analysis (Claude Haiku)
     ↓
-Embedding Generation (grok-embedding-small)
+Embedding Generation (text-embedding-3-small)
     ↓
 Vector Search (pgvector, threshold: 0.40)
     ↓
@@ -163,7 +163,7 @@ Role-Based Filtering → Results with Similarity Scores
 ### Key Settings
 | Setting | Value |
 |---------|-------|
-| Embedding Model | `grok-embedding-small` (1536 dimensions) |
+| Embedding Model | `text-embedding-3-small` (1536 dimensions) |
 | Similarity Threshold | 0.40 |
 | Chunk Size | 500 tokens |
 | Chunk Overlap | 50 tokens |
@@ -183,7 +183,7 @@ The primary practitioner workflow:
 
 ```
 1. Upload    → Diagnostic files to Supabase Storage
-2. Extract   → Vision API (grok-vision-beta) extracts structured data
+2. Extract   → Vision API (Claude Sonnet) extracts structured data
 3. Analyze   → Python agent RAG + AI generates analysis
 4. Recommend → AI suggests protocols based on knowledge base
 5. Validate  → Frequencies checked against approved list
@@ -227,7 +227,7 @@ bfm-copilot/
 │   │   └── ui/                   # Base UI components
 │   ├── hooks/                    # Custom React hooks (12)
 │   ├── lib/                      # Utilities & integrations
-│   │   ├── xai/                  # xAI client layer
+│   │   ├── anthropic/            # Anthropic client layer
 │   │   ├── rag/                  # RAG search & embeddings
 │   │   ├── labs/                 # Lab calculator logic
 │   │   └── supabase/             # Supabase clients
@@ -253,7 +253,8 @@ bfm-copilot/
 - Node.js 22+
 - Python 3.11+
 - Docker & Docker Compose
-- xAI API key
+- Anthropic API key
+- OpenAI API key
 - Supabase project
 
 ### Environment Setup
@@ -269,7 +270,8 @@ bfm-copilot/
    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   XAI_API_KEY=your-xai-key
+   ANTHROPIC_API_KEY=your-anthropic-key
+   OPENAI_API_KEY=your-openai-key
    PYTHON_AGENT_URL=http://localhost:8000
    # For hosted deployments, point this to your Railway agent URL instead
    # RAILWAY_PYTHON_AGENT_URL=https://your-agent-service.up.railway.app

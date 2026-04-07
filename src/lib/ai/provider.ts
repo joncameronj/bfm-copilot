@@ -20,14 +20,9 @@ export function getDefaultEmbeddingModel(): string {
   return process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'
 }
 
-function looksLikeLegacyModel(model: string): boolean {
+function looksLikeWrongProviderModel(model: string): boolean {
   const normalized = model.toLowerCase()
-  return (
-    normalized.startsWith('gpt-') ||
-    normalized.startsWith('o1') ||
-    normalized.startsWith('o3') ||
-    normalized.startsWith('grok-')
-  )
+  return !normalized.startsWith('claude-')
 }
 
 export function normalizeChatModelForProvider(
@@ -38,7 +33,7 @@ export function normalizeChatModelForProvider(
     return getDefaultChatModel()
   }
 
-  if (looksLikeLegacyModel(candidate)) {
+  if (looksLikeWrongProviderModel(candidate)) {
     return getDefaultChatModel()
   }
 

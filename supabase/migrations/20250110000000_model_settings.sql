@@ -37,7 +37,7 @@ CREATE POLICY "Authenticated users can read system config" ON public.system_conf
 -- Seed default model settings
 INSERT INTO public.system_config (key, value, description)
 VALUES
-    ('chat_model', '"grok-4-1-fast-reasoning"', 'The xAI model used for the main chat agent'),
+    ('chat_model', '"claude-sonnet-4-6"', 'The Anthropic model used for the main chat agent'),
     ('reasoning_effort', '"high"', 'Reasoning effort level for extended thinking (low, medium, high)'),
     ('reasoning_summary', '"detailed"', 'Reasoning summary verbosity (auto, concise, detailed)')
 ON CONFLICT (key) DO NOTHING;

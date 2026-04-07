@@ -6,12 +6,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - XAI_API_KEY=${XAI_API_KEY}
-      - XAI_BASE_URL=${XAI_BASE_URL:-https://api.x.ai/v1}
-      - XAI_CHAT_MODEL=${XAI_CHAT_MODEL:-grok-4-1-fast-reasoning}
-      - XAI_FAST_MODEL=${XAI_FAST_MODEL:-grok-4-1-fast-non-reasoning}
-      - XAI_VISION_MODEL=${XAI_VISION_MODEL:-grok-vision-beta}
-      - XAI_EMBEDDING_MODEL=${XAI_EMBEDDING_MODEL:-grok-embedding-small}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_CHAT_MODEL=${ANTHROPIC_CHAT_MODEL:-claude-sonnet-4-6}
+      - ANTHROPIC_FAST_MODEL=${ANTHROPIC_FAST_MODEL:-claude-haiku-4-5-20251001}
+      - ANTHROPIC_VISION_MODEL=${ANTHROPIC_VISION_MODEL:-claude-sonnet-4-6}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}

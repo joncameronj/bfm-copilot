@@ -1,11 +1,6 @@
-"""Embeddings Client - httpx wrapper for OpenAI REST /v1/embeddings endpoint.
-
-xAI removed standalone embedding models, so we use OpenAI's
-text-embedding-3-small via the same OpenAI-compatible REST format.
-"""
+"""Embeddings Client - httpx wrapper for OpenAI REST /v1/embeddings endpoint."""
 
 import asyncio
-import time
 
 import httpx
 

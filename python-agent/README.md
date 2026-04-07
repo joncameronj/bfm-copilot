@@ -1,6 +1,6 @@
 # BFM Copilot Python Agent
 
-Python backend for the BFM Copilot AI assistant with xAI support and RAG capabilities.
+Python backend for the BFM Copilot AI assistant using Anthropic for chat and OpenAI for embeddings.
 
 ## Setup
 

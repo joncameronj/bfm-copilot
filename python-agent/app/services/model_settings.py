@@ -50,11 +50,11 @@ class ModelSettingsService:
         self._cached_settings: Optional[ModelSettings] = None
         self._cache_timestamp: float = 0
 
-    def _normalize_chat_model(self, chat_model: str) -> str:
+    def _normalize_provider_model(self, chat_model: str) -> str:
         """
-        Ensure model name matches Anthropic provider to avoid silent mismatches.
+        Ensure the configured model matches the Anthropic provider.
         """
-        if chat_model.startswith(("gpt-", "o1", "o3", "grok-")):
+        if not chat_model.startswith("claude-"):
             fallback = get_chat_model()
             logger.warning(f"Model '{chat_model}' does not match Anthropic provider. Using '{fallback}' instead.")
             return fallback
@@ -96,7 +96,7 @@ class ModelSettingsService:
                 if response.status_code == 200:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
-                        chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
+                        chat_model=self._normalize_provider_model(data.get("chat_model", self.default_model)),
                         fast_model=data.get("fast_model", self.default_fast_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
@@ -132,7 +132,7 @@ class ModelSettingsService:
                 if response.status_code == 200:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
-                        chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
+                        chat_model=self._normalize_provider_model(data.get("chat_model", self.default_model)),
                         fast_model=data.get("fast_model", self.default_fast_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),

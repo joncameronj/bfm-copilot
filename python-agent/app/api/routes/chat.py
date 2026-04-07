@@ -10,12 +10,12 @@ import json
 import re
 import asyncio
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from app.models.requests import ChatRequest
 from app.agent.system_prompts import get_system_prompt
-from app.agent import create_base_agent, determine_reasoning_effort, SSEEventMapper
-from app.agent.runner import AgentRunner, _strip_thinking_blocks
+from app.agent import create_base_agent, determine_reasoning_effort
+from app.agent.runner import _get_thinking_config, _strip_thinking_blocks
 from app.services.output_validator import validate_output, check_for_clinical_leakage
 from app.services.model_settings import get_model_settings_service
 from app.services.query_complexity import analyze_query_complexity
@@ -383,21 +383,63 @@ def _select_model(
     return chat_model
 
 
+def _emit_sse(event_type: str, data: dict) -> str:
+    return f"data: {json.dumps({'type': event_type, **data})}\n\n"
+
+
+def _sse_response_from_result(content: str, reasoning_content: str = "") -> Response:
+    chunks: list[str] = []
+
+    if reasoning_content:
+        chunks.append(_emit_sse("step_start", {
+            "step_id": "reasoning-1",
+            "label": "Thinking...",
+        }))
+        chunks.append(_emit_sse("reasoning_delta", {
+            "delta": reasoning_content,
+            "elapsed_ms": 0,
+        }))
+        chunks.append(_emit_sse("step_complete", {
+            "step_id": "reasoning-1",
+        }))
+        chunks.append(_emit_sse("reasoning_done", {
+            "summary": None,
+            "elapsed_ms": 0,
+        }))
+
+    if content:
+        chunks.append(_emit_sse("text_delta", {
+            "delta": content,
+        }))
+        chunks.append(_emit_sse("text_done", {
+            "content": content,
+        }))
+
+    chunks.append(_emit_sse("done", {}))
+    chunks.append("data: [DONE]\n\n")
+
+    return Response(
+        "".join(chunks),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/chat")
 async def chat_stream(
     request: ChatRequest,
 ):
     """
-    Stream agent responses via SSE using the Anthropic messages API.
+    Return SSE-compatible chat responses for the frontend.
 
-    This endpoint uses our custom AgentRunner for automatic tool orchestration
-    with streaming via the Anthropic SDK.
-
-    Features preserved from original implementation:
-    - Query complexity analysis for dynamic reasoning effort
-    - Role-based content filtering
-    - Patient context injection
-    - Real-time reasoning and source streaming
+    This currently uses the stable non-streaming Anthropic call path and emits
+    SSE events the frontend already understands. The previous streaming runner
+    was failing in production before any SSE payload was emitted, which caused
+    plain HTTP 500 responses at the browser boundary.
     """
     # Get dynamic model settings from admin panel (with caching)
     model_settings = await get_model_settings_service().get_settings()
@@ -480,6 +522,7 @@ async def chat_stream(
     # Hard guard for protocol/supplement questions:
     # - Practitioner/admin: pre-search Sunday chunks and inject evidence.
     # - Member: enforce educational-only override with course callout.
+    is_protocol_query = _is_protocol_or_supplement_query(request.message)
     is_definitional = _is_definitional_query(request.message)
     needs_presearch = is_protocol_query and not is_definitional
 
@@ -529,48 +572,56 @@ async def chat_stream(
                 "\"Review the lesson in your purchased BFM course on this topic and discuss specifics with your practitioner.\""
             )
 
-    async def event_generator():
-        """Generate SSE events from AgentRunner streaming response."""
-        logger.info(f"Starting Anthropic stream for: {request.message[:50]}...")
-        logger.debug(f"Model: {agent_config.model}, Reasoning effort: {reasoning_effort}")
-
-        try:
-            # Create SSE event mapper
-            mapper = SSEEventMapper(
-                user_id=request.user_id or "system",
-                user_role=request.user_role or "member",
-            )
-
-            # Create agent runner with Anthropic async client
-            runner = AgentRunner(
-                client=get_async_client(),
-                model=agent_config.model,
-                instructions=agent_config.instructions,
-                tool_registry=agent_config.tool_registry,
-                reasoning_effort=agent_config.reasoning_effort,
-            )
-
-            # Run agent with streaming and process through SSE mapper
-            stream = runner.run_streamed(input_messages)
-            async for sse_event in mapper.process_stream(stream):
-                yield sse_event
-
-        except Exception as e:
-            import traceback
-            logger.error(f"Chat streaming error: {e}")
-            traceback.print_exc()
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
-            yield "data: [DONE]\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-transform",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+    logger.info(
+        "Starting SSE-compatible chat response for: %s...",
+        request.message[:50],
     )
+    logger.debug("Model: %s, Reasoning effort: %s", agent_config.model, reasoning_effort)
+
+    client = get_async_client()
+    api_messages = []
+    for msg in request.history:
+        api_messages.append({"role": msg.role, "content": _strip_thinking_blocks(msg.content)})
+    api_messages.append({"role": "user", "content": request.message})
+
+    thinking_config = _get_thinking_config(reasoning_effort, agent_config.model)
+
+    try:
+        create_params: dict = {
+            "model": agent_config.model,
+            "system": agent_config.instructions,
+            "messages": api_messages,
+            "max_tokens": 8192,
+        }
+        if thinking_config:
+            create_params["thinking"] = thinking_config
+
+        response = await client.messages.create(**create_params)
+
+        content = ""
+        reasoning_content = ""
+        for block in response.content:
+            if block.type == "text":
+                content += block.text
+            elif block.type == "thinking":
+                reasoning_content += block.thinking
+
+        if request.user_role == "member":
+            content, _ = validate_output(content, request.user_role)
+
+        check_for_clinical_leakage(content, request.user_role)
+        return _sse_response_from_result(content=content, reasoning_content=reasoning_content)
+    except Exception as e:
+        logger.error("SSE chat fallback failed: %s", e, exc_info=e)
+        return Response(
+            _emit_sse("error", {"error": str(e)}) + "data: [DONE]\n\n",
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
 
 @router.post("/chat/sync")

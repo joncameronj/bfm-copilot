@@ -1,4 +1,4 @@
-// Embeddings for RAG search (OpenAI — xAI removed standalone embedding models)
+// Embeddings for RAG search via OpenAI.
 import { getDefaultEmbeddingModel } from '@/lib/ai/provider'
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1'

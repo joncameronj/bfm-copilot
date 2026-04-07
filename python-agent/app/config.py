@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     anthropic_opus_model: str = "claude-opus-4-6"
     anthropic_vision_model: str = "claude-sonnet-4-6"
 
-    # OpenAI embeddings (xAI removed standalone embedding models)
+    # OpenAI embeddings
     openai_api_key: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536

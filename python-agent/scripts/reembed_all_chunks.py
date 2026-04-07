@@ -2,7 +2,7 @@
 """
 Re-embed all document_chunks using OpenAI text-embedding-3-small.
 
-Needed after switching from xAI grok-embedding-small (deprecated) to OpenAI.
+Needed after switching to OpenAI embeddings.
 Updates embeddings in-place without changing any other chunk data.
 """
 

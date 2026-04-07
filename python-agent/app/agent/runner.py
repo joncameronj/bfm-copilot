@@ -1,6 +1,5 @@
 """Agent Runner - Custom tool-calling loop using the Anthropic SDK.
 
-Replaces the xai-sdk streaming loop with Anthropic's stateless messages API.
 Handles multi-turn tool calling via message accumulation.
 """
 

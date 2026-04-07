@@ -13,7 +13,7 @@ This document outlines the recommended next steps for improving system health mo
 ### What Exists ✅
 
 1. **Comprehensive Health Check Endpoint** (`/api/admin/health`)
-   - Monitors 11 services: Supabase DB, Supabase Auth, Python Agent, xAI API, + 7 internal APIs
+   - Monitors 11 services: Supabase DB, Supabase Auth, Python Agent, Anthropic/OpenAI APIs, + 7 internal APIs
    - Tracks response times with thresholds (healthy/degraded/unhealthy)
    - Maintains failure history (last 10 failures per service)
    - Admin-only access control
@@ -67,7 +67,7 @@ This document outlines the recommended next steps for improving system health mo
 **Tier 1: MUST WORK (System unusable if broken)**
 1. **Authentication** - Magic link request → email → link click → login → session
 2. **Database** - Supabase connectivity, query execution, RLS enforcement
-3. **Chat** - Message send → Python agent → xAI API → response → save
+3. **Chat** - Message send → Python agent → Anthropic API → response → save
 
 **Tier 2: CORE FEATURES (Major functionality broken)**
 4. **Lab Processing** - PDF/image upload → Vision API extraction → marker matching
@@ -75,13 +75,13 @@ This document outlines the recommended next steps for improving system health mo
 6. **Patient Management** - CRUD operations, filters, search
 
 **Tier 3: SUPPORTIVE (Degraded experience)**
-7. **File Uploads** - xAI diagnostic extraction integration
+7. **File Uploads** - Anthropic diagnostic extraction integration
 8. **Analytics** - Usage tracking, dashboard stats
 
 ### External Dependencies
 
 - **Supabase** - Authentication, PostgreSQL database, storage
-- **xAI** - Chat completions, Vision API, embeddings
+- **Anthropic/OpenAI** - Chat completions, Vision API, embeddings
 - **Python Agent** - FastAPI service at `http://localhost:8000`
 - **Google Cloud** (optional) - If using for storage/analytics
 
@@ -174,7 +174,7 @@ This document outlines the recommended next steps for improving system health mo
     - Authentication attempts
     - API request/response
     - Database queries
-    - xAI API calls
+    - Anthropic/OpenAI API calls
 
 ### Phase 4: Long-term (Next 3 Months)
 **Goal**: Production monitoring and observability
@@ -261,7 +261,7 @@ This document outlines the recommended next steps for improving system health mo
       "responseTime": 52,
       "message": "Agent responding normally"
     },
-    "xai": {
+    "anthropic": {
       "status": "healthy",
       "responseTime": 487,
       "message": "API key valid and responding"
@@ -356,12 +356,12 @@ async def test_chat_response():
 2. Verify middleware fix is deployed in production
 3. Set up alerting for Python agent failures
 4. Document manual fallback procedures
-5. Implement circuit breaker for xAI API
+5. Implement circuit breaker for Anthropic/OpenAI APIs
 
 ### Recovery Procedures (To Document)
 1. **If Database is Down**: Cannot proceed, wait for Supabase recovery
 2. **If Python Agent is Down**: Chat functionality disabled, show message to users
-3. **If xAI API is Down**: Chat responses fail, suggest retry
+3. **If Anthropic/OpenAI API is Down**: Chat responses fail, suggest retry
 4. **If Auth is Down**: Users cannot login, trigger incident response
 
 ---
@@ -468,7 +468,7 @@ async def test_chat_response():
 1. **Supabase Database** - PostgreSQL connection + query test
 2. **Supabase Auth** - Session validation
 3. **Python Agent** - HTTP health endpoint
-4. **xAI API** - Key validation + API test
+4. **Anthropic/OpenAI APIs** - Key validation + API test
 5. **Conversations API** - List conversations endpoint
 6. **Patients API** - List patients endpoint
 7. **Labs API** - List lab results endpoint
