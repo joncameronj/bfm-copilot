@@ -5,8 +5,8 @@ import { getAnthropicClient, extractJSON, JSON_SYSTEM_SUFFIX } from '@/lib/anthr
 import { getDefaultVisionModel } from '@/lib/ai/provider'
 import type { ExtractionResult } from '@/types/diagnostic-extraction'
 
-const MAX_RETRIES = 3
-const INITIAL_BACKOFF_MS = 2000
+const MAX_RETRIES = 2
+const INITIAL_BACKOFF_MS = 1000
 
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {

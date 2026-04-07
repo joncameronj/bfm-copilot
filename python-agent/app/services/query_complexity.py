@@ -112,6 +112,19 @@ def analyze_query_complexity(
     if any(phrase in cleaned for phrase in ['help me design', 'what should', 'how would you', 'recommend', 'suggest protocol']):
         high_indicators += 1
 
+    # 6. Multi-condition / comorbidity queries
+    # Multiple medical terms in one query = complex clinical reasoning
+    medical_terms = [
+        'hypothyroidism', 'hyperthyroidism', 'hashimoto', 'adrenal', 'insulin',
+        'diabetes', 'cortisol', 'thyroid', 'autoimmune', 'inflammation',
+        'neurological', 'hormonal', 'deficiency', 'resistance', 'toxicity',
+        'supplements', 'dosing', 'frequency', 'concurrent', 'comorbid',
+        'levothyroxine', 'antibodies', 'elevated', 'depleted',
+    ]
+    medical_count = sum(1 for term in medical_terms if term in cleaned)
+    if medical_count >= 3:
+        high_indicators += 2  # Strong signal — complex clinical query
+
     # Decision logic
     # High indicators outweigh low indicators
     if high_indicators >= 2:

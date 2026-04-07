@@ -19,7 +19,7 @@ from app.agent.runner import AgentRunner, _strip_thinking_blocks
 from app.services.output_validator import validate_output, check_for_clinical_leakage
 from app.services.model_settings import get_model_settings_service
 from app.services.query_complexity import analyze_query_complexity
-from app.services.ai_client import get_async_client
+from app.services.ai_client import get_async_client, get_opus_model
 from app.services.supabase import get_supabase_client
 from app.services.protocol_loader import get_known_supplements
 from app.tools.rag_search import sunday_first_search
@@ -73,6 +73,46 @@ def _is_definitional_query(message: str) -> bool:
     """Return True for simple definitional questions that don't need presearch."""
     text = (message or "").lower().strip()
     return any(re.search(pattern, text) for pattern in DEFINITIONAL_QUERY_PATTERNS)
+
+
+# Health/science terms that signal a query needs BFM knowledge (RAG + Sonnet).
+# BFM redefines how many substances and body systems work through frequency
+# medicine, so even "What is vitamin D?" needs the BFM perspective, not Haiku.
+_HEALTH_RELATED_PATTERNS = re.compile(
+    r"\b("
+    # Vitamins, minerals, supplements
+    r"vitamin|mineral|magnesium|zinc|iron|calcium|potassium|selenium|iodine|"
+    r"b12|folate|omega|coq10|glutathione|melatonin|probiotics?|"
+    # Hormones and markers
+    r"hormone|insulin|cortisol|thyroid|tsh|t3|t4|estrogen|testosterone|"
+    r"progesterone|dhea|leptin|ghrelin|serotonin|dopamine|oxytocin|"
+    # Body systems and conditions
+    r"adrenal|liver|kidney|gut|brain|nervous|immune|lymph|mitochondri|"
+    r"autoimmune|inflammation|diabetes|hypothyroid|hyperthyroid|hashimoto|"
+    r"anemia|fatigue|insomnia|anxiety|depression|"
+    # BFM-specific terms
+    r"deuterium|frequency|frequencies|protocol|supplement|dosing|dose|"
+    r"fsm|bfm|bioenergetic|mold|toxicity|detox|parasite|"
+    r"hrv|brainwave|valsalva|ortho|urinalysis|"
+    # Medical/clinical terms
+    r"blood\s*panel|lab\s*results?|marker|diagnosis|symptom|treatment|"
+    r"patient|clinical|pathology|deficiency|resistance|"
+    # General health
+    r"health|wellness|healing|nutrition|diet|fasting|sleep|stress|exercise|"
+    r"chronic|acute|pain|energy|weight|metaboli"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_health_related_query(message: str) -> bool:
+    """Return True if the query contains any health, medical, or BFM-related terms.
+
+    Used by prompt routing to ensure health queries always use Sonnet (with RAG)
+    instead of Haiku, since BFM teaches unique perspectives on many substances
+    and body systems that differ from mainstream medicine.
+    """
+    return bool(_HEALTH_RELATED_PATTERNS.search(message or ""))
 
 
 def _build_presearch_query(base_message: str, category_keyword: str) -> str:
@@ -324,17 +364,21 @@ def _select_model(
     chat_model: str,
     fast_model: str,
     deep_dive: bool,
-    is_protocol_query: bool,
+    is_health_query: bool,
 ) -> str:
     """
     Select the appropriate model based on query complexity.
 
-    Simple/low-complexity queries use the fast model (Haiku) for speed.
-    Complex, deep-dive, or protocol queries always use the full chat model (Sonnet).
+    - Low complexity + non-health → Haiku (fast, sub-second)
+    - Low/medium complexity + health → Sonnet (needs RAG grounding for BFM perspective)
+    - High complexity or deep dive → Opus (max reasoning)
+
+    BFM redefines how many substances and body systems work through frequency
+    medicine, so even "What is vitamin D?" needs Sonnet + RAG, not Haiku.
     """
-    if deep_dive or is_protocol_query:
-        return chat_model
-    if detected_complexity == "low":
+    if deep_dive or detected_complexity == "high":
+        return get_opus_model()
+    if detected_complexity == "low" and not is_health_query:
         return fast_model
     return chat_model
 
@@ -363,24 +407,30 @@ async def chat_stream(
         admin_max_effort=model_settings.reasoning_effort,
     )
 
-    # Determine if this is a protocol query early (needed for model selection)
-    is_protocol_query = _is_protocol_or_supplement_query(request.message)
+    # Select model based on complexity and health-relevance
+    is_health_query = _is_health_related_query(request.message)
 
-    # Select model based on complexity: simple queries use Haiku, complex use Sonnet
-    selected_model = _select_model(
-        detected_complexity=detected_complexity,
-        chat_model=model_settings.chat_model,
-        fast_model=model_settings.fast_model,
-        deep_dive=request.deep_dive,
-        is_protocol_query=is_protocol_query,
-    )
+    if model_settings.prompt_routing_enabled:
+        selected_model = _select_model(
+            detected_complexity=detected_complexity,
+            chat_model=model_settings.chat_model,
+            fast_model=model_settings.fast_model,
+            deep_dive=request.deep_dive,
+            is_health_query=is_health_query,
+        )
+        # Bump reasoning to medium when health query gets promoted from low
+        if is_health_query and detected_complexity == "low" and reasoning_effort == "low":
+            reasoning_effort = "medium"
+    else:
+        selected_model = model_settings.chat_model
 
     logger.info(
-        "Query complexity: %s, reasoning effort: %s, model: %s, deep_dive: %s",
+        "Query complexity: %s, reasoning effort: %s, model: %s, deep_dive: %s, routing: %s",
         detected_complexity,
         reasoning_effort,
         selected_model,
         request.deep_dive,
+        "enabled" if model_settings.prompt_routing_enabled else "disabled",
     )
 
     # Build conversation history as input
@@ -540,10 +590,25 @@ async def chat_sync(
     # Get dynamic model settings from admin panel (with caching)
     model_settings = await get_model_settings_service().get_settings()
 
-    _, reasoning_effort = _resolve_reasoning_effort(
+    detected_complexity, reasoning_effort = _resolve_reasoning_effort(
         request=request,
         admin_max_effort=model_settings.reasoning_effort,
     )
+
+    sync_is_health = _is_health_related_query(request.message)
+
+    if model_settings.prompt_routing_enabled:
+        sync_selected_model = _select_model(
+            detected_complexity=detected_complexity,
+            chat_model=model_settings.chat_model,
+            fast_model=model_settings.fast_model,
+            deep_dive=request.deep_dive,
+            is_health_query=sync_is_health,
+        )
+        if sync_is_health and detected_complexity == "low" and reasoning_effort == "low":
+            reasoning_effort = "medium"
+    else:
+        sync_selected_model = model_settings.chat_model
 
     # Build system prompt with role-specific instructions
     system_prompt = get_system_prompt(
@@ -610,11 +675,11 @@ async def chat_sync(
     api_messages.append({"role": "user", "content": request.message})
 
     # Build thinking config
-    thinking_config = _get_thinking_config(reasoning_effort)
+    thinking_config = _get_thinking_config(reasoning_effort, sync_selected_model)
 
     try:
         create_params: dict = {
-            "model": model_settings.chat_model,
+            "model": sync_selected_model,
             "system": system_prompt,
             "messages": api_messages,
             "max_tokens": 8192,
@@ -644,7 +709,7 @@ async def chat_sync(
         return {
             "content": content,
             "reasoning_summary": reasoning_content or None,
-            "model": model_settings.chat_model,
+            "model": sync_selected_model,
             "was_filtered": was_filtered,
             "leakage_detected": leakage_check.get("has_leakage", False),
         }

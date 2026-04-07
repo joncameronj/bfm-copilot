@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: ModelSettings = {
   chat_model: getDefaultChatModel(),
   reasoning_effort: 'high',
   reasoning_summary: 'detailed',
+  prompt_routing_enabled: true,
 }
 
 // GET /api/settings/models - Get current model settings
@@ -28,7 +29,7 @@ export async function GET() {
     const { data: settings, error } = await supabase
       .from('system_config')
       .select('key, value')
-      .in('key', ['chat_model', 'reasoning_effort', 'reasoning_summary'])
+      .in('key', ['chat_model', 'reasoning_effort', 'reasoning_summary', 'prompt_routing_enabled'])
 
     if (error) {
       console.error('Error fetching model settings:', error)
@@ -51,6 +52,8 @@ export async function GET() {
         modelSettings.reasoning_effort = value as ModelSettings['reasoning_effort']
       } else if (setting.key === 'reasoning_summary') {
         modelSettings.reasoning_summary = value as ModelSettings['reasoning_summary']
+      } else if (setting.key === 'prompt_routing_enabled') {
+        modelSettings.prompt_routing_enabled = value === 'true' || value === true
       }
     }
 

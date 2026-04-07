@@ -39,6 +39,10 @@ def get_fast_model() -> str:
     return get_settings().anthropic_fast_model
 
 
+def get_opus_model() -> str:
+    return get_settings().anthropic_opus_model
+
+
 def get_vision_model() -> str:
     return get_settings().anthropic_vision_model
 

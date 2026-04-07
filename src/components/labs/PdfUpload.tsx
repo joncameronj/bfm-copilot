@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -26,6 +26,7 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
   const [parsedValues, setParsedValues] = useState<ParsedValue[]>([]);
   const [editableValues, setEditableValues] = useState<ParsedValue[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Sync editable values when parsed values change
   useEffect(() => {
@@ -67,6 +68,12 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
     setIsUploading(true);
     setParsedValues([]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // Auto-cancel after 60 seconds
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -74,6 +81,7 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
       const response = await fetch('/api/labs/parse-pdf', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -112,9 +120,15 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
         });
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        toast('Upload cancelled', { icon: '✕' });
+        return;
+      }
       console.error('Upload error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to parse lab file');
     } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
       setIsUploading(false);
     }
   }, []);
@@ -291,6 +305,16 @@ export function PdfUpload({ onValuesExtracted, className }: PdfUploadProps) {
               <p className="text-sm text-neutral-400">
                 This can take up to 30 seconds for large reports
               </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  abortControllerRef.current?.abort();
+                }}
+                className="mt-2 text-sm text-neutral-500 hover:text-neutral-900 underline transition-colors"
+              >
+                Cancel
+              </button>
             </>
           ) : (
             <>

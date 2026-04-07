@@ -4,7 +4,7 @@ import { extractBloodPanel } from '@/lib/vision/extractors';
 import { labMarkers } from '@/data/lab-data';
 import { MARKER_ALIASES } from '@/lib/labs/marker-aliases';
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // Claude Vision PDF extraction can take 30-60s
+export const maxDuration = 90 // Claude Vision PDF extraction can take 30-60s
 
 // Accepted file types
 const ACCEPTED_TYPES = {

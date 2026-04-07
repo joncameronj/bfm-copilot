@@ -59,14 +59,20 @@ class StreamEvent:
     data: dict
 
 
-def _get_thinking_config(reasoning_effort: str | None) -> dict | None:
-    """Map reasoning effort string to Anthropic extended thinking config."""
+def _get_thinking_config(reasoning_effort: str | None, model: str = "") -> dict | None:
+    """Map reasoning effort string to Anthropic extended thinking config.
+
+    Args:
+        reasoning_effort: Reasoning effort level (low, medium, high)
+        model: Model name — Opus gets a larger thinking budget for deep reasoning
+    """
     if not reasoning_effort or reasoning_effort == "low":
         return None
     if reasoning_effort == "medium":
-        return {"type": "enabled", "budget_tokens": 5000}
-    # high
-    return {"type": "enabled", "budget_tokens": 10000}
+        return {"type": "enabled", "budget_tokens": 8000}
+    # high — Opus gets 16K, others get 10K
+    budget = 16000 if "opus" in model else 10000
+    return {"type": "enabled", "budget_tokens": budget}
 
 
 def _strip_thinking_blocks(content):
@@ -123,7 +129,7 @@ class AgentRunner:
         tools = self.tool_registry.get_tool_definitions() if self.tool_registry else None
 
         # Build thinking config
-        thinking = _get_thinking_config(self.reasoning_effort)
+        thinking = _get_thinking_config(self.reasoning_effort, self.model)
 
         # Build messages for Anthropic (stateless - full history each call)
         # Strip thinking blocks from history — they require signatures that we

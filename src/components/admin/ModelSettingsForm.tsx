@@ -175,6 +175,50 @@ export function ModelSettingsForm() {
         </CardContent>
       </Card>
 
+      {/* Prompt Routing */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Prompt Routing</CardTitle>
+          <CardDescription>
+            Automatically route queries to the best model based on complexity. Simple questions use Haiku (fast), medium use Sonnet, and complex clinical queries use Opus (deep reasoning).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.prompt_routing_enabled ?? true}
+              onChange={(e) => setSettings({ ...settings, prompt_routing_enabled: e.target.checked })}
+              className="w-4 h-4 rounded text-primary-600"
+            />
+            <span className="text-sm font-medium text-neutral-700">
+              Enable automatic model routing
+            </span>
+          </label>
+
+          {(settings.prompt_routing_enabled ?? true) ? (
+            <div className="bg-neutral-50 rounded-lg p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-neutral-600">Simple questions</span>
+                <code className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs">claude-haiku-4.5</code>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-600">Medium complexity</span>
+                <code className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs">claude-sonnet-4.6</code>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-600">Complex / Deep Dive</span>
+                <code className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs">claude-opus-4.6</code>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-500">
+              All queries will use the selected chat model above.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Reasoning Settings */}
       <Card>
         <CardHeader>

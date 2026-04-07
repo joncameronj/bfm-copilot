@@ -26,7 +26,7 @@ from app.tools.save_suggestion import (
     SAVE_SUGGESTION_TOOL_DESCRIPTION,
     create_save_suggestion_handler,
 )
-from app.services.ai_client import get_chat_model
+from app.services.ai_client import get_chat_model, get_fast_model, get_opus_model
 
 
 @dataclass
@@ -154,3 +154,30 @@ def determine_reasoning_effort(
         return "medium"
 
     return admin_max_effort
+
+
+def determine_model_for_complexity(
+    detected_complexity: str,
+    default_model: str,
+    deep_dive: bool = False,
+) -> str:
+    """
+    Route queries to the optimal model based on detected complexity.
+
+    - Low complexity (simple questions) → Haiku (fast, cheap)
+    - Medium complexity → default model (Sonnet, admin-configured)
+    - High complexity or deep dive → Opus (max reasoning)
+
+    Args:
+        detected_complexity: Detected query complexity (low, medium, high)
+        default_model: Admin-configured default model (typically Sonnet)
+        deep_dive: Whether deep-dive mode is enabled
+
+    Returns:
+        Model name to use for this query
+    """
+    if deep_dive or detected_complexity == "high":
+        return get_opus_model()
+    if detected_complexity == "low":
+        return get_fast_model()
+    return default_model

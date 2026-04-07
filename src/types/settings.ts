@@ -50,12 +50,14 @@ export interface ModelSettings {
   chat_model: string
   reasoning_effort: ReasoningEffort
   reasoning_summary: ReasoningSummary
+  prompt_routing_enabled?: boolean
 }
 
 export interface ModelSettingsUpdatePayload {
   chat_model?: string
   reasoning_effort?: ReasoningEffort
   reasoning_summary?: ReasoningSummary
+  prompt_routing_enabled?: boolean
 }
 
 // AI Provider type

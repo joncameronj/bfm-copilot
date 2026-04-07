@@ -23,6 +23,7 @@ class ModelSettings:
     reasoning_effort: str
     reasoning_summary: str
     temperature: float = 0.8
+    prompt_routing_enabled: bool = True
 
 
 class ModelSettingsService:
@@ -100,6 +101,7 @@ class ModelSettingsService:
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),
+                        prompt_routing_enabled=data.get("prompt_routing_enabled", True),
                     )
                     self._cache_timestamp = time.time()
                     return self._cached_settings
@@ -135,6 +137,7 @@ class ModelSettingsService:
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),
+                        prompt_routing_enabled=data.get("prompt_routing_enabled", True),
                     )
                     self._cache_timestamp = time.time()
                     return self._cached_settings

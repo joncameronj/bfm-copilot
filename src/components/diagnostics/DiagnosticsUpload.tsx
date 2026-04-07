@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AiMagicIcon, Loading03Icon, Tick01Icon } from '@hugeicons/core-free-icons'
@@ -42,6 +42,7 @@ export function DiagnosticsUpload({
   const [isGenerating, setIsGenerating] = useState(false)
   const [analysisGenerated, setAnalysisGenerated] = useState(false)
   const [analysisAbortController, setAnalysisAbortController] = useState<AbortController | null>(null)
+  const uploadAbortRef = useRef<AbortController | null>(null)
 
   const guessFileType = useCallback((filename: string, mimeType?: string): DiagnosticType => {
     return classifyDiagnosticFile(filename, mimeType, {
@@ -85,13 +86,22 @@ export function DiagnosticsUpload({
     setFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
+  const cancelUpload = () => {
+    uploadAbortRef.current?.abort()
+  }
+
   const uploadFiles = async () => {
     setIsUploading(true)
+
+    const controller = new AbortController()
+    uploadAbortRef.current = controller
 
     const updatedFiles = [...files]
     let currentUploadId = uploadId
 
     for (let i = 0; i < updatedFiles.length; i++) {
+      if (controller.signal.aborted) break
+
       const fileData = updatedFiles[i]
       if (fileData.status !== 'pending') continue
 
@@ -109,6 +119,7 @@ export function DiagnosticsUpload({
         const response = await fetch('/api/diagnostics/upload', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         })
 
         if (!response.ok) {
@@ -132,6 +143,16 @@ export function DiagnosticsUpload({
         }
         setFiles([...updatedFiles])
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // Mark remaining pending files back to pending state
+          for (let j = i; j < updatedFiles.length; j++) {
+            if (updatedFiles[j].status === 'uploading') {
+              updatedFiles[j] = { ...updatedFiles[j], status: 'pending' }
+            }
+          }
+          setFiles([...updatedFiles])
+          break
+        }
         updatedFiles[i] = {
           ...fileData,
           status: 'error',
@@ -170,8 +191,11 @@ export function DiagnosticsUpload({
     }
 
     setIsUploading(false)
+    uploadAbortRef.current = null
     // Pass success status to callback so it can handle toast appropriately
-    onComplete?.(updatedFiles, currentUploadId, statusUpdateSuccess)
+    if (!controller.signal.aborted) {
+      onComplete?.(updatedFiles, currentUploadId, statusUpdateSuccess)
+    }
   }
 
   const generateAnalysis = async () => {
@@ -281,13 +305,23 @@ export function DiagnosticsUpload({
 
       {/* Upload Button */}
       {files.length > 0 && pendingCount > 0 && (
-        <Button
-          onClick={uploadFiles}
-          isLoading={isUploading}
-          className="w-full"
-        >
-          Upload {pendingCount} file{pendingCount > 1 ? 's' : ''}
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={uploadFiles}
+            isLoading={isUploading}
+            className="flex-1"
+          >
+            Upload {pendingCount} file{pendingCount > 1 ? 's' : ''}
+          </Button>
+          {isUploading && (
+            <Button
+              variant="secondary"
+              onClick={cancelUpload}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Error Message */}
