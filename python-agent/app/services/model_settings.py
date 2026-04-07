@@ -9,7 +9,7 @@ import time
 import httpx
 from dataclasses import dataclass
 from typing import Optional
-from app.services.ai_client import get_chat_model
+from app.services.ai_client import get_chat_model, get_fast_model
 from app.utils.logger import get_logger
 
 logger = get_logger("model_settings")
@@ -19,6 +19,7 @@ logger = get_logger("model_settings")
 class ModelSettings:
     """Model configuration settings."""
     chat_model: str
+    fast_model: str
     reasoning_effort: str
     reasoning_summary: str
     temperature: float = 0.8
@@ -32,6 +33,7 @@ class ModelSettingsService:
         api_url: str,
         cache_ttl_seconds: int = 60,
         default_model: str | None = None,
+        default_fast_model: str | None = None,
         default_reasoning_effort: str = "high",
         default_reasoning_summary: str = "detailed",
         default_temperature: float = 0.8,
@@ -39,6 +41,7 @@ class ModelSettingsService:
         self.api_url = api_url
         self.cache_ttl_seconds = cache_ttl_seconds
         self.default_model = default_model or get_chat_model()
+        self.default_fast_model = default_fast_model or get_fast_model()
         self.default_reasoning_effort = default_reasoning_effort
         self.default_reasoning_summary = default_reasoning_summary
         self.default_temperature = default_temperature
@@ -67,6 +70,7 @@ class ModelSettingsService:
         """Return default settings from environment variables."""
         return ModelSettings(
             chat_model=self.default_model,
+            fast_model=self.default_fast_model,
             reasoning_effort=self.default_reasoning_effort,
             reasoning_summary=self.default_reasoning_summary,
             temperature=self.default_temperature,
@@ -92,6 +96,7 @@ class ModelSettingsService:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
                         chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
+                        fast_model=data.get("fast_model", self.default_fast_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),
@@ -126,6 +131,7 @@ class ModelSettingsService:
                     data = response.json().get("data", {})
                     self._cached_settings = ModelSettings(
                         chat_model=self._normalize_chat_model(data.get("chat_model", self.default_model)),
+                        fast_model=data.get("fast_model", self.default_fast_model),
                         reasoning_effort=data.get("reasoning_effort", self.default_reasoning_effort),
                         reasoning_summary=data.get("reasoning_summary", self.default_reasoning_summary),
                         temperature=float(data.get("temperature", self.default_temperature)),

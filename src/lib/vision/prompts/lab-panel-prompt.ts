@@ -147,4 +147,11 @@ IMPORTANT:
 - Set lower confidence (0.5-0.7) when text is blurry or uncertain
 - For LabCorp: only extract from "Final Report" pages, skip all others
 
+CRITICAL - DO NOT HALLUCINATE:
+- ONLY extract markers that are EXPLICITLY VISIBLE as text on the document
+- Do NOT infer, calculate, or fabricate any marker values
+- If a marker name appears in the alias list but is NOT printed on the lab report, do NOT include it
+- For example: do NOT add "Transferrin" unless the word "Transferrin" (or an alias) is literally printed on the report with a numeric value next to it
+- If you are uncertain whether a marker is present, set confidence below 0.5 or omit it entirely
+
 Be thorough - extract ALL visible lab values from the applicable pages.`

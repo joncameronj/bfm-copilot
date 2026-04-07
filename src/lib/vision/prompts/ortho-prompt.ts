@@ -15,7 +15,7 @@ The report contains:
 CRITICAL CLINICAL RULES:
 - If the blue (supine) and red (upright) dots are PERFECTLY SUPERIMPOSED (all 4 values match exactly), this indicates Locus Coeruleus dysfunction — a serious deal breaker.
 - "PSNS BLOCKED" = parasympathetic nervous system not functioning
-- "SNS SWITCHED" = sympathetic nervous system reversed (deal breaker #1)
+- "SNS SWITCHED" or "PSNS SWITCHED" = sympathetic nervous system reversed (deal breaker #1). Newer software may label this "PSNS SWITCHED" — it is the same deal breaker.
 - Normal: HR should increase from supine to upright, R(HF) should decrease
 
 Extract ALL numeric values exactly as shown.`
@@ -60,7 +60,8 @@ CRITICAL — EXACT VALUE EXTRACTION:
 
 IMPORTANT:
 - If supine and upright values are identical across all 4 measurements, note "Dots superimposed — Locus Coeruleus indicator" in findings
-- Look for text like "PSNS BLOCKED", "SNS SWITCHED", "SNS EXCESSIVE" in the assessment
+- Look for text like "PSNS BLOCKED", "SNS SWITCHED", "PSNS SWITCHED", "SNS EXCESSIVE" in the assessment
+- If the report says "PSNS SWITCHED", treat it the same as "SNS SWITCHED" — set sns_status to "switched"
 
 MULTI-TEST DOCUMENT HANDLING:
 - Some documents contain MULTIPLE tests (e.g., initial exam + re-exam, or tests from different dates)
