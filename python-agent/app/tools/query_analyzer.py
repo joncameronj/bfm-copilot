@@ -130,6 +130,16 @@ DIAGNOSTIC_TO_FREQUENCY: dict[str, list[str]] = {
     "pituitary thyroid": ["Pit P Support"],
     "hypothyroid": ["Pit P Support"],
     "hyperthyroid": ["Pit P Support"],
+
+    # Five Archimedes Levers — all naming variants
+    "five levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "5 levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "archimedes levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "archimedes lever": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "5 archimedes levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "five archimedes levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "the levers": ["Leptin Resist", "Melanin", "Pineal Support"],
+    "master levers": ["Leptin Resist", "Melanin", "Pineal Support"],
 }
 
 # Supplement mappings derived from Sunday teaching sessions
@@ -150,7 +160,18 @@ DIAGNOSTIC_TO_SUPPLEMENT: dict[str, list[str]] = {
     "protein in urine": ["X-39"],
     "proteinuria": ["X-39"],
     "ub rate": ["X-39"],
+    "ub rates": ["X-39"],
     "msh issues": ["X-39"],
+
+    # Five Archimedes Levers — all naming variants
+    "five levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "5 levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "archimedes levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "archimedes lever": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "5 archimedes levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "five archimedes levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "the levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
+    "master levers": ["Melatonin", "Adipothin", "Cell Synergy", "X-39"],
 
     # Iron/ferritin
     "high ferritin": ["Deuterium Drops"],

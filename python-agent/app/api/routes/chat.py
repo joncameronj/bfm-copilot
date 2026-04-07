@@ -585,6 +585,7 @@ async def chat_stream(
     api_messages.append({"role": "user", "content": request.message})
 
     thinking_config = _get_thinking_config(reasoning_effort, agent_config.model)
+    tool_definitions = agent_config.tool_registry.get_tool_definitions() if agent_config.tool_registry else None
 
     try:
         create_params: dict = {
@@ -595,16 +596,65 @@ async def chat_stream(
         }
         if thinking_config:
             create_params["thinking"] = thinking_config
-
-        response = await client.messages.create(**create_params)
+        if tool_definitions:
+            create_params["tools"] = tool_definitions
 
         content = ""
         reasoning_content = ""
-        for block in response.content:
-            if block.type == "text":
-                content += block.text
-            elif block.type == "thinking":
-                reasoning_content += block.thinking
+
+        # Tool-calling loop: execute up to 5 tool calls before final answer
+        for _tool_iteration in range(5):
+            response = await client.messages.create(**create_params)
+
+            # Collect text, reasoning, and any tool_use blocks
+            tool_uses = []
+            iteration_text = ""
+            for block in response.content:
+                if block.type == "text":
+                    iteration_text += block.text
+                elif block.type == "thinking":
+                    reasoning_content += block.thinking
+                elif block.type == "tool_use":
+                    tool_uses.append(block)
+
+            # If no tool calls, we have the final response
+            if not tool_uses:
+                content = iteration_text
+                break
+
+            # Execute tool calls and build tool_result messages
+            tool_results = []
+            for tu in tool_uses:
+                tool_input = tu.input if isinstance(tu.input, dict) else {}
+                tool_result = await agent_config.tool_registry.execute(tu.name, tool_input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu.id,
+                    "content": tool_result,
+                })
+
+            # Serialize SDK content blocks to plain dicts, dropping thinking blocks
+            # (thinking blocks require signatures we don't track across turns)
+            assistant_blocks = []
+            for block in response.content:
+                if block.type == "text":
+                    assistant_blocks.append({"type": "text", "text": block.text})
+                elif block.type == "tool_use":
+                    assistant_blocks.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input if isinstance(block.input, dict) else {},
+                    })
+                # thinking blocks intentionally omitted
+
+            # Append assistant turn (with tool_use blocks) and tool results to conversation
+            create_params["messages"] = list(create_params["messages"]) + [
+                {"role": "assistant", "content": assistant_blocks},
+                {"role": "user", "content": tool_results},
+            ]
+            # Extended thinking cannot be used in follow-up turns after tool use
+            create_params.pop("thinking", None)
 
         if request.user_role == "member":
             content, _ = validate_output(content, request.user_role)

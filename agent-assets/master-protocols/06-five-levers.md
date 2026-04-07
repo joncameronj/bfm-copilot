@@ -1,4 +1,6 @@
-# BFM Master Protocol Key: The Five Levers
+# BFM Master Protocol Key: The Five Levers (Five Archimedes Levers)
+
+*Also called the Five Archimedes Levers, 5 Archimedes Levers, or simply "the levers" — named after Archimedes' principle: "Give me a lever and a place to stand and I'll move the world." These are Dr. Rob DeMartino's highest-leverage intervention points in BFM methodology.*
 
 The 5 master levers that govern metabolic health in the BFM framework.
 These are the foundational markers that must be assessed and optimized:

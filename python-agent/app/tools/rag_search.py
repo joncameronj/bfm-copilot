@@ -832,7 +832,9 @@ it will also find adrenal and iron deficiency protocols that commonly co-occur.
 
 Content includes:
 - BFM Master Protocol Key (authoritative reference for all protocols, deal breakers,
-  lab mappings, condition protocols, supplements, contraindications, and the Five Levers)
+  lab mappings, condition protocols, supplements, contraindications, and the Five Archimedes
+  Levers — Melatonin, Leptin, MSH, Vitamin D, UB Rates — Dr. Rob's foundational framework.
+  Also referred to as "5 Levers", "5 Archimedes Levers", "the levers", or "master levers".)
 - BFM seminar slides (Friday/Saturday/Sunday sessions) with case studies and walkthroughs
 - Supplement reference with dosages, timing, indications, and brands
 - Frequency protocol details and mitochondrial frequency settings
