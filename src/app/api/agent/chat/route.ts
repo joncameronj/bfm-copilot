@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getPythonAgentUrl } from '@/lib/agent/url'
-import { extractDiagnosticValues } from '@/lib/vision'
 import { parseLabPdf } from '@/lib/labs/pdf-parser'
 import type { DiagnosticType } from '@/types/shared'
 
@@ -242,31 +241,26 @@ async function summarizeAttachment(
     return `Attachment "${filename}" (${mimeType}) uploaded. Direct extraction is not available for this format in chat yet.`
   }
 
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(CHAT_UPLOAD_BUCKET)
-    .createSignedUrl(storagePath, 60 * 10)
-
-  if (signedError || !signedData?.signedUrl) {
-    return `Attachment "${filename}" image URL could not be generated for analysis.`
-  }
-
+  // Return lightweight metadata instead of calling the vision LLM.
+  // Vision extraction was the main bottleneck (minutes per image), causing
+  // the UI to freeze. The agent has enough context to discuss the file,
+  // and full extraction happens via the dedicated diagnostics pipeline.
   const inferredType = inferDiagnosticType(filename)
-  const extraction = await extractDiagnosticValues(
-    signedData.signedUrl,
-    inferredType,
-    mimeType
-  )
-
-  if (!extraction.success) {
-    return `Attachment "${filename}" image analysis failed (${extraction.error || 'unknown error'}).`
-  }
-
-  const confidencePct = Math.round(extraction.confidence * 100)
-  const extractedJson = truncate(JSON.stringify(extraction.data), 2600)
   return (
-    `Attachment "${filename}" analyzed as ${inferredType} ` +
-    `(confidence: ${confidencePct}%). Extracted JSON: ${extractedJson}`
+    `Attachment "${filename}" (${mimeType}) uploaded as ${inferredType} diagnostic image. ` +
+    `The user wants you to help analyze this file. ` +
+    `For detailed extraction, use the diagnostics upload flow.`
   )
+}
+
+const PER_FILE_TIMEOUT_MS = 30_000 // 30 seconds per file
+const TOTAL_ATTACHMENT_TIMEOUT_MS = 45_000 // 45 seconds total
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ])
 }
 
 async function buildAttachmentContext(
@@ -280,10 +274,26 @@ async function buildAttachmentContext(
   }
 
   const attachmentById = new Map(attachments.map((a) => [a.id, a]))
-  const summaries = await Promise.all(
-    fileIds.map((fileId) =>
-      summarizeAttachment(supabase, userId, fileId, attachmentById.get(fileId))
+
+  // Process all files in parallel with per-file and overall timeouts
+  const filePromises = fileIds.map((fileId) => {
+    const attachment = attachmentById.get(fileId)
+    const fallbackName = attachment?.filename || fileId
+    return withTimeout(
+      summarizeAttachment(supabase, userId, fileId, attachment),
+      PER_FILE_TIMEOUT_MS,
+      `Attachment "${fallbackName}" processing timed out. The file was uploaded successfully.`
     )
+  })
+
+  const summaries = await withTimeout(
+    Promise.all(filePromises),
+    TOTAL_ATTACHMENT_TIMEOUT_MS,
+    fileIds.map((fileId) => {
+      const attachment = attachmentById.get(fileId)
+      const fallbackName = attachment?.filename || fileId
+      return `Attachment "${fallbackName}" uploaded. Processing skipped due to time limit.`
+    })
   )
 
   const context = [

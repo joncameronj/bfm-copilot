@@ -306,7 +306,10 @@ def _resolve_reasoning_effort(request: ChatRequest, admin_max_effort: str) -> tu
     Resolve detected complexity + final reasoning effort for this request.
     Deep dive always runs high reasoning regardless of complexity.
     """
-    detected_complexity = analyze_query_complexity(request.message, request.history)
+    has_files = bool(request.file_ids)
+    detected_complexity = analyze_query_complexity(
+        request.message, request.history, has_files=has_files
+    )
     reasoning_effort = determine_reasoning_effort(
         detected_complexity=detected_complexity,
         admin_max_effort=admin_max_effort,
@@ -314,6 +317,26 @@ def _resolve_reasoning_effort(request: ChatRequest, admin_max_effort: str) -> tu
     if request.deep_dive:
         reasoning_effort = "high"
     return detected_complexity, reasoning_effort
+
+
+def _select_model(
+    detected_complexity: str,
+    chat_model: str,
+    fast_model: str,
+    deep_dive: bool,
+    is_protocol_query: bool,
+) -> str:
+    """
+    Select the appropriate model based on query complexity.
+
+    Simple/low-complexity queries use the fast model (Haiku) for speed.
+    Complex, deep-dive, or protocol queries always use the full chat model (Sonnet).
+    """
+    if deep_dive or is_protocol_query:
+        return chat_model
+    if detected_complexity == "low":
+        return fast_model
+    return chat_model
 
 
 @router.post("/chat")
@@ -340,10 +363,23 @@ async def chat_stream(
         admin_max_effort=model_settings.reasoning_effort,
     )
 
+    # Determine if this is a protocol query early (needed for model selection)
+    is_protocol_query = _is_protocol_or_supplement_query(request.message)
+
+    # Select model based on complexity: simple queries use Haiku, complex use Sonnet
+    selected_model = _select_model(
+        detected_complexity=detected_complexity,
+        chat_model=model_settings.chat_model,
+        fast_model=model_settings.fast_model,
+        deep_dive=request.deep_dive,
+        is_protocol_query=is_protocol_query,
+    )
+
     logger.info(
-        "Query complexity: %s, reasoning effort: %s, deep_dive: %s",
+        "Query complexity: %s, reasoning effort: %s, model: %s, deep_dive: %s",
         detected_complexity,
         reasoning_effort,
+        selected_model,
         request.deep_dive,
     )
 
@@ -371,7 +407,7 @@ async def chat_stream(
         reasoning_effort=reasoning_effort,
         user_id=request.user_id or "system",
         conversation_id=request.conversation_id,
-        model=model_settings.chat_model,
+        model=selected_model,
         deep_dive=request.deep_dive,
     )
 
@@ -394,7 +430,6 @@ async def chat_stream(
     # Hard guard for protocol/supplement questions:
     # - Practitioner/admin: pre-search Sunday chunks and inject evidence.
     # - Member: enforce educational-only override with course callout.
-    is_protocol_query = _is_protocol_or_supplement_query(request.message)
     is_definitional = _is_definitional_query(request.message)
     needs_presearch = is_protocol_query and not is_definitional
 
