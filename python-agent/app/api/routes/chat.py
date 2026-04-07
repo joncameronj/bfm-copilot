@@ -42,6 +42,11 @@ PROTOCOL_SUPPLEMENT_QUERY_PATTERNS = [
     r"\bdos(?:e|ing)\b",
     r"\bdeuterium\b",
     r"\bdrops?\b",
+    # Five Levers / Archimedes Levers — always need RAG grounding
+    r"\b(?:5|five)\s+levers?\b",
+    r"\barchimedes\s+levers?\b",
+    r"\bmaster\s+levers?\b",
+    r"\bthe\s+levers?\b",
 ]
 
 NORMAL_PRESEARCH_LIMIT = 5
