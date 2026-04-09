@@ -1,12 +1,27 @@
 import hashlib
+import re
 
 from app.services.embeddings_client import create_embedding, create_embedding_batch_sync
 
 # Batch size for embedding operations
 BATCH_SIZE = 100
 
-# Embedding cache (in-memory, keyed by MD5 hash of query text)
+# Embedding cache (in-memory, keyed by MD5 hash of normalized query text)
 _embedding_cache: dict[str, list[float]] = {}
+
+# Trailing punctuation that doesn't add semantic value for search queries
+_TRAILING_PUNCT_RE = re.compile(r"[?.!,;:]+$")
+
+
+def _normalize_query_text(text: str) -> str:
+    """Normalize query text before embedding so minor punctuation differences
+    (e.g. "What is heteroplasmy?" vs "What is heteroplasmy") produce
+    identical vectors. Only applied to search queries, not document chunks."""
+    normalized = text.strip()
+    normalized = _TRAILING_PUNCT_RE.sub("", normalized)
+    # Collapse repeated whitespace
+    normalized = " ".join(normalized.split())
+    return normalized
 
 
 async def get_embedding(text: str) -> list[float]:
@@ -55,12 +70,13 @@ async def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
 
 
 async def embed_query(query: str) -> list[float]:
-    """
-    Embed a search query.
+    """Embed a search query with normalization.
 
-    This is an alias for get_embedding but named semantically for search use cases.
+    Normalizes the query text (strip trailing punctuation, collapse whitespace)
+    so that minor formatting differences don't produce different vectors.
+    Document chunks are embedded via get_embedding() without normalization.
     """
-    return await get_embedding(query)
+    return await get_embedding(_normalize_query_text(query))
 
 
 def clear_embedding_cache() -> None:

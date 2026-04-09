@@ -82,44 +82,113 @@ def _is_definitional_query(message: str) -> bool:
     return any(re.search(pattern, text) for pattern in DEFINITIONAL_QUERY_PATTERNS)
 
 
-# Health/science terms that signal a query needs BFM knowledge (RAG + Sonnet).
-# BFM redefines how many substances and body systems work through frequency
-# medicine, so even "What is vitamin D?" needs the BFM perspective, not Haiku.
+# ── Trivial non-health patterns (the ONLY queries that may use Haiku) ──────
+# In a BFM health app, almost every substantive question is health-related.
+# Instead of trying to enumerate every medical term (and always missing some),
+# we define what is CLEARLY non-health and route everything else to Sonnet/Opus.
+_TRIVIAL_NON_HEALTH_PATTERNS = [
+    # Greetings & small-talk
+    r"^(hi|hello|hey|yo|sup|howdy|good\s+(morning|afternoon|evening))\b",
+    r"^(thanks|thank you|thx|cheers|ok(ay)?|yes|no|sure|got it|sounds good|cool|great|nice)\s*[!.?]*$",
+    # Meta questions about the bot itself
+    r"^(what\s+is\s+your\s+name|who\s+are\s+you|what\s+can\s+you\s+do|how\s+do\s+you\s+work)\b",
+    # Weather, time, math, geography, pop culture
+    r"\b(weather|temperature|forecast|rain|snow)\b",
+    r"^what\s+(time|day|date)\s+is\s+it",
+    r"^(how\s+old|when\s+was|where\s+is|where\s+was)\b.*\b(born|founded|located|built|made)\b",
+    r"^\d+\s*[\+\-\*/]\s*\d+",  # arithmetic: "2 + 2"
+    # Generic tech/non-health
+    r"\b(javascript|python|html|css|code|programming|software|website|app\s+store)\b",
+]
+_TRIVIAL_NON_HEALTH_RE = [re.compile(p, re.IGNORECASE) for p in _TRIVIAL_NON_HEALTH_PATTERNS]
+
+# Positive health signal — expanded to catch BFM-specific and general medical terms.
+# Used as a secondary check: if ANY of these appear the query is definitely health.
 _HEALTH_RELATED_PATTERNS = re.compile(
     r"\b("
     # Vitamins, minerals, supplements
     r"vitamin|mineral|magnesium|zinc|iron|calcium|potassium|selenium|iodine|"
     r"b12|folate|omega|coq10|glutathione|melatonin|probiotics?|"
+    r"ip6|gold|innovita|nac|curcumin|berberine|quercetin|resveratrol|"
+    r"collagen|biotin|chromium|boron|molybdenum|vanadium|"
     # Hormones and markers
     r"hormone|insulin|cortisol|thyroid|tsh|t3|t4|estrogen|testosterone|"
     r"progesterone|dhea|leptin|ghrelin|serotonin|dopamine|oxytocin|"
+    r"aldosterone|prolactin|igf|hgh|growth\s*hormone|"
     # Body systems and conditions
     r"adrenal|liver|kidney|gut|brain|nervous|immune|lymph|mitochondri|"
     r"autoimmune|inflammation|diabetes|hypothyroid|hyperthyroid|hashimoto|"
     r"anemia|fatigue|insomnia|anxiety|depression|"
+    r"heart|cardiac|lung|pulmonary|spleen|pancrea|gallbladder|colon|"
+    r"intestin|stomach|esophag|bladder|prostate|ovary|uterus|"
     # BFM-specific terms
     r"deuterium|frequency|frequencies|protocol|supplement|dosing|dose|"
     r"fsm|bfm|bioenergetic|mold|toxicity|detox|parasite|"
     r"hrv|brainwave|valsalva|ortho|urinalysis|"
+    r"heteroplasm|methylat|epigenetic|telomer|apoptosis|autophagy|"
+    r"locus\s*coeruleus|ns\s*tox|deal\s*breaker|archimedes|five\s*levers|"
+    r"ubiquitin|proteasome|ub\s*rate|master\s*protocol|"
+    r"specific\s*gravity|ph\s*level|"
     # Medical/clinical terms
     r"blood\s*panel|lab\s*results?|marker|diagnosis|symptom|treatment|"
     r"patient|clinical|pathology|deficiency|resistance|"
+    r"biopsy|prognosis|etiology|comorbid|contraindic|"
+    r"prescription|pharmaceutical|antibiotic|antifungal|antiviral|"
+    r"cholesterol|triglyceride|glucose|hemoglobin|a1c|creatinine|"
+    r"ast|alt|ggt|bun|albumin|bilirubin|ferritin|transferrin|"
+    r"wbc|rbc|platelet|neutrophil|lymphocyte|eosinophil|basophil|"
+    r"igm|igg|iga|ige|crp|esr|sed\s*rate|"
+    # Genetics & cellular biology
+    r"dna|rna|gene|genetic|mutation|polymorphism|snp|mthfr|"
+    r"cytokine|histamine|peptide|enzyme|receptor|antibod|antigen|"
+    r"stem\s*cell|telomer|chromosome|genome|"
     # General health
     r"health|wellness|healing|nutrition|diet|fasting|sleep|stress|exercise|"
-    r"chronic|acute|pain|energy|weight|metaboli"
+    r"chronic|acute|pain|energy|weight|metaboli|"
+    r"disease|disorder|syndrome|condition|illness|infection|"
+    r"cancer|tumor|oncolog|benign|malignant|"
+    r"allergy|allergic|intolerance|sensitivity|"
+    r"surgery|surgical|procedure|therapy|therapeutic|"
+    r"blood\s*pressure|hypertension|hypotension|"
+    r"fever|nausea|vomit|diarrhea|constipat|bloat|"
+    r"rash|eczema|psoriasis|dermatit|acne|"
+    r"migraine|headache|seizure|vertigo|tinnitus|"
+    r"asthma|copd|bronchit|pneumonia|"
+    r"arthritis|osteopor|fibromyalg|lupus|"
+    r"hepatitis|cirrhosis|pancreatitis|"
+    r"lyme|candida|herpes|hpv|"
+    r"concussion|neuropathy|sclerosis|parkinson|alzheimer|dementia|"
+    r"emf|grounding|earthing|circadian|"
+    r"functional\s*medicine|integrative|holistic|naturopath|chiropractic"
     r")\b",
     re.IGNORECASE,
 )
 
 
 def _is_health_related_query(message: str) -> bool:
-    """Return True if the query contains any health, medical, or BFM-related terms.
+    """Return True unless the query is clearly trivial and non-health-related.
 
-    Used by prompt routing to ensure health queries always use Sonnet (with RAG)
-    instead of Haiku, since BFM teaches unique perspectives on many substances
-    and body systems that differ from mainstream medicine.
+    In a BFM health app the safe default is 'probably health'. Only obvious
+    non-health queries (greetings, weather, meta-questions about the bot) are
+    allowed through to Haiku. Everything else routes to Sonnet/Opus with RAG.
     """
-    return bool(_HEALTH_RELATED_PATTERNS.search(message or ""))
+    text = (message or "").strip()
+    if not text:
+        return False
+
+    # Fast positive: any explicit health/medical term → definitely health
+    if _HEALTH_RELATED_PATTERNS.search(text):
+        return True
+
+    # Check if it's clearly trivial/non-health
+    for pattern in _TRIVIAL_NON_HEALTH_RE:
+        if pattern.search(text):
+            return False
+
+    # Default: in a health app, assume it's health-related.
+    # This catches terms we haven't explicitly listed (like "heteroplasmy")
+    # and ensures they get Sonnet + RAG instead of Haiku.
+    return True
 
 
 def _build_presearch_query(base_message: str, category_keyword: str) -> str:
