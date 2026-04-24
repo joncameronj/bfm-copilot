@@ -12,12 +12,12 @@ const OUTPUT_FILE = path.join(process.cwd(), 'docs/auth-email-preview.html')
 
 const variables = {
   action_url:
-    'https://awdvlfjiusotgbumoojt.supabase.co/auth/v1/verify?token_hash=sample-token-hash&type=recovery&redirect_to=https%3A%2F%2Fcopilot.energeticdebt.com%2Fupdate-password',
+    'https://copilot.energeticdebt.com/auth/verify/recovery/sample-token-hash',
   otp_code: '123456',
   support_email: 'support@beyondfunctionalmedicine.com',
   product_name: 'Copilot',
   recipient_email: 'joncameronj@gmail.com',
-  logo_url: 'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
+  logo_url: 'https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png',
 }
 
 const templates = parseTemplates(await readFile(TEMPLATE_DOC, 'utf8'))

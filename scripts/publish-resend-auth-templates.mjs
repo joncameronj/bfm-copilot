@@ -40,7 +40,7 @@ const VARIABLES = [
     key: 'logo_url',
     type: 'string',
     fallbackValue:
-      'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
+      'https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png',
   },
 ]
 

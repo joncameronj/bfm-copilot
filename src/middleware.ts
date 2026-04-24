@@ -47,6 +47,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/login') || pathname.startsWith('/reset-password')
   const isPublicPage =
     isAuthPage ||
+    pathname.startsWith('/auth/verify') ||
     pathname.startsWith('/update-password') ||
     pathname.startsWith('/purchase-success')
 

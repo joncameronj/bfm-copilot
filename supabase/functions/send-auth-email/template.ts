@@ -80,7 +80,7 @@ interface TemplateCopy {
 
 const DEFAULT_PRODUCT_NAME = 'Copilot'
 const DEFAULT_LOGO_URL =
-  'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png'
+  'https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png'
 
 const COPY: Record<AuthEmailTemplateKey, TemplateCopy> = {
   recovery: {
@@ -185,14 +185,19 @@ export function buildVerifyUrl(params: {
   tokenHash?: string
   type?: string
   redirectTo?: string
+  siteUrl?: string
 }): string {
-  if (!params.tokenHash) return params.redirectTo || ''
+  const tokenHash = params.tokenHash
+  if (!tokenHash) return params.redirectTo || ''
+
+  const appVerifyUrl = buildAppVerifyUrl({ ...params, tokenHash })
+  if (appVerifyUrl) return appVerifyUrl
 
   const url = new URL(
     '/auth/v1/verify',
     ensureTrailingSlash(params.supabaseUrl)
   )
-  url.searchParams.set('token_hash', params.tokenHash)
+  url.searchParams.set('token_hash', tokenHash)
   url.searchParams.set('type', params.type || 'signup')
 
   if (params.redirectTo) {
@@ -200,6 +205,80 @@ export function buildVerifyUrl(params: {
   }
 
   return url.toString()
+}
+
+function buildAppVerifyUrl(params: {
+  tokenHash: string
+  type?: string
+  redirectTo?: string
+  siteUrl?: string
+}): string | null {
+  const baseUrl = getAppVerifyBaseUrl(params.redirectTo, params.siteUrl)
+  if (!baseUrl) return null
+
+  const actionType = params.type || 'signup'
+  const url = new URL(
+    `/auth/verify/${encodeURIComponent(actionType)}/${encodeURIComponent(
+      params.tokenHash
+    )}`,
+    baseUrl
+  )
+
+  const nextPath = getSameOriginNextPath(baseUrl, params.redirectTo)
+  if (nextPath && nextPath !== getDefaultNextPath(actionType)) {
+    url.searchParams.set('next', nextPath)
+  }
+
+  return url.toString()
+}
+
+function getAppVerifyBaseUrl(
+  redirectTo?: string,
+  siteUrl?: string
+): string | null {
+  for (const candidate of [redirectTo, siteUrl]) {
+    if (!candidate) continue
+
+    try {
+      const url = new URL(candidate)
+      if (url.protocol === 'https:' || url.hostname === 'localhost') {
+        return url.origin
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
+function getSameOriginNextPath(
+  baseUrl: string,
+  redirectTo?: string
+): string | null {
+  if (!redirectTo) return null
+
+  try {
+    const base = new URL(baseUrl)
+    const redirect = new URL(redirectTo)
+    if (redirect.origin !== base.origin) return null
+
+    return `${redirect.pathname}${redirect.search}${redirect.hash}`
+  } catch {
+    return null
+  }
+}
+
+function getDefaultNextPath(actionType: string): string {
+  switch (actionType) {
+    case 'recovery':
+    case 'invite':
+      return '/update-password'
+    case 'email_change':
+      return '/settings'
+    default:
+      return '/'
+  }
 }
 
 export function buildAuthEmailMessages(
@@ -287,6 +366,7 @@ function buildMessage(params: {
     tokenHash: params.tokenHash,
     type: params.actionType,
     redirectTo: params.options.emailData.redirect_to,
+    siteUrl: params.options.emailData.site_url,
   })
 
   const variables = {

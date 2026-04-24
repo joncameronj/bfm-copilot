@@ -25,7 +25,7 @@ describe('send-auth-email template routing', () => {
     expect(normalizeTemplateKey('unknown')).toBe('generic')
   })
 
-  it('builds Supabase verify URLs from token hashes', () => {
+  it('builds app verify URLs from token hashes when a redirect origin is available', () => {
     const url = new URL(
       buildVerifyUrl({
         supabaseUrl: 'https://project-ref.supabase.co/',
@@ -35,13 +35,23 @@ describe('send-auth-email template routing', () => {
       })
     )
 
+    expect(url.origin).toBe('https://app.example.com')
+    expect(url.pathname).toBe('/auth/verify/recovery/hash-123')
+    expect(url.searchParams.get('next')).toBeNull()
+  })
+
+  it('falls back to direct Supabase verify URLs without an app origin', () => {
+    const url = new URL(
+      buildVerifyUrl({
+        supabaseUrl: 'https://project-ref.supabase.co/',
+        tokenHash: 'hash-123',
+        type: 'recovery',
+      })
+    )
+
     expect(url.origin).toBe('https://project-ref.supabase.co')
     expect(url.pathname).toBe('/auth/v1/verify')
     expect(url.searchParams.get('token_hash')).toBe('hash-123')
-    expect(url.searchParams.get('type')).toBe('recovery')
-    expect(url.searchParams.get('redirect_to')).toBe(
-      'https://app.example.com/update-password'
-    )
   })
 
   it.each([
@@ -71,16 +81,16 @@ describe('send-auth-email template routing', () => {
     expect(message.templateKey).toBe(templateKey)
     expect(message.templateId).toBe(`template-${templateKey}`)
     expect(message.variables).toMatchObject({
-      action_url: expect.stringContaining('/auth/v1/verify'),
+      action_url: expect.stringContaining('/auth/verify/'),
       otp_code: '123456',
       support_email: 'support@example.com',
       product_name: 'Copilot',
       recipient_email: 'user@example.com',
       logo_url:
-        'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
+        'https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png',
     })
     expect(message.html).toContain(
-      'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
+      'https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png',
     )
   })
 
@@ -113,9 +123,9 @@ describe('send-auth-email template routing', () => {
       templateId: 'template-email-change-current',
     })
     expect(messages[0].variables.otp_code).toBe('111111')
-    expect(
-      new URL(messages[0].variables.action_url).searchParams.get('token_hash')
-    ).toBe('current-address-hash')
+    expect(new URL(messages[0].variables.action_url).pathname).toBe(
+      '/auth/verify/email_change/current-address-hash'
+    )
 
     expect(messages[1]).toMatchObject({
       to: 'new@example.com',
@@ -124,9 +134,9 @@ describe('send-auth-email template routing', () => {
       templateId: 'template-email-change-new',
     })
     expect(messages[1].variables.otp_code).toBe('222222')
-    expect(
-      new URL(messages[1].variables.action_url).searchParams.get('token_hash')
-    ).toBe('new-address-hash')
+    expect(new URL(messages[1].variables.action_url).pathname).toBe(
+      '/auth/verify/email_change/new-address-hash'
+    )
   })
 
   it('throws when a secure email change payload omits the new email address', () => {

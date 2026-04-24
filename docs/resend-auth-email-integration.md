@@ -7,7 +7,7 @@ Copilot auth email delivery now uses Supabase Auth Send Email Hook plus Resend.
 1. Supabase Auth creates the auth token for signup, invite, magic link, recovery, reauthentication, or email change.
 2. Supabase calls `supabase/functions/send-auth-email`.
 3. The Edge Function verifies the Standard Webhooks signature using `SEND_EMAIL_HOOK_SECRET`.
-4. The function builds a Supabase `/auth/v1/verify` URL using `SUPABASE_URL`, the token hash, action type, and `redirect_to`.
+4. The function builds an app-hosted `/auth/verify/:type/:tokenHash` URL when `redirect_to` or `site_url` provides an app origin. That route redirects to Supabase `/auth/v1/verify` with the token hash intact.
 5. The function sends the message through Resend.
 6. If a matching `RESEND_TEMPLATE_AUTH_*` value is configured, Resend sends the published template with variables. If not, the function sends fallback HTML that matches the Paper email panel for development.
 
@@ -23,7 +23,7 @@ supabase secrets set \
   AUTH_EMAIL_REPLY_TO="support@your-domain.com" \
   AUTH_SUPPORT_EMAIL="support@your-domain.com" \
   AUTH_PRODUCT_NAME="Copilot" \
-  AUTH_EMAIL_LOGO_URL="https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png"
+  AUTH_EMAIL_LOGO_URL="https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png"
 ```
 
 Set these after publishing the matching Resend Templates:
@@ -69,7 +69,7 @@ public/images/copilot-logo-gradient-email-v1.png
 https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png
 ```
 
-Until `copilot.energeticdebt.com` is live, `AUTH_EMAIL_LOGO_URL` points at the Vercel production alias. After DNS and the app deployment are verified, update `AUTH_EMAIL_LOGO_URL` and republish the Resend templates if you want email previews to use the branded app CDN URL.
+Auth emails should point users at app-hosted verification URLs such as `https://copilot.energeticdebt.com/auth/verify/recovery/:tokenHash`. This keeps the token in the path, then redirects to Supabase with the correct query string.
 
 ## Resend Setup
 
@@ -78,7 +78,7 @@ Until `copilot.energeticdebt.com` is live, `AUTH_EMAIL_LOGO_URL` points at the V
 3. Use the template IDs or aliases in the `RESEND_TEMPLATE_AUTH_*` secrets.
 4. Disable click/open tracking for auth emails so Supabase verification links are not rewritten.
 
-Each template receives `action_url`, `otp_code`, `support_email`, `product_name`, `recipient_email`, and `logo_url`. The `logo_url` value must point to a public HTTPS image URL. For production, this uses the hosted Vercel asset at `https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png`.
+Each template receives `action_url`, `otp_code`, `support_email`, `product_name`, `recipient_email`, and `logo_url`. The `logo_url` value must point to a public HTTPS image URL. For production, this uses the hosted app asset at `https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png`.
 
 To create or update the eight templates through the Resend API, use a temporary full-access Resend API key and run:
 
