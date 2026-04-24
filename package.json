@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest",
+    "resend:publish-auth-templates": "node scripts/publish-resend-auth-templates.mjs",
     "test:run": "vitest run"
   },
   "dependencies": {
