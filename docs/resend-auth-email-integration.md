@@ -23,7 +23,7 @@ supabase secrets set \
   AUTH_EMAIL_REPLY_TO="support@your-domain.com" \
   AUTH_SUPPORT_EMAIL="support@your-domain.com" \
   AUTH_PRODUCT_NAME="Copilot" \
-  AUTH_EMAIL_LOGO_URL="https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png"
+  AUTH_EMAIL_LOGO_URL="https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png"
 ```
 
 Set these after publishing the matching Resend Templates:
@@ -69,7 +69,7 @@ public/images/copilot-logo-gradient-email-v1.png
 https://copilot.energeticdebt.com/images/copilot-logo-gradient-email-v1.png
 ```
 
-Until `copilot.energeticdebt.com` is live, `AUTH_EMAIL_LOGO_URL` points at the public Supabase Storage copy. After DNS and the app deployment are verified, update `AUTH_EMAIL_LOGO_URL` and republish the Resend templates if you want email previews to use the branded app CDN URL.
+Until `copilot.energeticdebt.com` is live, `AUTH_EMAIL_LOGO_URL` points at the Vercel production alias. After DNS and the app deployment are verified, update `AUTH_EMAIL_LOGO_URL` and republish the Resend templates if you want email previews to use the branded app CDN URL.
 
 ## Resend Setup
 
@@ -78,7 +78,7 @@ Until `copilot.energeticdebt.com` is live, `AUTH_EMAIL_LOGO_URL` points at the p
 3. Use the template IDs or aliases in the `RESEND_TEMPLATE_AUTH_*` secrets.
 4. Disable click/open tracking for auth emails so Supabase verification links are not rewritten.
 
-Each template receives `action_url`, `otp_code`, `support_email`, `product_name`, `recipient_email`, and `logo_url`. The `logo_url` value must point to a public HTTPS image URL. For production, this uses the hosted Supabase Storage asset at `https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png`.
+Each template receives `action_url`, `otp_code`, `support_email`, `product_name`, `recipient_email`, and `logo_url`. The `logo_url` value must point to a public HTTPS image URL. For production, this uses the hosted Vercel asset at `https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png`.
 
 To create or update the eight templates through the Resend API, use a temporary full-access Resend API key and run:
 

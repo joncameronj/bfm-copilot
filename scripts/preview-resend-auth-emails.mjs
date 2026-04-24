@@ -17,7 +17,7 @@ const variables = {
   support_email: 'support@beyondfunctionalmedicine.com',
   product_name: 'Copilot',
   recipient_email: 'joncameronj@gmail.com',
-  logo_url: 'https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png',
+  logo_url: 'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
 }
 
 const templates = parseTemplates(await readFile(TEMPLATE_DOC, 'utf8'))

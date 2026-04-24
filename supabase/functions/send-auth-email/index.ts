@@ -61,7 +61,7 @@ Deno.serve(async (request: Request) => {
       productName: Deno.env.get('AUTH_PRODUCT_NAME') || 'Copilot',
       logoUrl:
         Deno.env.get('AUTH_EMAIL_LOGO_URL') ||
-        'https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png',
+        'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
       templateIds: readTemplateIds(),
     })
 

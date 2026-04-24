@@ -77,10 +77,10 @@ describe('send-auth-email template routing', () => {
       product_name: 'Copilot',
       recipient_email: 'user@example.com',
       logo_url:
-        'https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png',
+        'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
     })
     expect(message.html).toContain(
-      'https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png',
+      'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
     )
   })
 

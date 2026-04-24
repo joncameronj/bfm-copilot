@@ -40,7 +40,7 @@ const VARIABLES = [
     key: 'logo_url',
     type: 'string',
     fallbackValue:
-      'https://awdvlfjiusotgbumoojt.supabase.co/storage/v1/object/public/email-assets/copilot-logo-gradient-email-v1.png',
+      'https://bfm-copilot.vercel.app/images/copilot-logo-gradient-email-v1.png',
   },
 ]
 
