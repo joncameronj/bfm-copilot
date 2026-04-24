@@ -197,7 +197,7 @@ export function buildVerifyUrl(params: {
     '/auth/v1/verify',
     ensureTrailingSlash(params.supabaseUrl)
   )
-  url.searchParams.set('token_hash', tokenHash)
+  url.searchParams.set('token', tokenHash)
   url.searchParams.set('type', params.type || 'signup')
 
   if (params.redirectTo) {

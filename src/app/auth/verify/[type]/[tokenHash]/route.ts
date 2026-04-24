@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   )
   const redirectTo = new URL(nextPath, requestUrl.origin)
   const verifyUrl = new URL('/auth/v1/verify', supabaseUrl)
-  verifyUrl.searchParams.set('token_hash', decodedTokenHash)
+  verifyUrl.searchParams.set('token', decodedTokenHash)
   verifyUrl.searchParams.set('type', type || 'signup')
   verifyUrl.searchParams.set('redirect_to', redirectTo.toString())
 
