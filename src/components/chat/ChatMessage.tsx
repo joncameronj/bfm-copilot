@@ -11,7 +11,8 @@ import { ActionButtons } from './ActionButtons'
 import { MessageActions } from './MessageActions'
 import { FileAttachments } from './FileAttachments'
 import type { Message, ReasoningData, AgentStep, ActionButton, Source, RagChunk } from '@/types/chat'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useTheme } from '@/providers/ThemeProvider'
 
 // Helper to extract and remove source citations from content
@@ -34,6 +35,41 @@ function extractSources(content: string): { cleanContent: string; inlineSources:
   })
 
   return { cleanContent: cleanContent.trim(), inlineSources }
+}
+
+const markdownComponents: Components = {
+  table: ({ node: _node, ...props }) => (
+    <div className="not-prose my-4 w-full overflow-x-auto rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
+      <table
+        className="min-w-full border-collapse text-left text-sm leading-relaxed"
+        {...props}
+      />
+    </div>
+  ),
+  thead: ({ node: _node, ...props }) => (
+    <thead
+      className="bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+      {...props}
+    />
+  ),
+  th: ({ node: _node, ...props }) => (
+    <th
+      className="border-b border-neutral-200 px-3 py-2 align-top dark:border-neutral-700"
+      {...props}
+    />
+  ),
+  td: ({ node: _node, ...props }) => (
+    <td
+      className="border-b border-neutral-100 px-3 py-2 align-top text-neutral-700 dark:border-neutral-800 dark:text-neutral-200"
+      {...props}
+    />
+  ),
+  tr: ({ node: _node, ...props }) => (
+    <tr
+      className="last:[&>td]:border-b-0"
+      {...props}
+    />
+  ),
 }
 
 interface ChatMessageProps {
@@ -150,7 +186,12 @@ export function ChatMessage({
                       {isInterrupted ? (
                         <span className="text-red-400 italic">{message.content}</span>
                       ) : (
-                        <ReactMarkdown>{cleanContent}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
+                          {cleanContent}
+                        </ReactMarkdown>
                       )}
                       {isStreaming && (
                         <Image

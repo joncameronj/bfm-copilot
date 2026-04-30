@@ -19,9 +19,9 @@ import Placeholder from '@tiptap/extension-placeholder'
 
 interface ChatInputProps {
   onSend: (
-    message: string,
-    files?: File[],
-    options?: { webSearch?: boolean; deepDive?: boolean }
+    _message: string,
+    _files?: File[],
+    _options?: { webSearch?: boolean; deepDive?: boolean }
   ) => void
   onStop?: () => void
   onMoveToBackground?: () => void
@@ -300,7 +300,7 @@ export function ChatInput({
         <div className="input-container-chatgpt flex items-center gap-2 p-3">
           {/* Plus (+) dropdown menu */}
           <Dropdown
-            position="below"
+            position="above"
             align="left"
             trigger={
               <button
