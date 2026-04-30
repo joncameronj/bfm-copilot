@@ -3,17 +3,14 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useTheme } from '@/providers/ThemeProvider'
 import toast from 'react-hot-toast'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { resolvedTheme } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -58,17 +55,6 @@ function LoginContent() {
     <div>
       {/* Mobile Warning - Show only on small screens */}
       <div className="md:hidden text-center">
-        <div className="flex justify-center mb-6">
-          <Image
-            src={resolvedTheme === 'dark'
-              ? '/images/copilot-logo-gradient-dark.svg'
-              : '/images/copilot-logo-gradient.svg'}
-            alt="Copilot"
-            width={180}
-            height={44}
-            priority
-          />
-        </div>
         <p className="text-lg font-bold tracking-[-0.05em] text-neutral-900 dark:text-neutral-50 leading-relaxed">
           For best experience, login with your desktop
         </p>
