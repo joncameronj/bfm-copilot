@@ -56,9 +56,10 @@ export function BloodPanelUpload({ patientId, onComplete, className }: BloodPane
     }
   }
 
-  // Poll for analysis completion once the eval agent is running
+  // Poll while extraction/eval is in progress. The first API response usually
+  // reports "extracting"; polling is what advances it to analyzing/finalizing.
   useEffect(() => {
-    if (stage !== 'analyzing' || !uploadId) return
+    if ((stage !== 'extracting' && stage !== 'analyzing') || !uploadId) return
 
     pollRef.current = setInterval(async () => {
       try {

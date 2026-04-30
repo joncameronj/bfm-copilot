@@ -51,7 +51,7 @@ describe('send-auth-email template routing', () => {
 
     expect(url.origin).toBe('https://project-ref.supabase.co')
     expect(url.pathname).toBe('/auth/v1/verify')
-    expect(url.searchParams.get('token')).toBe('hash-123')
+    expect(url.searchParams.get('token_hash')).toBe('hash-123')
   })
 
   it.each([

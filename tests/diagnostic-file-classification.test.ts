@@ -38,6 +38,8 @@ describe('diagnostic file classification', () => {
     expect(classifyDiagnosticFile('HRV In Office Template PDF.pdf', 'application/pdf')).toBe('hrv')
     expect(classifyDiagnosticFile('Ortho 2-3-26.pdf', 'application/pdf')).toBe('ortho')
     expect(classifyDiagnosticFile('Valsalva 2-24-26.pdf', 'application/pdf')).toBe('valsalva')
+    expect(classifyDiagnosticFile('Case Study 2 HRV Ortho.pdf', 'application/pdf')).toBe('ortho')
+    expect(classifyDiagnosticFile('Case Study 2 HRV Valsalva.pdf', 'application/pdf')).toBe('valsalva')
     expect(classifyDiagnosticFile('UA Results 1st Test Results.pdf', 'application/pdf')).toBe('urinalysis')
   })
 

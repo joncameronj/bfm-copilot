@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import type { UserRole } from '@/types/roles'
 
 interface EvalModeContextType {
   isEvalModeEnabled: boolean
@@ -15,6 +16,7 @@ const EvalModeContext = createContext<EvalModeContextType | undefined>(undefined
 interface EvalModeProviderProps {
   children: ReactNode
   userEmail?: string | null
+  userRole?: UserRole | null
 }
 
 // Users who are eligible for eval mode
@@ -24,7 +26,7 @@ const EVAL_MODE_USERS = [
   'patientadvocate@shslasvegas.com',
 ]
 
-export function EvalModeProvider({ children, userEmail }: EvalModeProviderProps) {
+export function EvalModeProvider({ children, userEmail, userRole }: EvalModeProviderProps) {
   const [isEvalModeEnabled, setIsEvalModeEnabled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -87,7 +89,7 @@ export function EvalModeProvider({ children, userEmail }: EvalModeProviderProps)
   return (
     <EvalModeContext.Provider
       value={{
-        isEvalModeEnabled: isEvalModeUser && isEvalModeEnabled,
+        isEvalModeEnabled: isEvalModeUser && userRole !== 'practitioner' && isEvalModeEnabled,
         isLoading,
         toggleEvalMode,
         isEvalModeUser,

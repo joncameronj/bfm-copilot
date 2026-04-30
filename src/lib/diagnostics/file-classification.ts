@@ -72,10 +72,10 @@ export function classifyDiagnosticFile(
 ): DiagnosticType {
   const lower = normalizeFilename(filename)
 
-  if (hasAnyKeyword(lower, ['pulse', 'dpulse', 'depuls', 'd-pulse', 'd pulse'])) return 'd_pulse'
-  if (hasAnyKeyword(lower, ['hrv'])) return 'hrv'
   if (hasAnyKeyword(lower, ['ortho'])) return 'ortho'
   if (hasAnyKeyword(lower, ['valsalva'])) return 'valsalva'
+  if (hasAnyKeyword(lower, ['pulse', 'dpulse', 'depuls', 'd-pulse', 'd pulse'])) return 'd_pulse'
+  if (hasAnyKeyword(lower, ['hrv'])) return 'hrv'
   if (hasAnyKeyword(lower, ['urinalysis', 'urine']) || hasDelimitedToken(lower, 'ua')) return 'urinalysis'
   if (hasAnyKeyword(lower, ['vcs', 'visual contrast'])) return 'vcs'
   if (hasAnyKeyword(lower, ['brainwave', 'eeg', 'qeeg'])) return 'brainwave'

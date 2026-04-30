@@ -1,4 +1,6 @@
+import { type EmailOtpType } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +9,15 @@ const DEFAULT_NEXT_PATHS: Record<string, string> = {
   invite: '/update-password',
   email_change: '/settings',
 }
+
+const SUPPORTED_EMAIL_OTP_TYPES = new Set<string>([
+  'signup',
+  'invite',
+  'magiclink',
+  'recovery',
+  'email_change',
+  'email',
+])
 
 interface RouteContext {
   params: Promise<unknown>
@@ -19,31 +30,61 @@ export async function GET(request: NextRequest, context: RouteContext) {
     tokenHash?: string
   }
   const decodedTokenHash = decodeURIComponent(tokenHash || '')
+  const authType = getEmailOtpType(type)
 
   if (!decodedTokenHash) {
-    return NextResponse.redirect(
-      new URL('/login?error=auth_link_invalid', requestUrl.origin)
-    )
+    return redirectToInvalidLink(requestUrl, authType)
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (!supabaseUrl) {
+  const nextPath = getSafeNextPath(
+    requestUrl.searchParams.get('next'),
+    authType || 'signup'
+  )
+  const redirectTo = new URL(nextPath, requestUrl.origin)
+
+  if (!authType) {
+    return redirectToInvalidLink(requestUrl, authType)
+  }
+
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.verifyOtp({
+      type: authType,
+      token_hash: decodedTokenHash,
+    })
+
+    if (error) {
+      console.error('Auth link verification failed:', error)
+      return redirectToInvalidLink(requestUrl, authType)
+    }
+  } catch (error) {
+    console.error('Auth link verification crashed:', error)
     return NextResponse.redirect(
       new URL('/login?error=auth_configuration_error', requestUrl.origin)
     )
   }
 
-  const nextPath = getSafeNextPath(
-    requestUrl.searchParams.get('next'),
-    type || 'signup'
-  )
-  const redirectTo = new URL(nextPath, requestUrl.origin)
-  const verifyUrl = new URL('/auth/v1/verify', supabaseUrl)
-  verifyUrl.searchParams.set('token', decodedTokenHash)
-  verifyUrl.searchParams.set('type', type || 'signup')
-  verifyUrl.searchParams.set('redirect_to', redirectTo.toString())
+  return NextResponse.redirect(redirectTo)
+}
 
-  return NextResponse.redirect(verifyUrl)
+function getEmailOtpType(type: string | undefined): EmailOtpType | null {
+  if (!type || !SUPPORTED_EMAIL_OTP_TYPES.has(type)) return null
+  return type as EmailOtpType
+}
+
+function redirectToInvalidLink(
+  requestUrl: URL,
+  type: EmailOtpType | null
+): NextResponse {
+  if (type === 'recovery' || type === 'invite') {
+    return NextResponse.redirect(
+      new URL('/reset-password?error=auth_link_invalid', requestUrl.origin)
+    )
+  }
+
+  return NextResponse.redirect(
+    new URL('/login?error=auth_link_invalid', requestUrl.origin)
+  )
 }
 
 function getSafeNextPath(next: string | null, type: string): string {

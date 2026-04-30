@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +11,14 @@ export default function ResetPasswordPage() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') !== 'auth_link_invalid') return
+
+    toast.error('Reset link is invalid or expired. Request a new link.')
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

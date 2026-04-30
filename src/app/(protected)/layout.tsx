@@ -28,7 +28,7 @@ export default async function ProtectedLayout({
 
   return (
     <RoleViewProvider actualRole={userRole}>
-      <EvalModeProvider userEmail={user.email}>
+      <EvalModeProvider userEmail={user.email} userRole={userRole}>
         <BackgroundJobsWrapper
           userId={user.id}
           sidebarUser={{
